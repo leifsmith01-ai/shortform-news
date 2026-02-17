@@ -4,8 +4,8 @@
 import { mockApiService } from './mockApiService';
 import { newsApiClient } from './newsApiClient';
 
-// Use mock API if explicitly set to true, otherwise use real API
-const USE_MOCK_API = import.meta.env.VITE_USE_MOCK_API === 'true';
+// Use mock API ONLY if explicitly set to 'true', otherwise always use real API
+const USE_MOCK_API = String(import.meta.env.VITE_USE_MOCK_API).toLowerCase() === 'true';
 
 console.log(`Using ${USE_MOCK_API ? 'MOCK' : 'REAL'} API`);
 
