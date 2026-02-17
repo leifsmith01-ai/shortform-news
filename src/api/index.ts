@@ -1,22 +1,27 @@
-// Unified API Service
-// Automatically switches between mock API (for development) and real API (for production)
+// src/api/index.ts
+// Automatically switches between mock API (development) and real API (production)
 
-import { apiClient } from './apiClient';
 import { mockApiService } from './mockApiService';
+import { newsApiClient } from './newsApiClient';
 
-const USE_MOCK_API = import.meta.env.VITE_USE_MOCK_API === 'true' || !import.meta.env.VITE_API_URL;
+// Use mock API if explicitly set to true, otherwise use real API
+const USE_MOCK_API = import.meta.env.VITE_USE_MOCK_API === 'true';
 
-type ApiClient = typeof apiClient | typeof mockApiService;
+console.log(`Using ${USE_MOCK_API ? 'MOCK' : 'REAL'} API`);
 
 class ApiService {
-  private client: ApiClient;
+  private client: any;
 
   constructor() {
-    this.client = USE_MOCK_API ? mockApiService : apiClient;
-    console.log(`Using ${USE_MOCK_API ? 'MOCK' : 'REAL'} API`);
+    this.client = USE_MOCK_API ? mockApiService : newsApiClient;
   }
 
-  async fetchNews(params: { countries: string[]; categories: string[]; searchQuery?: string; dateRange?: string }) {
+  async fetchNews(params: {
+    countries: string[];
+    categories: string[];
+    searchQuery?: string;
+    dateRange?: string;
+  }) {
     try {
       return await this.client.fetchNews(params);
     } catch (error) {
@@ -25,20 +30,18 @@ class ApiService {
     }
   }
 
-  async getCachedNews(date: string, country: string, category: string) {
+  async getCachedNews(date?: string, country?: string, category?: string) {
     try {
       return await this.client.getCachedNews(date, country, category);
     } catch (error) {
-      console.error('Failed to get cached news:', error);
       return null;
     }
   }
 
-  async cacheNews(data: { fetch_date: string; country: string; category: string; articles: unknown[] }) {
+  async cacheNews(data: any) {
     try {
       return await this.client.cacheNews(data);
     } catch (error) {
-      console.error('Failed to cache news:', error);
       return null;
     }
   }
@@ -47,16 +50,14 @@ class ApiService {
     try {
       return await this.client.getSavedArticles();
     } catch (error) {
-      console.error('Failed to get saved articles:', error);
       return [];
     }
   }
 
-  async saveArticle(article: Record<string, unknown>) {
+  async saveArticle(article: any) {
     try {
       return await this.client.saveArticle(article);
     } catch (error) {
-      console.error('Failed to save article:', error);
       throw error;
     }
   }
@@ -65,7 +66,6 @@ class ApiService {
     try {
       return await this.client.unsaveArticle(articleId);
     } catch (error) {
-      console.error('Failed to unsave article:', error);
       throw error;
     }
   }
@@ -74,30 +74,26 @@ class ApiService {
     try {
       return await this.client.getReadingHistory();
     } catch (error) {
-      console.error('Failed to get reading history:', error);
       return [];
     }
   }
 
-  async addToHistory(article: Record<string, unknown>) {
+  async addToHistory(article: any) {
     try {
       return await this.client.addToHistory(article);
     } catch (error) {
-      console.error('Failed to add to history:', error);
       return null;
     }
   }
 
-  async summarizeWithClaude(articles: unknown[]) {
+  async summarizeWithClaude(articles: any[]) {
     try {
       return await this.client.summarizeWithClaude(articles);
     } catch (error) {
-      console.error('Failed to summarize with Claude:', error);
       throw error;
     }
   }
 }
 
-// Export singleton instance
 export const api = new ApiService();
 export default api;
