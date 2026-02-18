@@ -35,7 +35,7 @@ function UserInitialiser() {
   return null
 }
 
-// Wrapper that redirects unauthenticated users to sign-in
+// Wrapper that redirects unauthenticated users to sign-in (used only for auth-required pages)
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return (
     <>
@@ -54,15 +54,38 @@ export default function App() {
         <Route path="/sign-in/*" element={<SignInPage />} />
         <Route path="/sign-up/*" element={<SignUpPage />} />
 
-        {/* Protected app routes */}
+        {/* Public app routes — accessible without signing in */}
         <Route path="/" element={
-          <ProtectedRoute>
-            <Layout currentPageName="/">
-              <Home />
-            </Layout>
-          </ProtectedRoute>
+          <Layout currentPageName="/">
+            <Home />
+          </Layout>
         } />
 
+        <Route path="/finance" element={
+          <Layout currentPageName="/finance">
+            <Finance />
+          </Layout>
+        } />
+
+        <Route path="/personalized" element={
+          <Layout currentPageName="/personalized">
+            <PlaceholderPage title="Personalized Feed" />
+          </Layout>
+        } />
+
+        <Route path="/keywords" element={
+          <Layout currentPageName="/keywords">
+            <PlaceholderPage title="Keyword Tracking" />
+          </Layout>
+        } />
+
+        <Route path="/alerts" element={
+          <Layout currentPageName="/alerts">
+            <PlaceholderPage title="News Alerts" />
+          </Layout>
+        } />
+
+        {/* Auth-required routes — saving and history need a user ID */}
         <Route path="/saved" element={
           <ProtectedRoute>
             <Layout currentPageName="/saved">
@@ -75,38 +98,6 @@ export default function App() {
           <ProtectedRoute>
             <Layout currentPageName="/history">
               <History />
-            </Layout>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/finance" element={
-          <ProtectedRoute>
-            <Layout currentPageName="/finance">
-              <Finance />
-            </Layout>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/personalized" element={
-          <ProtectedRoute>
-            <Layout currentPageName="/personalized">
-              <PlaceholderPage title="Personalized Feed" />
-            </Layout>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/keywords" element={
-          <ProtectedRoute>
-            <Layout currentPageName="/keywords">
-              <PlaceholderPage title="Keyword Tracking" />
-            </Layout>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/alerts" element={
-          <ProtectedRoute>
-            <Layout currentPageName="/alerts">
-              <PlaceholderPage title="News Alerts" />
             </Layout>
           </ProtectedRoute>
         } />

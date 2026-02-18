@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Home, Bookmark, Clock, Sparkles, Tag, Bell, TrendingUp } from 'lucide-react';
-import { UserButton } from '@clerk/clerk-react';
+import { Home, Bookmark, Clock, Sparkles, Tag, Bell, TrendingUp, LogIn } from 'lucide-react';
+import { UserButton, SignedIn, SignedOut } from '@clerk/clerk-react';
 
 export default function Layout({ children, currentPageName }: { children: React.ReactNode; currentPageName: string }) {
   const navItems = [
@@ -45,14 +45,25 @@ export default function Layout({ children, currentPageName }: { children: React.
           })}
         </nav>
 
-        {/* Clerk UserButton — handles avatar, profile & sign out */}
-        <UserButton
-          appearance={{
-            elements: {
-              avatarBox: 'w-10 h-10 rounded-xl',
-            },
-          }}
-        />
+        {/* Signed-in: avatar + profile menu. Signed-out: sign-in button */}
+        <SignedIn>
+          <UserButton
+            appearance={{
+              elements: {
+                avatarBox: 'w-10 h-10 rounded-xl',
+              },
+            }}
+          />
+        </SignedIn>
+        <SignedOut>
+          <Link
+            to="/sign-in"
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+            title="Sign In"
+          >
+            <LogIn className="w-5 h-5" />
+          </Link>
+        </SignedOut>
       </aside>
 
       {/* Main Content */}
