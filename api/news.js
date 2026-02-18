@@ -52,6 +52,15 @@ const GUARDIAN_SECTION_MAP = {
   world:         'world'
 };
 
+// Guardian native country sections — used instead of keyword search for geographic specificity.
+// These are real Guardian section IDs that guarantee articles are from/about that country.
+// Countries NOT listed here fall back to keyword search (e.g. "Brazil technology").
+const GUARDIAN_COUNTRY_SECTIONS = {
+  au: 'australia-news',
+  gb: 'uk-news',
+  us: 'us-news',
+};
+
 // Helper: generate cache key
 function getCacheKey(country, category) {
   const today = new Date().toISOString().split('T')[0];
@@ -103,20 +112,42 @@ async function fetchFromNewsAPI(country, category, apiKey) {
 
 // Helper: fetch from The Guardian (fallback for countries not in NewsAPI)
 async function fetchFromGuardian(country, category, apiKey) {
-  const countryName = COUNTRY_NAMES_FOR_GUARDIAN[country] || country;
-  const guardianSection = GUARDIAN_SECTION_MAP[category] || 'news';
+  const countrySection = GUARDIAN_COUNTRY_SECTIONS[country]; // e.g. 'australia-news'
+  const categorySection = GUARDIAN_SECTION_MAP[category] || 'news';
 
-  // Search "<Country> <category>" — Guardian has no native country filter
-  const searchQuery = category === 'world' ? countryName : `${countryName} ${category}`;
+  let params;
 
-  const params = new URLSearchParams({
-    q: searchQuery,
-    section: guardianSection,
-    'show-fields': 'trailText,thumbnail,byline',
-    'page-size': '10',
-    'order-by': 'newest',
-    'api-key': apiKey || 'test', // 'test' = Guardian anonymous tier (500 calls/day)
-  });
+  if (countrySection) {
+    // PREFERRED: use Guardian's native country section for geographic accuracy.
+    // For non-world categories, add a keyword filter to narrow to the topic.
+    // e.g. section=australia-news + q=technology
+    const queryParams = {
+      section: countrySection,
+      'show-fields': 'trailText,thumbnail,byline',
+      'page-size': '10',
+      'order-by': 'newest',
+      'api-key': apiKey || 'test',
+    };
+    if (category !== 'world') {
+      queryParams.q = category; // narrow within the country section by topic keyword
+    }
+    params = new URLSearchParams(queryParams);
+    console.log(`  Guardian: section=${countrySection} q=${category !== 'world' ? category : '(none)'}`);
+  } else {
+    // FALLBACK: keyword search for countries without a dedicated Guardian section.
+    // e.g. q="Brazil technology" + section=technology
+    const countryName = COUNTRY_NAMES_FOR_GUARDIAN[country] || country;
+    const searchQuery = category === 'world' ? countryName : `${countryName} ${category}`;
+    params = new URLSearchParams({
+      q: searchQuery,
+      section: categorySection,
+      'show-fields': 'trailText,thumbnail,byline',
+      'page-size': '10',
+      'order-by': 'newest',
+      'api-key': apiKey || 'test',
+    });
+    console.log(`  Guardian: keyword search q="${searchQuery}" section=${categorySection}`);
+  }
 
   const url = `https://content.guardianapis.com/search?${params.toString()}`;
   const response = await fetch(url);
