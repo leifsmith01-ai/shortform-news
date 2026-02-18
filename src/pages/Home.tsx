@@ -373,7 +373,7 @@ export default function Home() {
                           {(index + 1) % 6 === 0 && (
                             <div className="col-span-full">
                               <AdUnit
-                                slot="REPLACE_WITH_SLOT_ID"
+                                slot="2844757664"
                                 format="horizontal"
                                 className="rounded-xl overflow-hidden bg-stone-100 min-h-[90px]"
                               />

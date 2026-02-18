@@ -85,7 +85,7 @@ export default function SavedArticles() {
       {/* Ad banner between header and content */}
       <div className="px-4 lg:px-8 pt-4">
         <AdUnit
-          slot="REPLACE_WITH_SLOT_ID"
+          slot="2844757664"
           format="horizontal"
           className="rounded-xl overflow-hidden bg-stone-100 min-h-[90px]"
         />
