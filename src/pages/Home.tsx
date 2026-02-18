@@ -52,9 +52,24 @@ const CATEGORY_NAMES = {
   sports: 'Sports', entertainment: 'Entertainment', politics: 'Politics', world: 'World'
 };
 
+function getStoredList(key: string, fallback: string[]): string[] {
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return fallback;
+}
+
 export default function Home() {
-  const [selectedCountries, setSelectedCountries] = useState(['us']);
-  const [selectedCategories, setSelectedCategories] = useState(['technology']);
+  const [selectedCountries, setSelectedCountries] = useState<string[]>(() =>
+    getStoredList('selectedCountries', ['us'])
+  );
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(() =>
+    getStoredList('selectedCategories', ['technology'])
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState('week');
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -64,6 +79,15 @@ export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [groupBy, setGroupBy] = useState(null);
+
+  // Persist filter selections across refreshes
+  useEffect(() => {
+    localStorage.setItem('selectedCountries', JSON.stringify(selectedCountries));
+  }, [selectedCountries]);
+
+  useEffect(() => {
+    localStorage.setItem('selectedCategories', JSON.stringify(selectedCategories));
+  }, [selectedCategories]);
 
   const fetchNews = useCallback(async () => {
     if (selectedCountries.length === 0 || selectedCategories.length === 0) {
@@ -334,7 +358,11 @@ export default function Home() {
                   exit={{ opacity: 0 }}
                 >
                   {groupBy && groupBy !== 'none' ? (
-                    <GroupedArticles articles={articles} groupBy={groupBy} />
+                    <GroupedArticles
+                      articles={articles}
+                      groupBy={groupBy}
+                      selectedKeys={groupBy === 'country' ? selectedCountries : selectedCategories}
+                    />
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                       {articles.map((article, index) => (

@@ -91,18 +91,18 @@ const generateMockArticles = (countries: string[], categories: string[], count =
 
       for (let i = 0; i < Math.min(count, categoryHeadlines.length); i++) {
         articles.push({
-          title: categoryHeadlines[i],
+          title: `[${country.toUpperCase()}] ${categoryHeadlines[i]}`,
           source: sources[Math.floor(Math.random() * sources.length)],
-          image_url: `https://source.unsplash.com/800x600/?${category},news&sig=${Math.random()}`,
+          image_url: `https://source.unsplash.com/800x600/?${category},news&sig=${country}-${i}`,
           country: country,
           category: category,
           url: `https://example.com/news/${category}-${country}-${i}`,
           time_ago: ['2 hours ago', '5 hours ago', '1 day ago', '2 days ago'][Math.floor(Math.random() * 4)],
           views: Math.floor(Math.random() * 50000) + 10000,
           summary_points: [
-            `Key development in ${category} sector shows significant progress and potential impact.`,
-            `Experts analyze implications for stakeholders and broader market trends.`,
-            `Officials and analysts provide context and future outlook for the situation.`
+            `Key development in the ${country.toUpperCase()} ${category} sector shows significant progress.`,
+            `Experts in ${country.toUpperCase()} analyze implications for local stakeholders and broader trends.`,
+            `Officials and analysts provide context and future outlook for the ${country.toUpperCase()} situation.`
           ]
         });
       }

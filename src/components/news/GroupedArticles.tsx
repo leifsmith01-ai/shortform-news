@@ -38,26 +38,46 @@ const CATEGORY_NAMES = {
   sports: 'Sports', entertainment: 'Entertainment', politics: 'Politics', world: 'World'
 };
 
-export default function GroupedArticles({ articles, groupBy }) {
+// NewsAPI free tier only supports top-headlines for these country codes
+const SUPPORTED_COUNTRIES = new Set([
+  'ae', 'ar', 'at', 'au', 'be', 'bg', 'br', 'ca', 'ch', 'cn', 'co', 'cu', 'cz',
+  'de', 'eg', 'fr', 'gb', 'gr', 'hk', 'hu', 'id', 'ie', 'il', 'in', 'it', 'jp',
+  'kr', 'lt', 'lv', 'ma', 'mx', 'my', 'ng', 'nl', 'no', 'nz', 'ph', 'pl', 'pt',
+  'ro', 'rs', 'ru', 'sa', 'se', 'sg', 'si', 'sk', 'th', 'tr', 'tw', 'ua', 'us',
+  've', 'za'
+]);
+
+export default function GroupedArticles({ articles, groupBy, selectedKeys = [] }: {
+  articles: any[];
+  groupBy: string;
+  selectedKeys?: string[];
+}) {
   const grouped = React.useMemo(() => {
-    const groups = {};
+    const groups: Record<string, any[]> = {};
+    // Pre-populate all selected keys so empty ones are visible
+    selectedKeys.forEach(key => { groups[key] = []; });
     articles.forEach(article => {
       const key = groupBy === 'country' ? article.country : article.category;
-      if (!groups[key]) {
-        groups[key] = [];
-      }
+      if (!groups[key]) groups[key] = [];
       groups[key].push(article);
     });
     return groups;
-  }, [articles, groupBy]);
+  }, [articles, groupBy, selectedKeys]);
 
-  const getGroupName = (key) => {
+  const getGroupName = (key: string) => {
     return groupBy === 'country' ? COUNTRY_NAMES[key] || key : CATEGORY_NAMES[key] || key;
+  };
+
+  const getEmptyReason = (key: string) => {
+    if (groupBy === 'country' && !SUPPORTED_COUNTRIES.has(key)) {
+      return 'Not available on free plan — NewsAPI only supports ~55 countries for top headlines.';
+    }
+    return 'No articles found for this selection. Try a different category or time period.';
   };
 
   return (
     <div className="space-y-12">
-      {Object.entries(grouped).map(([key, groupArticles]) => (
+      {Object.entries(grouped).map(([key, groupArticles]: [string, any[]]) => (
         <motion.div
           key={key}
           initial={{ opacity: 0, y: 20 }}
@@ -70,11 +90,18 @@ export default function GroupedArticles({ articles, groupBy }) {
               ({groupArticles.length} {groupArticles.length === 1 ? 'article' : 'articles'})
             </span>
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {groupArticles.map((article, index) => (
-              <NewsCard key={index} article={article} index={index} rank={index + 1} />
-            ))}
-          </div>
+          {groupArticles.length === 0 ? (
+            <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm max-w-xl">
+              <span className="text-lg leading-none mt-0.5">⚠️</span>
+              <p>{getEmptyReason(key)}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {groupArticles.map((article, index) => (
+                <NewsCard key={index} article={article} index={index} rank={index + 1} />
+              ))}
+            </div>
+          )}
         </motion.div>
       ))}
     </div>
