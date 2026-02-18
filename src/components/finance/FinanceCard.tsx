@@ -72,7 +72,7 @@ interface FinanceArticle {
   image_url: string;
   market: string;
   sector: string;
-  region: string;
+  region?: string;
   url: string;
   time_ago: string;
   views: number;

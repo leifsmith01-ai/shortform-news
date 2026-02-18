@@ -153,8 +153,8 @@ export default function Finance() {
                     setSelectedMarkets={setSelectedMarkets}
                     selectedSectors={selectedSectors}
                     setSelectedSectors={setSelectedSectors}
-                    selectedRegions={selectedRegions}
-                    setSelectedRegions={setSelectedRegions}
+                    selectedIndices={selectedIndices}
+                    setSelectedIndices={setSelectedIndices}
                     searchQuery={searchQuery}
                     setSearchQuery={setSearchQuery}
                     dateRange={dateRange}
