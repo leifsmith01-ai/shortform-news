@@ -140,7 +140,7 @@ async function generateSummary(article, geminiKey) {
 
   const content = `${article.title}. ${article.description || ''}`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${geminiKey}`;
 
   const response = await fetch(url, {
     method: 'POST',
@@ -163,9 +163,12 @@ Article: ${content}`
     })
   });
 
-  if (!response.ok) return null;
-
   const data = await response.json();
+  if (!response.ok) {
+    console.error(`Gemini error: ${data.error?.status} - ${data.error?.message?.slice(0, 100)}`);
+    return null;
+  }
+
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
   if (!text) return null;
