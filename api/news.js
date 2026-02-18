@@ -194,7 +194,7 @@ function formatArticle(article, country, category) {
     country: country,
     category: category,
     views: Math.floor(Math.random() * 5000) + 100,
-    summary: null
+    summary_points: null
   };
 }
 
@@ -213,7 +213,7 @@ function formatGuardianArticle(result, country, category) {
     country: country,
     category: category,
     views: Math.floor(Math.random() * 5000) + 100,
-    summary: null
+    summary_points: null
   };
 }
 
@@ -308,7 +308,7 @@ export default async function handler(req, res) {
           const summaryPromises = formattedArticles.slice(0, 5).map(async (article) => {
             try {
               const summary = await generateSummary(article, GEMINI_API_KEY);
-              if (summary) article.summary = summary;
+              if (summary) article.summary_points = summary;
             } catch (err) {
               console.error('Summary generation failed:', err.message);
             }
