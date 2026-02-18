@@ -18,7 +18,7 @@ import { fetchFinanceNews } from '@/api/financeApi';
 export default function Finance() {
   const [selectedMarkets, setSelectedMarkets] = useState(['stocks']);
   const [selectedSectors, setSelectedSectors] = useState(['tech']);
-  const [selectedRegions, setSelectedRegions] = useState(['us']);
+  const [selectedIndices, setSelectedIndices] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState('week');
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -42,7 +42,7 @@ export default function Finance() {
       const result = await fetchFinanceNews({
         markets: selectedMarkets,
         sectors: selectedSectors,
-        regions: selectedRegions,
+        indices: selectedIndices,
         searchQuery,
         dateRange,
       });
@@ -72,7 +72,7 @@ export default function Finance() {
     } finally {
       setLoading(false);
     }
-  }, [selectedMarkets, selectedSectors, selectedRegions, searchQuery, dateRange, groupBy]);
+  }, [selectedMarkets, selectedSectors, selectedIndices, searchQuery, dateRange, groupBy]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -125,8 +125,8 @@ export default function Finance() {
           setSelectedMarkets={setSelectedMarkets}
           selectedSectors={selectedSectors}
           setSelectedSectors={setSelectedSectors}
-          selectedRegions={selectedRegions}
-          setSelectedRegions={setSelectedRegions}
+          selectedIndices={selectedIndices}
+          setSelectedIndices={setSelectedIndices}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           dateRange={dateRange}

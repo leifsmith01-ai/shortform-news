@@ -2,7 +2,7 @@ import React from 'react';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { TrendingUp, ChevronDown, Search, Calendar, Globe } from 'lucide-react';
+import { TrendingUp, ChevronDown, Search, Calendar, BarChart2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
   Collapsible,
@@ -37,119 +37,30 @@ const SECTORS = [
   { id: 'utilities', name: 'Utilities', icon: '💡' },
 ];
 
-const COUNTRIES_BY_CONTINENT: Record<string, { code: string; name: string; flag: string }[]> = {
-  'North America': [
-    { code: 'us', name: 'United States', flag: '🇺🇸' },
-    { code: 'ca', name: 'Canada', flag: '🇨🇦' },
-    { code: 'mx', name: 'Mexico', flag: '🇲🇽' },
-    { code: 'cu', name: 'Cuba', flag: '🇨🇺' },
-    { code: 'jm', name: 'Jamaica', flag: '🇯🇲' },
-    { code: 'cr', name: 'Costa Rica', flag: '🇨🇷' },
-    { code: 'pa', name: 'Panama', flag: '🇵🇦' },
-    { code: 'do', name: 'Dominican Republic', flag: '🇩🇴' },
-    { code: 'gt', name: 'Guatemala', flag: '🇬🇹' },
-    { code: 'hn', name: 'Honduras', flag: '🇭🇳' },
-  ],
-  'South America': [
-    { code: 'br', name: 'Brazil', flag: '🇧🇷' },
-    { code: 'ar', name: 'Argentina', flag: '🇦🇷' },
-    { code: 'cl', name: 'Chile', flag: '🇨🇱' },
-    { code: 'co', name: 'Colombia', flag: '🇨🇴' },
-    { code: 'pe', name: 'Peru', flag: '🇵🇪' },
-    { code: 've', name: 'Venezuela', flag: '🇻🇪' },
-    { code: 'ec', name: 'Ecuador', flag: '🇪🇨' },
-    { code: 'uy', name: 'Uruguay', flag: '🇺🇾' },
-    { code: 'py', name: 'Paraguay', flag: '🇵🇾' },
-    { code: 'bo', name: 'Bolivia', flag: '🇧🇴' },
+const INDICES_BY_REGION: Record<string, { id: string; name: string; ticker: string; flag: string }[]> = {
+  'Americas': [
+    { id: 'sp500', name: 'S&P 500', ticker: 'SPX', flag: '🇺🇸' },
+    { id: 'nasdaq', name: 'Nasdaq 100', ticker: 'NDX', flag: '🇺🇸' },
+    { id: 'dow', name: 'Dow Jones', ticker: 'DJIA', flag: '🇺🇸' },
+    { id: 'russell', name: 'Russell 2000', ticker: 'RUT', flag: '🇺🇸' },
+    { id: 'tsx', name: 'TSX Composite', ticker: 'TSX', flag: '🇨🇦' },
+    { id: 'bovespa', name: 'Bovespa', ticker: 'IBOV', flag: '🇧🇷' },
   ],
   'Europe': [
-    { code: 'gb', name: 'United Kingdom', flag: '🇬🇧' },
-    { code: 'de', name: 'Germany', flag: '🇩🇪' },
-    { code: 'fr', name: 'France', flag: '🇫🇷' },
-    { code: 'it', name: 'Italy', flag: '🇮🇹' },
-    { code: 'es', name: 'Spain', flag: '🇪🇸' },
-    { code: 'nl', name: 'Netherlands', flag: '🇳🇱' },
-    { code: 'se', name: 'Sweden', flag: '🇸🇪' },
-    { code: 'no', name: 'Norway', flag: '🇳🇴' },
-    { code: 'pl', name: 'Poland', flag: '🇵🇱' },
-    { code: 'ch', name: 'Switzerland', flag: '🇨🇭' },
-    { code: 'be', name: 'Belgium', flag: '🇧🇪' },
-    { code: 'at', name: 'Austria', flag: '🇦🇹' },
-    { code: 'ie', name: 'Ireland', flag: '🇮🇪' },
-    { code: 'pt', name: 'Portugal', flag: '🇵🇹' },
-    { code: 'dk', name: 'Denmark', flag: '🇩🇰' },
-    { code: 'fi', name: 'Finland', flag: '🇫🇮' },
-    { code: 'gr', name: 'Greece', flag: '🇬🇷' },
-    { code: 'cz', name: 'Czech Republic', flag: '🇨🇿' },
-    { code: 'ro', name: 'Romania', flag: '🇷🇴' },
-    { code: 'hu', name: 'Hungary', flag: '🇭🇺' },
-    { code: 'ua', name: 'Ukraine', flag: '🇺🇦' },
-    { code: 'rs', name: 'Serbia', flag: '🇷🇸' },
-    { code: 'hr', name: 'Croatia', flag: '🇭🇷' },
-    { code: 'bg', name: 'Bulgaria', flag: '🇧🇬' },
-    { code: 'sk', name: 'Slovakia', flag: '🇸🇰' },
-    { code: 'lt', name: 'Lithuania', flag: '🇱🇹' },
-    { code: 'lv', name: 'Latvia', flag: '🇱🇻' },
-    { code: 'ee', name: 'Estonia', flag: '🇪🇪' },
-    { code: 'is', name: 'Iceland', flag: '🇮🇸' },
-    { code: 'lu', name: 'Luxembourg', flag: '🇱🇺' },
+    { id: 'ftse', name: 'FTSE 100', ticker: 'UKX', flag: '🇬🇧' },
+    { id: 'dax', name: 'DAX 40', ticker: 'DAX', flag: '🇩🇪' },
+    { id: 'cac', name: 'CAC 40', ticker: 'CAC', flag: '🇫🇷' },
+    { id: 'stoxx', name: 'Euro Stoxx 50', ticker: 'SX5E', flag: '🇪🇺' },
+    { id: 'ibex', name: 'IBEX 35', ticker: 'IBEX', flag: '🇪🇸' },
+    { id: 'smi', name: 'SMI', ticker: 'SMI', flag: '🇨🇭' },
   ],
-  'Asia': [
-    { code: 'cn', name: 'China', flag: '🇨🇳' },
-    { code: 'jp', name: 'Japan', flag: '🇯🇵' },
-    { code: 'in', name: 'India', flag: '🇮🇳' },
-    { code: 'kr', name: 'South Korea', flag: '🇰🇷' },
-    { code: 'sg', name: 'Singapore', flag: '🇸🇬' },
-    { code: 'hk', name: 'Hong Kong', flag: '🇭🇰' },
-    { code: 'tw', name: 'Taiwan', flag: '🇹🇼' },
-    { code: 'id', name: 'Indonesia', flag: '🇮🇩' },
-    { code: 'th', name: 'Thailand', flag: '🇹🇭' },
-    { code: 'my', name: 'Malaysia', flag: '🇲🇾' },
-    { code: 'ph', name: 'Philippines', flag: '🇵🇭' },
-    { code: 'vn', name: 'Vietnam', flag: '🇻🇳' },
-    { code: 'pk', name: 'Pakistan', flag: '🇵🇰' },
-    { code: 'bd', name: 'Bangladesh', flag: '🇧🇩' },
-    { code: 'lk', name: 'Sri Lanka', flag: '🇱🇰' },
-    { code: 'mm', name: 'Myanmar', flag: '🇲🇲' },
-    { code: 'kh', name: 'Cambodia', flag: '🇰🇭' },
-    { code: 'np', name: 'Nepal', flag: '🇳🇵' },
-  ],
-  'Middle East': [
-    { code: 'il', name: 'Israel', flag: '🇮🇱' },
-    { code: 'ae', name: 'UAE', flag: '🇦🇪' },
-    { code: 'sa', name: 'Saudi Arabia', flag: '🇸🇦' },
-    { code: 'tr', name: 'Turkey', flag: '🇹🇷' },
-    { code: 'qa', name: 'Qatar', flag: '🇶🇦' },
-    { code: 'kw', name: 'Kuwait', flag: '🇰🇼' },
-    { code: 'bh', name: 'Bahrain', flag: '🇧🇭' },
-    { code: 'om', name: 'Oman', flag: '🇴🇲' },
-    { code: 'jo', name: 'Jordan', flag: '🇯🇴' },
-    { code: 'lb', name: 'Lebanon', flag: '🇱🇧' },
-    { code: 'iq', name: 'Iraq', flag: '🇮🇶' },
-    { code: 'ir', name: 'Iran', flag: '🇮🇷' },
-  ],
-  'Africa': [
-    { code: 'za', name: 'South Africa', flag: '🇿🇦' },
-    { code: 'ng', name: 'Nigeria', flag: '🇳🇬' },
-    { code: 'eg', name: 'Egypt', flag: '🇪🇬' },
-    { code: 'ke', name: 'Kenya', flag: '🇰🇪' },
-    { code: 'ma', name: 'Morocco', flag: '🇲🇦' },
-    { code: 'gh', name: 'Ghana', flag: '🇬🇭' },
-    { code: 'et', name: 'Ethiopia', flag: '🇪🇹' },
-    { code: 'tz', name: 'Tanzania', flag: '🇹🇿' },
-    { code: 'ug', name: 'Uganda', flag: '🇺🇬' },
-    { code: 'sn', name: 'Senegal', flag: '🇸🇳' },
-    { code: 'ci', name: 'Ivory Coast', flag: '🇨🇮' },
-    { code: 'cm', name: 'Cameroon', flag: '🇨🇲' },
-    { code: 'dz', name: 'Algeria', flag: '🇩🇿' },
-    { code: 'tn', name: 'Tunisia', flag: '🇹🇳' },
-    { code: 'rw', name: 'Rwanda', flag: '🇷🇼' },
-  ],
-  'Oceania': [
-    { code: 'au', name: 'Australia', flag: '🇦🇺' },
-    { code: 'nz', name: 'New Zealand', flag: '🇳🇿' },
-    { code: 'fj', name: 'Fiji', flag: '🇫🇯' },
-    { code: 'pg', name: 'Papua New Guinea', flag: '🇵🇬' },
+  'Asia-Pacific': [
+    { id: 'nikkei', name: 'Nikkei 225', ticker: 'N225', flag: '🇯🇵' },
+    { id: 'hangseng', name: 'Hang Seng', ticker: 'HSI', flag: '🇭🇰' },
+    { id: 'csi300', name: 'CSI 300', ticker: 'CSI300', flag: '🇨🇳' },
+    { id: 'asx', name: 'ASX 200', ticker: 'AS51', flag: '🇦🇺' },
+    { id: 'kospi', name: 'KOSPI', ticker: 'KOSPI', flag: '🇰🇷' },
+    { id: 'sensex', name: 'Sensex', ticker: 'SENSEX', flag: '🇮🇳' },
   ],
 };
 
@@ -158,8 +69,8 @@ export default function FinanceFilterSidebar({
   setSelectedMarkets,
   selectedSectors,
   setSelectedSectors,
-  selectedRegions,
-  setSelectedRegions,
+  selectedIndices,
+  setSelectedIndices,
   searchQuery,
   setSearchQuery,
   dateRange,
@@ -169,8 +80,8 @@ export default function FinanceFilterSidebar({
   setSelectedMarkets: React.Dispatch<React.SetStateAction<string[]>>;
   selectedSectors: string[];
   setSelectedSectors: React.Dispatch<React.SetStateAction<string[]>>;
-  selectedRegions: string[];
-  setSelectedRegions: React.Dispatch<React.SetStateAction<string[]>>;
+  selectedIndices: string[];
+  setSelectedIndices: React.Dispatch<React.SetStateAction<string[]>>;
   searchQuery: string;
   setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
   dateRange: string;
@@ -178,15 +89,11 @@ export default function FinanceFilterSidebar({
 }) {
   const [marketsOpen, setMarketsOpen] = React.useState(true);
   const [sectorsOpen, setSectorsOpen] = React.useState(true);
-  const [countriesOpen, setCountriesOpen] = React.useState(false);
-  const [continentStates, setContinentStates] = React.useState<Record<string, boolean>>({
-    'North America': true,
-    'South America': false,
+  const [indicesOpen, setIndicesOpen] = React.useState(false);
+  const [regionStates, setRegionStates] = React.useState<Record<string, boolean>>({
+    'Americas': true,
     'Europe': false,
-    'Asia': false,
-    'Middle East': false,
-    'Africa': false,
-    'Oceania': false,
+    'Asia-Pacific': false,
   });
 
   const toggleMarket = (id: string) => {
@@ -205,11 +112,11 @@ export default function FinanceFilterSidebar({
     );
   };
 
-  const toggleRegion = (code: string) => {
-    setSelectedRegions((prev: string[]) =>
-      prev.includes(code)
-        ? prev.filter((c: string) => c !== code)
-        : [...prev, code]
+  const toggleIndex = (id: string) => {
+    setSelectedIndices((prev: string[]) =>
+      prev.includes(id)
+        ? prev.filter((c: string) => c !== id)
+        : [...prev, id]
     );
   };
 
@@ -347,17 +254,17 @@ export default function FinanceFilterSidebar({
           </CollapsibleContent>
         </Collapsible>
 
-        {/* Countries Section */}
-        <Collapsible open={countriesOpen} onOpenChange={setCountriesOpen}>
+        {/* Indices Section */}
+        <Collapsible open={indicesOpen} onOpenChange={setIndicesOpen}>
           <CollapsibleTrigger className="flex items-center justify-between w-full group mb-4">
             <div className="flex items-center gap-2">
-              <Globe className="w-4 h-4 text-slate-400" />
-              <span className="text-sm font-medium text-slate-300">Countries</span>
+              <BarChart2 className="w-4 h-4 text-slate-400" />
+              <span className="text-sm font-medium text-slate-300">Indices</span>
               <span className="text-xs bg-slate-800 px-2 py-0.5 rounded-full text-slate-400">
-                {selectedRegions.length}
+                {selectedIndices.length}
               </span>
             </div>
-            <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${countriesOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${indicesOpen ? 'rotate-180' : ''}`} />
           </CollapsibleTrigger>
           <CollapsibleContent>
             <motion.div
@@ -365,41 +272,44 @@ export default function FinanceFilterSidebar({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              {Object.entries(COUNTRIES_BY_CONTINENT).map(([continent, countries]) => (
+              {Object.entries(INDICES_BY_REGION).map(([region, indices]) => (
                 <Collapsible
-                  key={continent}
-                  open={continentStates[continent]}
-                  onOpenChange={(open: boolean) => setContinentStates(prev => ({ ...prev, [continent]: open }))}
+                  key={region}
+                  open={regionStates[region]}
+                  onOpenChange={(open: boolean) => setRegionStates(prev => ({ ...prev, [region]: open }))}
                 >
                   <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-2 rounded-lg hover:bg-slate-800/50 transition-colors group">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-slate-300">{continent}</span>
-                      {countries.filter(c => selectedRegions.includes(c.code)).length > 0 && (
+                      <span className="text-sm font-medium text-slate-300">{region}</span>
+                      {indices.filter(i => selectedIndices.includes(i.id)).length > 0 && (
                         <span className="text-xs bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded-full">
-                          {countries.filter(c => selectedRegions.includes(c.code)).length}
+                          {indices.filter(i => selectedIndices.includes(i.id)).length}
                         </span>
                       )}
                     </div>
-                    <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${continentStates[continent] ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${regionStates[region] ? 'rotate-180' : ''}`} />
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <div className="ml-2 mt-1 space-y-1">
-                      {countries.map((country) => (
+                      {indices.map((index) => (
                         <label
-                          key={country.code}
+                          key={index.id}
                           className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 ${
-                            selectedRegions.includes(country.code)
+                            selectedIndices.includes(index.id)
                               ? 'bg-slate-800 text-white'
                               : 'hover:bg-slate-800/50 text-slate-400'
                           }`}
                         >
                           <Checkbox
-                            checked={selectedRegions.includes(country.code)}
-                            onCheckedChange={() => toggleRegion(country.code)}
+                            checked={selectedIndices.includes(index.id)}
+                            onCheckedChange={() => toggleIndex(index.id)}
                             className="border-slate-600 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
                           />
-                          <span className="text-base">{country.flag}</span>
-                          <span className="text-sm">{country.name}</span>
+                          <span className="text-base">{index.flag}</span>
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-sm">{index.name}</span>
+                            <span className="text-xs text-slate-500">{index.ticker}</span>
+                          </div>
                         </label>
                       ))}
                     </div>
