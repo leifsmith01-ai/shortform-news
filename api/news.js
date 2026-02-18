@@ -172,8 +172,8 @@ Article: ${content}`
 
   const bullets = text
     .split('\n')
-    .filter(line => line.trim().startsWith('•'))
-    .map(line => line.replace('•', '').trim())
+    .filter(line => /^[\s]*[•*\-]/.test(line))
+    .map(line => line.replace(/^[\s]*[•*\-]+\s*/, '').trim())
     .filter(Boolean);
 
   return bullets.length > 0 ? bullets : null;
@@ -302,9 +302,9 @@ export default async function handler(req, res) {
           }
         }
 
-        // Generate AI summaries for first 5 articles (shared for both sources)
+        // Generate AI summaries for first 3 articles (parallel, keeps well within timeout)
         if (GEMINI_API_KEY && formattedArticles.length > 0) {
-          const summaryPromises = formattedArticles.slice(0, 5).map(async (article) => {
+          const summaryPromises = formattedArticles.slice(0, 3).map(async (article) => {
             try {
               const summary = await generateSummary(article, GEMINI_API_KEY);
               if (summary) article.summary_points = summary;
