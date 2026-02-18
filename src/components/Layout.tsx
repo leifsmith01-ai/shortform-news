@@ -1,23 +1,9 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Home, Bookmark, Clock, LogOut, Sparkles, Tag, Bell, TrendingUp } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
+import { Home, Bookmark, Clock, Sparkles, Tag, Bell, TrendingUp } from 'lucide-react';
+import { UserButton } from '@clerk/clerk-react';
 
 export default function Layout({ children, currentPageName }: { children: React.ReactNode; currentPageName: string }) {
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    // Clear any stored auth tokens
-    localStorage.removeItem('authToken');
-    sessionStorage.clear();
-    
-    toast.success('Logged out successfully');
-    
-    // Redirect to login or home
-    navigate('/');
-  };
-
   const navItems = [
     { name: 'Home', icon: Home, page: '/' },
     { name: 'Finance', icon: TrendingUp, page: '/finance' },
@@ -59,16 +45,14 @@ export default function Layout({ children, currentPageName }: { children: React.
           })}
         </nav>
 
-        {/* Logout */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleLogout}
-          className="w-12 h-12 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white"
-          title="Logout"
-        >
-          <LogOut className="w-5 h-5" />
-        </Button>
+        {/* Clerk UserButton — handles avatar, profile & sign out */}
+        <UserButton
+          appearance={{
+            elements: {
+              avatarBox: 'w-10 h-10 rounded-xl',
+            },
+          }}
+        />
       </aside>
 
       {/* Main Content */}

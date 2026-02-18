@@ -1,0 +1,27 @@
+import { SignIn } from '@clerk/clerk-react'
+
+export default function SignInPage() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-slate-900">
+      <div className="flex flex-col items-center gap-8">
+        {/* Logo */}
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center">
+            <span className="text-lg font-bold text-slate-900" style={{ fontFamily: 'monospace' }}>SF</span>
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Shortform News</h1>
+            <p className="text-slate-400 text-sm">The world, briefly.</p>
+          </div>
+        </div>
+
+        <SignIn
+          path="/sign-in"
+          routing="path"
+          signUpUrl="/sign-up"
+          forceRedirectUrl="/"
+        />
+      </div>
+    </div>
+  )
+}

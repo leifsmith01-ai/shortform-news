@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import NewsCard from '@/components/news/NewsCard';
 import LoadingCard from '@/components/news/LoadingCard';
+import AdUnit from '@/components/AdUnit';
 import api from '@/api';
 import { toast } from 'sonner';
 
@@ -80,6 +81,15 @@ export default function SavedArticles() {
           )}
         </div>
       </header>
+
+      {/* Ad banner between header and content */}
+      <div className="px-4 lg:px-8 pt-4">
+        <AdUnit
+          slot="REPLACE_WITH_SLOT_ID"
+          format="horizontal"
+          className="rounded-xl overflow-hidden bg-stone-100 min-h-[90px]"
+        />
+      </div>
 
       {/* Content */}
       <ScrollArea className="flex-1">

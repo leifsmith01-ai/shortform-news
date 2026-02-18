@@ -14,6 +14,7 @@ import LoadingCard from '@/components/news/LoadingCard';
 import EmptyState from '@/components/news/EmptyState';
 import GroupedArticles from '@/components/news/GroupedArticles';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import AdUnit from '@/components/AdUnit';
 import api from '@/api';
 
 const COUNTRY_NAMES: Record<string, string> = {
@@ -366,7 +367,19 @@ export default function Home() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                       {articles.map((article, index) => (
-                        <NewsCard key={index} article={article} index={index} rank={index + 1} />
+                        <React.Fragment key={index}>
+                          <NewsCard article={article} index={index} rank={index + 1} />
+                          {/* Ad after every 6th article */}
+                          {(index + 1) % 6 === 0 && (
+                            <div className="col-span-full">
+                              <AdUnit
+                                slot="REPLACE_WITH_SLOT_ID"
+                                format="horizontal"
+                                className="rounded-xl overflow-hidden bg-stone-100 min-h-[90px]"
+                              />
+                            </div>
+                          )}
+                        </React.Fragment>
                       ))}
                     </div>
                   )}

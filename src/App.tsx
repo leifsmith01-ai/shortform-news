@@ -1,12 +1,16 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { SignedIn, SignedOut, RedirectToSignIn, useUser } from '@clerk/clerk-react'
 import Layout from './components/Layout'
 import Home from './pages/Home'
 import Finance from './pages/Finance'
 import SavedArticles from './pages/SavedArticles'
 import History from './pages/History'
+import SignInPage from './pages/SignInPage'
+import SignUpPage from './pages/SignUpPage'
+import { api } from './api'
 
 // Placeholder components for routes referenced in Layout
-// Remove or implement these as needed
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center h-screen bg-stone-50">
     <div className="text-center">
@@ -14,52 +18,97 @@ const PlaceholderPage = ({ title }: { title: string }) => (
       <p className="text-stone-500">This page is coming soon!</p>
     </div>
   </div>
-);
+)
+
+// Initialises Supabase with the signed-in Clerk user ID
+function UserInitialiser() {
+  const { user } = useUser()
+
+  useEffect(() => {
+    if (user?.id) {
+      api.setUser(user.id)
+    } else {
+      api.clearUser()
+    }
+  }, [user?.id])
+
+  return null
+}
+
+// Wrapper that redirects unauthenticated users to sign-in
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <SignedIn>{children}</SignedIn>
+      <SignedOut><RedirectToSignIn /></SignedOut>
+    </>
+  )
+}
 
 export default function App() {
   return (
     <BrowserRouter>
+      <UserInitialiser />
       <Routes>
+        {/* Auth routes */}
+        <Route path="/sign-in/*" element={<SignInPage />} />
+        <Route path="/sign-up/*" element={<SignUpPage />} />
+
+        {/* Protected app routes */}
         <Route path="/" element={
-          <Layout currentPageName="/">
-            <Home />
-          </Layout>
+          <ProtectedRoute>
+            <Layout currentPageName="/">
+              <Home />
+            </Layout>
+          </ProtectedRoute>
         } />
-        
+
         <Route path="/saved" element={
-          <Layout currentPageName="/saved">
-            <SavedArticles />
-          </Layout>
+          <ProtectedRoute>
+            <Layout currentPageName="/saved">
+              <SavedArticles />
+            </Layout>
+          </ProtectedRoute>
         } />
-        
+
         <Route path="/history" element={
-          <Layout currentPageName="/history">
-            <History />
-          </Layout>
+          <ProtectedRoute>
+            <Layout currentPageName="/history">
+              <History />
+            </Layout>
+          </ProtectedRoute>
         } />
-        
+
         <Route path="/finance" element={
-          <Layout currentPageName="/finance">
-            <Finance />
-          </Layout>
+          <ProtectedRoute>
+            <Layout currentPageName="/finance">
+              <Finance />
+            </Layout>
+          </ProtectedRoute>
         } />
-        
+
         <Route path="/personalized" element={
-          <Layout currentPageName="/personalized">
-            <PlaceholderPage title="Personalized Feed" />
-          </Layout>
+          <ProtectedRoute>
+            <Layout currentPageName="/personalized">
+              <PlaceholderPage title="Personalized Feed" />
+            </Layout>
+          </ProtectedRoute>
         } />
-        
+
         <Route path="/keywords" element={
-          <Layout currentPageName="/keywords">
-            <PlaceholderPage title="Keyword Tracking" />
-          </Layout>
+          <ProtectedRoute>
+            <Layout currentPageName="/keywords">
+              <PlaceholderPage title="Keyword Tracking" />
+            </Layout>
+          </ProtectedRoute>
         } />
-        
+
         <Route path="/alerts" element={
-          <Layout currentPageName="/alerts">
-            <PlaceholderPage title="News Alerts" />
-          </Layout>
+          <ProtectedRoute>
+            <Layout currentPageName="/alerts">
+              <PlaceholderPage title="News Alerts" />
+            </Layout>
+          </ProtectedRoute>
         } />
       </Routes>
     </BrowserRouter>
