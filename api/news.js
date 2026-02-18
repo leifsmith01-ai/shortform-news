@@ -148,18 +148,17 @@ async function generateSummary(article, geminiKey) {
     body: JSON.stringify({
       contents: [{
         parts: [{
-          text: `Summarize this news article in exactly 3 short bullet points (1 sentence each).
-Be concise and factual. Format as:
+          text: `Summarize this news article in 2 to 3 short bullet points. Each point should be one brief sentence. Only output the bullet points, nothing else.
 • Point 1
 • Point 2
-• Point 3
+• Point 3 (if needed)
 
 Article: ${content}`
         }]
       }],
       generationConfig: {
         temperature: 0.3,
-        maxOutputTokens: 200
+        maxOutputTokens: 500
       }
     })
   });
