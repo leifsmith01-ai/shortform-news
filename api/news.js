@@ -279,13 +279,15 @@ export default async function handler(req, res) {
             formattedArticles = validArticles.map(a => formatArticle(a, country, category));
           } catch (err) {
             console.error(`  NewsAPI failed for ${country}/${category}:`, err.message);
-            // Fall through to Guardian as secondary attempt
-            console.log(`  Falling back to Guardian for ${country}/${category}`);
+          }
+          // Fall back to Guardian if NewsAPI returned nothing (error or empty - free tier limitation)
+          if (formattedArticles.length === 0) {
+            console.log(`  NewsAPI returned 0 results for ${country}/${category}, falling back to Guardian`);
             try {
               const results = await fetchFromGuardian(country, category, GUARDIAN_API_KEY);
               formattedArticles = results.map(r => formatGuardianArticle(r, country, category));
             } catch (guardianErr) {
-              console.error(`  Guardian fallback also failed:`, guardianErr.message);
+              console.error(`  Guardian fallback also failed for ${country}/${category}:`, guardianErr.message);
               formattedArticles = [];
             }
           }
