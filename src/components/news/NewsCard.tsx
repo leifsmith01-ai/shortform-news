@@ -57,6 +57,7 @@ const CATEGORY_COLORS = {
 export default function NewsCard({ article, index, rank }) {
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -175,16 +176,14 @@ export default function NewsCard({ article, index, rank }) {
       </div>
 
       {/* Image */}
-      {article.image_url && (
-        <div className="aspect-[16/9] overflow-hidden">
-          <img 
-            src={article.image_url} 
+      {article.image_url && !imageError && (
+        <div className="aspect-[16/9] overflow-hidden bg-stone-100">
+          <img
+            src={article.image_url}
             alt={article.title}
             loading="lazy"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-            onError={(e) => {
-              e.target.style.display = 'none';
-            }}
+            onError={() => setImageError(true)}
           />
         </div>
       )}

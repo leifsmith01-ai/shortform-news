@@ -241,6 +241,19 @@ async function generateSummary(article, geminiKey) {
   return bullets.length > 0 ? bullets : null;
 }
 
+// Helper: human-readable time ago (e.g. "2h ago", "3d ago")
+function timeAgo(dateStr) {
+  if (!dateStr) return 'Today';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return `${Math.floor(days / 7)}w ago`;
+}
+
 // Formatters — normalise each API's shape to our app format
 function formatNewsAPIArticle(article, country, category) {
   return {
@@ -249,9 +262,10 @@ function formatNewsAPIArticle(article, country, category) {
     description: article.description || '',
     content: article.content || article.description || '',
     url: article.url || '#',
-    image: article.urlToImage || `https://source.unsplash.com/800x400/?${category},news`,
+    image_url: article.urlToImage || null,
     source: article.source?.name || 'Unknown',
     publishedAt: article.publishedAt || new Date().toISOString(),
+    time_ago: timeAgo(article.publishedAt),
     country, category,
     views: Math.floor(Math.random() * 5000) + 100,
     summary_points: null
@@ -265,9 +279,10 @@ function formatWorldNewsAPIArticle(article, country, category) {
     description: article.text ? article.text.slice(0, 200) : '',
     content: article.text || '',
     url: article.url || '#',
-    image: article.image || `https://source.unsplash.com/800x400/?${category},news`,
+    image_url: article.image || null,
     source: article.source_country ? `World News (${article.source_country.toUpperCase()})` : 'World News API',
     publishedAt: article.publish_date || new Date().toISOString(),
+    time_ago: timeAgo(article.publish_date),
     country, category,
     views: Math.floor(Math.random() * 5000) + 100,
     summary_points: null
@@ -281,9 +296,10 @@ function formatNewsDataArticle(article, country, category) {
     description: article.description || article.content?.slice(0, 200) || '',
     content: article.content || article.description || '',
     url: article.link || '#',
-    image: article.image_url || `https://source.unsplash.com/800x400/?${category},news`,
+    image_url: article.image_url || null,
     source: article.source_id || 'NewsData',
     publishedAt: article.pubDate || new Date().toISOString(),
+    time_ago: timeAgo(article.pubDate),
     country, category,
     views: Math.floor(Math.random() * 5000) + 100,
     summary_points: null
@@ -298,9 +314,10 @@ function formatGuardianArticle(result, country, category) {
     description: fields.trailText || '',
     content: fields.trailText || '',
     url: result.webUrl || '#',
-    image: fields.thumbnail || `https://source.unsplash.com/800x400/?${category},news`,
+    image_url: fields.thumbnail || null,
     source: 'The Guardian',
     publishedAt: result.webPublicationDate || new Date().toISOString(),
+    time_ago: timeAgo(result.webPublicationDate),
     country, category,
     views: Math.floor(Math.random() * 5000) + 100,
     summary_points: null
