@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { ClerkProvider } from '@clerk/clerk-react'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 import App from './App'
 import './index.css'
 import { Toaster } from 'sonner'
@@ -16,6 +17,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/">
       <App />
       <Toaster position="top-right" richColors />
+      <SpeedInsights />
     </ClerkProvider>
   </React.StrictMode>,
 )
