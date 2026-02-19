@@ -126,6 +126,56 @@ class SupabaseApiService {
 
     if (error) throw error
   }
+
+  // ─── Article Reactions ────────────────────────────────────────────────────
+  // Requires a Supabase table:
+  //   article_reactions(id uuid PK, user_id text, article_url text,
+  //     article_title text, source text, category text, country text,
+  //     reaction text CHECK (reaction IN ('up','down')),
+  //     created_at timestamptz DEFAULT now(),
+  //     UNIQUE(user_id, article_url))
+
+  async getReactions(): Promise<{ id: string; article_url: string; article_title: string; source: string; category: string; country: string; reaction: 'up' | 'down'; created_at: string }[]> {
+    const { data, error } = await supabase
+      .from('article_reactions')
+      .select('*')
+      .eq('user_id', this.userId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data ?? []
+  }
+
+  async setReaction(article: Record<string, unknown>, reaction: 'up' | 'down') {
+    const row = {
+      user_id: this.userId,
+      article_url: (article.article_url ?? article.url) as string,
+      article_title: (article.article_title ?? article.title) as string,
+      source: article.source as string,
+      category: article.category as string,
+      country: article.country as string,
+      reaction,
+    }
+
+    const { data, error } = await supabase
+      .from('article_reactions')
+      .upsert(row, { onConflict: 'user_id,article_url' })
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  }
+
+  async removeReaction(articleUrl: string): Promise<void> {
+    const { error } = await supabase
+      .from('article_reactions')
+      .delete()
+      .eq('user_id', this.userId)
+      .eq('article_url', articleUrl)
+
+    if (error) throw error
+  }
 }
 
 export default SupabaseApiService

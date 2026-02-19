@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ExternalLink, Clock, Bookmark, BookmarkCheck, Share2, Twitter, Facebook, Linkedin, Link2 } from 'lucide-react';
+import { ExternalLink, Clock, Bookmark, BookmarkCheck, Share2, Twitter, Facebook, Linkedin, Link2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -60,6 +60,8 @@ export default function NewsCard({ article, index, rank }) {
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [reaction, setReaction] = useState<'up' | 'down' | null>(null);
+  const [isReacting, setIsReacting] = useState(false);
   const { isSignedIn } = useUser();
   const navigate = useNavigate();
 
@@ -104,6 +106,32 @@ export default function NewsCard({ article, index, rank }) {
       });
     } catch (error) {
       console.error('Failed to track reading:', error);
+    }
+  };
+
+  const handleReaction = async (e: React.MouseEvent, r: 'up' | 'down') => {
+    e.preventDefault();
+    if (!isSignedIn) {
+      toast.error('Sign in to rate articles');
+      navigate('/sign-in');
+      return;
+    }
+    if (isReacting) return;
+    setIsReacting(true);
+    try {
+      if (reaction === r) {
+        // Clicking the active reaction removes it
+        await api.removeReaction(article.url);
+        setReaction(null);
+      } else {
+        await api.setReaction(article, r);
+        setReaction(r);
+        if (r === 'up') toast.success('Marked as relevant — your feed will improve');
+      }
+    } catch {
+      toast.error('Failed to save reaction');
+    } finally {
+      setIsReacting(false);
     }
   };
 
@@ -249,9 +277,9 @@ export default function NewsCard({ article, index, rank }) {
         )}
 
         {/* Read More */}
-        <a 
-          href={article.url} 
-          target="_blank" 
+        <a
+          href={article.url}
+          target="_blank"
           rel="noopener noreferrer"
           onClick={handleArticleClick}
           className="inline-flex items-center gap-2 text-sm font-medium text-slate-900 hover:text-slate-700 transition-colors group/link"
@@ -259,6 +287,37 @@ export default function NewsCard({ article, index, rank }) {
           Read full article
           <ExternalLink className="w-3.5 h-3.5 group-hover/link:translate-x-0.5 transition-transform" />
         </a>
+
+        {/* Reaction row — influences the For You feed */}
+        <div className="flex items-center gap-2 mt-4 pt-3 border-t border-stone-100">
+          <span className="text-xs text-stone-400 flex-1">Relevant to you?</span>
+          <button
+            onClick={(e) => handleReaction(e, 'up')}
+            disabled={isReacting}
+            title="Relevant — show me more like this"
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              reaction === 'up'
+                ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                : 'text-stone-400 hover:bg-stone-100 hover:text-stone-700 border border-transparent'
+            }`}
+          >
+            <ThumbsUp className="w-3.5 h-3.5" />
+            {reaction === 'up' && <span>Yes</span>}
+          </button>
+          <button
+            onClick={(e) => handleReaction(e, 'down')}
+            disabled={isReacting}
+            title="Not relevant — show me less like this"
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              reaction === 'down'
+                ? 'bg-rose-100 text-rose-600 border border-rose-200'
+                : 'text-stone-400 hover:bg-stone-100 hover:text-stone-700 border border-transparent'
+            }`}
+          >
+            <ThumbsDown className="w-3.5 h-3.5" />
+            {reaction === 'down' && <span>No</span>}
+          </button>
+        </div>
       </div>
     </motion.article>
   );

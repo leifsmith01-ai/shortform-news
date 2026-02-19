@@ -30,14 +30,38 @@ interface Combo {
   count: number
 }
 
-function computeTopCombos(history: { country: string; category: string }[], limit = 3): Combo[] {
-  const counts: Record<string, number> = {}
+interface Reaction {
+  category: string
+  country: string
+  reaction: 'up' | 'down'
+}
+
+// Score each country+category combo using reading history and thumbs reactions.
+// History reads: +1 per article read
+// Thumbs up:     +3 (strong positive signal)
+// Thumbs down:   -5 (strong negative — suppress the combo)
+// Combos with a final score ≤ 0 are filtered out entirely.
+function computeTopCombos(
+  history: { country: string; category: string }[],
+  reactions: Reaction[],
+  limit = 3,
+): Combo[] {
+  const scores: Record<string, number> = {}
+
   for (const item of history) {
     if (!item.country || !item.category) continue
     const key = `${item.country}:${item.category}`
-    counts[key] = (counts[key] ?? 0) + 1
+    scores[key] = (scores[key] ?? 0) + 1
   }
-  return Object.entries(counts)
+
+  for (const r of reactions) {
+    if (!r.country || !r.category) continue
+    const key = `${r.country}:${r.category}`
+    scores[key] = (scores[key] ?? 0) + (r.reaction === 'up' ? 3 : -5)
+  }
+
+  return Object.entries(scores)
+    .filter(([, score]) => score > 0)
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
     .map(([key, count]) => {
@@ -50,6 +74,7 @@ export default function Personalized() {
   const [articles, setArticles] = useState<any[]>([])
   const [topCombos, setTopCombos] = useState<Combo[]>([])
   const [historyCount, setHistoryCount] = useState(0)
+  const [likedCount, setLikedCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [noHistory, setNoHistory] = useState(false)
 
@@ -57,16 +82,21 @@ export default function Personalized() {
     async function load() {
       setLoading(true)
       try {
-        const history = await api.getReadingHistory()
+        // Fetch history and reactions in parallel
+        const [history, reactions] = await Promise.all([
+          api.getReadingHistory(),
+          api.getReactions(),
+        ])
         setHistoryCount(history.length)
+        setLikedCount(reactions.filter((r: Reaction) => r.reaction === 'up').length)
 
-        if (history.length === 0) {
+        if (history.length === 0 && reactions.length === 0) {
           setNoHistory(true)
           setLoading(false)
           return
         }
 
-        const combos = computeTopCombos(history, 3)
+        const combos = computeTopCombos(history, reactions, 3)
         setTopCombos(combos)
 
         if (combos.length === 0) {
@@ -121,8 +151,11 @@ export default function Personalized() {
             <div>
               <h1 className="text-2xl font-bold text-stone-900">For You</h1>
               <p className="text-sm text-stone-500">
-                {historyCount > 0
-                  ? `Based on ${historyCount} article${historyCount !== 1 ? 's' : ''} read`
+                {historyCount > 0 || likedCount > 0
+                  ? [
+                      historyCount > 0 && `${historyCount} article${historyCount !== 1 ? 's' : ''} read`,
+                      likedCount > 0 && `${likedCount} liked`,
+                    ].filter(Boolean).join(' · ')
                   : 'Your personalised feed'}
               </p>
             </div>
