@@ -263,28 +263,29 @@ async function fetchFromGuardian(country, category, apiKey) {
       'api-key': apiKey || 'test',
     });
   } else {
-  const countrySection = GUARDIAN_COUNTRY_SECTIONS[country];
-  if (countrySection) {
-    const queryParams = {
-      section: countrySection,
-      'show-fields': 'trailText,thumbnail,byline,bodyText',
-      'page-size': '10',
-      'order-by': 'newest',
-      'api-key': apiKey || 'test',
-    };
-    if (category !== 'world') queryParams.q = category;
-    params = new URLSearchParams(queryParams);
-  } else {
-    const countryName = COUNTRY_NAMES[country] || country;
-    const searchQuery = category === 'world' ? countryName : `${countryName} ${category}`;
-    params = new URLSearchParams({
-      q: searchQuery,
-      section: categorySection,
-      'show-fields': 'trailText,thumbnail,byline,bodyText',
-      'page-size': '10',
-      'order-by': 'newest',
-      'api-key': apiKey || 'test',
-    });
+    const countrySection = GUARDIAN_COUNTRY_SECTIONS[country];
+    if (countrySection) {
+      const queryParams = {
+        section: countrySection,
+        'show-fields': 'trailText,thumbnail,byline,bodyText',
+        'page-size': '10',
+        'order-by': 'newest',
+        'api-key': apiKey || 'test',
+      };
+      if (category !== 'world') queryParams.q = category;
+      params = new URLSearchParams(queryParams);
+    } else {
+      const countryName = COUNTRY_NAMES[country] || country;
+      const searchQuery = category === 'world' ? countryName : `${countryName} ${category}`;
+      params = new URLSearchParams({
+        q: searchQuery,
+        section: categorySection,
+        'show-fields': 'trailText,thumbnail,byline,bodyText',
+        'page-size': '10',
+        'order-by': 'newest',
+        'api-key': apiKey || 'test',
+      });
+    }
   }
   const url = `https://content.guardianapis.com/search?${params.toString()}`;
   const response = await fetch(url);
