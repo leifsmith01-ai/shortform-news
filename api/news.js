@@ -234,11 +234,18 @@ async function generateSummary(article, geminiKey) {
   if (!response.ok) { console.error(`Gemini error: ${data.error?.message?.slice(0, 100)}`); return null; }
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) return null;
-  const bullets = text.split('\n')
-    .filter(line => /^[\s]*[•*\-]/.test(line))
-    .map(line => line.replace(/^[\s]*[•*\-]+\s*/, '').trim())
+  // Try matching common bullet styles: •, *, -, –, —
+  let bullets = text.split('\n')
+    .filter(line => /^[\s]*[•*\-–—]/.test(line))
+    .map(line => line.replace(/^[\s]*[•*\-–—]+\s*/, '').trim())
     .filter(Boolean);
-  return bullets.length > 0 ? bullets : null;
+  // Fallback: if Gemini returned a numbered list (1. 2. 3.) or plain lines, use those
+  if (bullets.length === 0) {
+    bullets = text.split('\n')
+      .map(line => line.replace(/^[\s]*\d+[\.\)]\s*/, '').trim())
+      .filter(line => line.length > 15);
+  }
+  return bullets.length > 0 ? bullets.slice(0, 3) : null;
 }
 
 // Helper: human-readable time ago (e.g. "2h ago", "3d ago")

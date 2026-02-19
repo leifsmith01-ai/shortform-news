@@ -6,14 +6,21 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import api from '@/api';
 import { toast } from 'sonner';
+import { useUser } from '@clerk/clerk-react';
 
 export default function History() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { user, isLoaded: userLoaded } = useUser();
 
+  // Re-run when the Clerk user finishes loading (fixes race condition on mobile where
+  // History mounts before UserInitialiser has had a chance to call api.setUser())
   useEffect(() => {
+    if (!userLoaded) return;
+    // Safety net: ensure api has the user set even if UserInitialiser fires late
+    if (user?.id) api.setUser(user.id);
     loadHistory();
-  }, []);
+  }, [userLoaded, user?.id]);
 
   const loadHistory = async () => {
     setLoading(true);
@@ -30,7 +37,8 @@ export default function History() {
   const groupByDate = (items) => {
     const grouped = {};
     items.forEach(item => {
-      const date = new Date(item.read_date).toLocaleDateString();
+      const d = item.read_date ? new Date(item.read_date) : new Date();
+      const date = isNaN(d.getTime()) ? 'Unknown date' : d.toLocaleDateString();
       if (!grouped[date]) {
         grouped[date] = [];
       }
@@ -42,7 +50,7 @@ export default function History() {
   const groupedHistory = groupByDate(history);
 
   return (
-    <div className="h-screen flex flex-col bg-stone-50">
+    <div className="h-full flex flex-col bg-stone-50">
       {/* Header */}
       <header className="bg-white border-b border-stone-200 px-4 lg:px-8 py-4">
         <div className="flex items-center justify-between">
@@ -98,7 +106,7 @@ export default function History() {
                               <span>•</span>
                               <span>{item.category}</span>
                               <span>•</span>
-                              <span>{format(new Date(item.read_date), 'h:mm a')}</span>
+                              <span>{item.read_date ? format(new Date(item.read_date), 'h:mm a') : ''}</span>
                             </div>
                           </div>
                           <a

@@ -47,7 +47,7 @@ export default function SavedArticles() {
   const categories = ['all', ...new Set(savedArticles.map(a => a.category))];
 
   return (
-    <div className="h-screen flex flex-col bg-stone-50">
+    <div className="h-full flex flex-col bg-stone-50">
       {/* Header */}
       <header className="bg-white border-b border-stone-200 px-4 lg:px-8 py-4">
         <div className="flex items-center justify-between">

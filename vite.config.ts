@@ -4,18 +4,23 @@ import path from 'path'
 import { pathToFileURL } from 'url'
 import fs from 'fs'
 
-// Vite middleware plugin: serves api/news.js locally (mirrors Vercel serverless in dev)
+// Vite middleware plugin: serves api/*.js handlers locally (mirrors Vercel serverless in dev)
 function localApiPlugin() {
-  const handlerPath = path.resolve(__dirname, 'api/news.js');
-  // Cache the imported module so the in-memory CACHE inside api/news.js persists between requests
-  let cachedModule: any = null;
-  let cachedMtime = 0;
+  // Per-handler module cache so in-memory caches (e.g. news CACHE) persist between requests
+  const moduleCache: Record<string, { module: any; mtime: number }> = {};
 
   return {
     name: 'local-api',
     configureServer(server: any) {
       server.middlewares.use(async (req: any, res: any, next: any) => {
         if (!req.url?.startsWith('/api/')) return next();
+
+        // Derive handler file from URL: /api/news → api/news.js, /api/admin-set-premium → api/admin-set-premium.js
+        const urlPath = req.url.split('?')[0]; // strip query string
+        const handlerName = urlPath.replace(/^\/api\//, '').replace(/\/$/, '') || 'news';
+        const handlerPath = path.resolve(__dirname, `api/${handlerName}.js`);
+
+        if (!fs.existsSync(handlerPath)) return next();
 
         let chunks: Buffer[] = [];
         req.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -42,18 +47,17 @@ function localApiPlugin() {
           };
 
           try {
-            // Only re-import api/news.js if it has changed on disk (preserves in-memory cache between requests)
             const mtime = fs.statSync(handlerPath).mtimeMs;
-            if (!cachedModule || mtime !== cachedMtime) {
+            const cached = moduleCache[handlerName];
+            if (!cached || mtime !== cached.mtime) {
               const fileUrl = pathToFileURL(handlerPath).href + `?t=${mtime}`;
-              cachedModule = await import(fileUrl);
-              cachedMtime = mtime;
-              console.log('[local-api] Loaded api/news.js (fresh)');
+              moduleCache[handlerName] = { module: await import(fileUrl), mtime };
+              console.log(`[local-api] Loaded api/${handlerName}.js (fresh)`);
             }
-            const handler = cachedModule.default ?? cachedModule;
+            const handler = moduleCache[handlerName].module.default ?? moduleCache[handlerName].module;
             await handler(req, resShim);
           } catch (err: any) {
-            console.error('[local-api] Handler error:', err.message);
+            console.error(`[local-api] Handler error (${handlerName}):`, err.message);
             res.statusCode = 500;
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ error: err.message }));

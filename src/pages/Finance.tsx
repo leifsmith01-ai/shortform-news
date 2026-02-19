@@ -117,7 +117,7 @@ export default function Finance() {
   };
 
   return (
-    <div className="flex h-screen bg-stone-50">
+    <div className="flex h-full bg-stone-50">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:block w-72 flex-shrink-0 border-r border-stone-200">
         <FinanceFilterSidebar

@@ -119,6 +119,27 @@ class ApiService {
     return await this.supabase.deleteKeyword(id)
   }
 
+  // ─── Article Reactions — requires sign-in ────────────────────────────────
+
+  async getReactions() {
+    try {
+      if (!this.supabase) return []
+      return await this.supabase.getReactions()
+    } catch (error) {
+      return []
+    }
+  }
+
+  async setReaction(article: any, reaction: 'up' | 'down') {
+    if (!this.supabase) throw new Error('Must be signed in to react to articles')
+    return await this.supabase.setReaction(article, reaction)
+  }
+
+  async removeReaction(articleUrl: string) {
+    if (!this.supabase) throw new Error('Must be signed in to remove reactions')
+    return await this.supabase.removeReaction(articleUrl)
+  }
+
   // ─── AI Summarization (unchanged) ─────────────────────────────────────────
 
   async summarizeWithClaude(articles: any[]) {
