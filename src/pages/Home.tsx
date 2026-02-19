@@ -46,6 +46,8 @@ const COUNTRY_NAMES: Record<string, string> = {
   ci: 'Ivory Coast', cm: 'Cameroon', dz: 'Algeria', tn: 'Tunisia', rw: 'Rwanda',
   // Oceania
   au: 'Australia', nz: 'New Zealand', fj: 'Fiji', pg: 'Papua New Guinea',
+  // Special
+  world: 'World',
 };
 
 const CATEGORY_NAMES = {
