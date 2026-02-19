@@ -257,7 +257,7 @@ async function fetchFromGuardian(country, category, apiKey) {
     // No country restriction — fetch by category section only
     params = new URLSearchParams({
       section: categorySection,
-      'show-fields': 'trailText,thumbnail,byline',
+      'show-fields': 'trailText,thumbnail,byline,bodyText',
       'page-size': '10',
       'order-by': 'newest',
       'api-key': apiKey || 'test',
@@ -267,7 +267,7 @@ async function fetchFromGuardian(country, category, apiKey) {
   if (countrySection) {
     const queryParams = {
       section: countrySection,
-      'show-fields': 'trailText,thumbnail,byline',
+      'show-fields': 'trailText,thumbnail,byline,bodyText',
       'page-size': '10',
       'order-by': 'newest',
       'api-key': apiKey || 'test',
@@ -280,7 +280,7 @@ async function fetchFromGuardian(country, category, apiKey) {
     params = new URLSearchParams({
       q: searchQuery,
       section: categorySection,
-      'show-fields': 'trailText,thumbnail,byline',
+      'show-fields': 'trailText,thumbnail,byline,bodyText',
       'page-size': '10',
       'order-by': 'newest',
       'api-key': apiKey || 'test',
@@ -297,14 +297,26 @@ async function fetchFromGuardian(country, category, apiKey) {
 // Helper: generate AI summary using Gemini
 async function generateSummary(article, geminiKey) {
   if (!geminiKey) return null;
-  const content = `${article.title}. ${article.description || ''}`;
+
+  // Use the best available content — prefer full article text over short description
+  let content = (article.content && article.content.length > (article.description || '').length)
+    ? article.content
+    : `${article.title}. ${article.description || ''}`;
+  // Strip the "[+N chars]" truncation marker that NewsAPI appends to free-tier content
+  content = content.replace(/\s*\[\+\d+ chars\].*$/s, '').trim();
+  // Ensure the title is always in scope for the model
+  if (!content.toLowerCase().includes(article.title.slice(0, 20).toLowerCase())) {
+    content = `${article.title}. ${content}`;
+  }
+  content = content.slice(0, 3000);
+
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${geminiKey}`;
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: `Summarize this news article in 2 to 3 short bullet points. Each point should be one brief sentence. Only output the bullet points, nothing else.\n• Point 1\n• Point 2\n• Point 3 (if needed)\n\nArticle: ${content}` }] }],
-      generationConfig: { temperature: 0.3, maxOutputTokens: 500 }
+      contents: [{ parts: [{ text: `You are a factual news summarizer. Based ONLY on the provided article text, write 2-3 concise bullet points covering the key facts. Do NOT add information that is not in the text.\n\n• Key point 1\n• Key point 2\n• Key point 3 (if warranted)\n\nArticle:\n${content}` }] }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 500 }
     })
   });
   const data = await response.json();
@@ -392,11 +404,13 @@ function formatNewsDataArticle(article, country, category) {
 
 function formatGuardianArticle(result, country, category) {
   const fields = result.fields || {};
+  // bodyText is the full article body; trailText is a short teaser
+  const bodyText = fields.bodyText ? fields.bodyText.slice(0, 3000) : '';
   return {
     id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     title: result.webTitle || 'No title',
     description: fields.trailText || '',
-    content: fields.trailText || '',
+    content: bodyText || fields.trailText || '',
     url: result.webUrl || '#',
     image_url: fields.thumbnail || null,
     source: 'The Guardian',
@@ -494,9 +508,9 @@ export default async function handler(req, res) {
           }
         }
 
-        // ── AI summaries for first 3 articles ─────────────────────────────────
+        // ── AI summaries for first 5 articles ─────────────────────────────────
         if (GEMINI_API_KEY && formattedArticles.length > 0) {
-          const summaryPromises = formattedArticles.slice(0, 3).map(async (article) => {
+          const summaryPromises = formattedArticles.slice(0, 5).map(async (article) => {
             try {
               const summary = await generateSummary(article, GEMINI_API_KEY);
               if (summary) article.summary_points = summary;
