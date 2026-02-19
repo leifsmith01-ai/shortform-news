@@ -8,6 +8,8 @@ import SavedArticles from './pages/SavedArticles'
 import History from './pages/History'
 import SignInPage from './pages/SignInPage'
 import SignUpPage from './pages/SignUpPage'
+import Keywords from './pages/Keywords'
+import Personalized from './pages/Personalized'
 import { api } from './api'
 
 // Placeholder components for routes referenced in Layout
@@ -68,14 +70,16 @@ export default function App() {
         } />
 
         <Route path="/personalized" element={
-          <Layout currentPageName="/personalized">
-            <PlaceholderPage title="Personalized Feed" />
-          </Layout>
+          <ProtectedRoute>
+            <Layout currentPageName="/personalized">
+              <Personalized />
+            </Layout>
+          </ProtectedRoute>
         } />
 
         <Route path="/keywords" element={
           <Layout currentPageName="/keywords">
-            <PlaceholderPage title="Keyword Tracking" />
+            <Keywords />
           </Layout>
         } />
 

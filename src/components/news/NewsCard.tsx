@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import api from '@/api';
+import { useUser } from '@clerk/clerk-react';
+import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,14 +60,21 @@ export default function NewsCard({ article, index, rank }) {
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const { isSignedIn } = useUser();
+  const navigate = useNavigate();
 
   const handleSave = async (e) => {
     e.preventDefault();
+
+    if (!isSignedIn) {
+      toast.error('Sign in to save articles');
+      navigate('/sign-in');
+      return;
+    }
+
     setIsSaving(true);
-    
     try {
       if (isSaved) {
-        // Note: You'll need to track the article ID to unsave
         toast.success('Article unsaved');
         setIsSaved(false);
       } else {

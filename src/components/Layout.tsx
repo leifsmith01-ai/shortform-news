@@ -5,13 +5,13 @@ import { UserButton, SignedIn, SignedOut } from '@clerk/clerk-react';
 
 export default function Layout({ children, currentPageName }: { children: React.ReactNode; currentPageName: string }) {
   const navItems = [
-    { name: 'Home', icon: Home, page: '/' },
-    { name: 'Finance', icon: TrendingUp, page: '/finance' },
-    { name: 'For You', icon: Sparkles, page: '/personalized' },
-    { name: 'Keywords', icon: Tag, page: '/keywords' },
-    { name: 'Alerts', icon: Bell, page: '/alerts' },
-    { name: 'Saved', icon: Bookmark, page: '/saved' },
-    { name: 'History', icon: Clock, page: '/history' },
+    { name: 'Home',     icon: Home,       page: '/' },
+    { name: 'Finance',  icon: TrendingUp, page: '/finance' },
+    { name: 'For You',  icon: Sparkles,   page: '/personalized' },
+    { name: 'Keywords', icon: Tag,        page: '/keywords', isPremium: true },
+    { name: 'Alerts',   icon: Bell,       page: '/alerts' },
+    { name: 'Saved',    icon: Bookmark,   page: '/saved' },
+    { name: 'History',  icon: Clock,      page: '/history' },
   ];
 
   return (
@@ -29,18 +29,22 @@ export default function Layout({ children, currentPageName }: { children: React.
             const Icon = item.icon;
             const isActive = currentPageName === item.page || window.location.pathname === item.page;
             return (
-              <Link
-                key={item.page}
-                to={item.page}
-                className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
-                  isActive
-                    ? 'bg-white text-slate-900'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                }`}
-                title={item.name}
-              >
-                <Icon className="w-5 h-5" />
-              </Link>
+              <div key={item.page} className="relative">
+                <Link
+                  to={item.page}
+                  className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
+                    isActive
+                      ? 'bg-white text-slate-900'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`}
+                  title={item.name}
+                >
+                  <Icon className="w-5 h-5" />
+                </Link>
+                {item.isPremium && (
+                  <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-amber-400 border-2 border-slate-900 pointer-events-none" />
+                )}
+              </div>
             );
           })}
         </nav>

@@ -90,6 +90,40 @@ class SupabaseApiService {
     if (error) throw error
     return data
   }
+
+  // ─── Tracked Keywords ─────────────────────────────────────────────────────
+
+  async getKeywords(): Promise<{ id: string; keyword: string; created_at: string }[]> {
+    const { data, error } = await supabase
+      .from('tracked_keywords')
+      .select('*')
+      .eq('user_id', this.userId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data ?? []
+  }
+
+  async addKeyword(keyword: string): Promise<{ id: string; keyword: string; created_at: string }> {
+    const { data, error } = await supabase
+      .from('tracked_keywords')
+      .insert({ user_id: this.userId, keyword: keyword.trim().toLowerCase() })
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  }
+
+  async deleteKeyword(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('tracked_keywords')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', this.userId)
+
+    if (error) throw error
+  }
 }
 
 export default SupabaseApiService

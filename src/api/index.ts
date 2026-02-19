@@ -102,6 +102,23 @@ class ApiService {
     }
   }
 
+  // ─── Tracked Keywords — premium feature, requires sign-in ────────────────
+
+  async getKeywords() {
+    if (!this.supabase) throw new Error('Must be signed in to manage keywords')
+    return await this.supabase.getKeywords()
+  }
+
+  async addKeyword(keyword: string) {
+    if (!this.supabase) throw new Error('Must be signed in to manage keywords')
+    return await this.supabase.addKeyword(keyword)
+  }
+
+  async deleteKeyword(id: string) {
+    if (!this.supabase) throw new Error('Must be signed in to manage keywords')
+    return await this.supabase.deleteKeyword(id)
+  }
+
   // ─── AI Summarization (unchanged) ─────────────────────────────────────────
 
   async summarizeWithClaude(articles: any[]) {
