@@ -6,14 +6,14 @@
 
 ## ✨ Features
 
-- 🤖 **AI-Powered Summaries**: Claude AI generates concise 3-point summaries for every article
+- 🤖 **AI-Powered Summaries**: AI generates concise 3-point summaries for every article
 - 🌍 **Global Coverage**: News from 50+ countries across 6 continents
 - 📊 **Smart Categorization**: 8 news categories (Technology, Business, Science, Health, Sports, Entertainment, Politics, World)
 - 🔍 **Keyword Search**: Filter news by specific topics or keywords
 - 📅 **Time Range Filters**: View news from the last 24 hours to the past month
 - 🎯 **Personalized Feed**: Track your reading history and save favorite articles
 - 📱 **Responsive Design**: Beautiful interface that works on desktop, tablet, and mobile
-- 🌙 **Dark Mode Ready**: Clean, modern UI with dark mode support (coming soon)
+- 🌙 **Dark Mode Ready**: Clean, modern UI with dark mode support 
 - ⚡ **Fast & Cached**: Smart caching for instant loading
 
 ## 🚀 Quick Start
