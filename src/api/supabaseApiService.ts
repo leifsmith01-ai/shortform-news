@@ -74,11 +74,13 @@ class SupabaseApiService {
   async addToHistory(article: Record<string, unknown>) {
     const row = {
       user_id: this.userId,
-      article_title: article.title as string,
-      article_url: article.url as string,
+      // NewsCard sends article_title/article_url; fall back to title/url for flexibility
+      article_title: (article.article_title ?? article.title) as string,
+      article_url: (article.article_url ?? article.url) as string,
       source: article.source as string,
       category: article.category as string,
       country: article.country as string,
+      read_date: (article.read_date ?? new Date().toISOString()) as string,
     }
 
     const { data, error } = await supabase

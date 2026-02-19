@@ -111,7 +111,7 @@ export default function Personalized() {
   }, [])
 
   return (
-    <div className="h-screen flex flex-col bg-stone-50">
+    <div className="h-full flex flex-col bg-stone-50">
       <header className="bg-white border-b border-stone-200 px-4 lg:px-8 py-4 flex-shrink-0">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">

@@ -10,6 +10,7 @@ import PremiumModal from '@/components/PremiumModal'
 import NewsCard from '@/components/news/NewsCard'
 import LoadingCard from '@/components/news/LoadingCard'
 import api from '@/api'
+import { useSession, useUser } from '@clerk/clerk-react'
 
 interface Keyword {
   id: string
@@ -50,6 +51,8 @@ function PremiumGate({ onUpgradeClick }: { onUpgradeClick: () => void }) {
 
 export default function Keywords() {
   const { isPremium, isLoaded } = usePremium()
+  const { session } = useSession()
+  const { isSignedIn } = useUser()
   const [keywords, setKeywords] = useState<Keyword[]>([])
   const [selectedKeyword, setSelectedKeyword] = useState<Keyword | null>(null)
   const [inputValue, setInputValue] = useState('')
@@ -58,6 +61,28 @@ export default function Keywords() {
   const [articles, setArticles] = useState<any[]>([])
   const [isLoadingArticles, setIsLoadingArticles] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
+  const [isUpgrading, setIsUpgrading] = useState(false)
+
+  // Dev/testing: upgrade the signed-in user's account to premium via the backend API
+  const handleEnablePremium = async () => {
+    if (!session) { toast.error('You must be signed in to enable premium'); return }
+    setIsUpgrading(true)
+    try {
+      const token = await session.getToken()
+      const res = await fetch('/api/admin-set-premium', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to upgrade')
+      toast.success('Account upgraded to premium! Refreshing…')
+      setTimeout(() => window.location.reload(), 1500)
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Upgrade failed')
+    } finally {
+      setIsUpgrading(false)
+    }
+  }
 
   // Load saved keywords on mount
   useEffect(() => {
@@ -146,7 +171,7 @@ export default function Keywords() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-stone-50">
+    <div className="h-full flex flex-col bg-stone-50">
       {/* Header */}
       <header className="bg-white border-b border-stone-200 px-4 lg:px-8 py-4 flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -181,8 +206,25 @@ export default function Keywords() {
       )}
 
       {isLoaded && !isPremium && (
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto flex flex-col">
           <PremiumGate onUpgradeClick={() => setModalOpen(true)} />
+          {/* Dev tool: enable premium for your account to test this feature */}
+          {isSignedIn && (
+            <div className="border-t border-stone-200 p-4 flex flex-col items-center gap-2">
+              <p className="text-xs text-stone-400 text-center">
+                Developer / testing tool
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleEnablePremium}
+                disabled={isUpgrading}
+                className="text-xs border-stone-300 text-stone-500 hover:text-stone-900"
+              >
+                {isUpgrading ? 'Upgrading…' : 'Enable Premium on my account'}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 

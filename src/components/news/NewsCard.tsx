@@ -228,23 +228,25 @@ export default function NewsCard({ article, index, rank }) {
           {article.source}
         </p>
 
-        {/* AI Summary Bullets */}
-        <div className="bg-stone-50 rounded-xl p-4 mb-4 border border-stone-100">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-5 h-5 rounded-md bg-slate-900 flex items-center justify-center">
-              <span className="text-xs">✨</span>
+        {/* AI Summary Bullets — only shown when summaries were generated */}
+        {article.summary_points && article.summary_points.length > 0 && (
+          <div className="bg-stone-50 rounded-xl p-4 mb-4 border border-stone-100">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-5 h-5 rounded-md bg-slate-900 flex items-center justify-center">
+                <span className="text-xs">✨</span>
+              </div>
+              <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">AI Summary</span>
             </div>
-            <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">AI Summary</span>
+            <ul className="space-y-2">
+              {article.summary_points.map((point, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-sm text-stone-700">
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-900 mt-2 flex-shrink-0" />
+                  <span className="leading-relaxed">{point}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-          <ul className="space-y-2">
-            {article.summary_points?.map((point, idx) => (
-              <li key={idx} className="flex items-start gap-2 text-sm text-stone-700">
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-900 mt-2 flex-shrink-0" />
-                <span className="leading-relaxed">{point}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        )}
 
         {/* Read More */}
         <a 
