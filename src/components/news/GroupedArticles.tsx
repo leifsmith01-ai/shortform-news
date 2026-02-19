@@ -31,6 +31,8 @@ const COUNTRY_NAMES: Record<string, string> = {
   ci: 'Ivory Coast', cm: 'Cameroon', dz: 'Algeria', tn: 'Tunisia', rw: 'Rwanda',
   // Oceania
   au: 'Australia', nz: 'New Zealand', fj: 'Fiji', pg: 'Papua New Guinea',
+  // Special
+  world: 'World',
 };
 
 const CATEGORY_NAMES = {
@@ -44,7 +46,7 @@ const SUPPORTED_COUNTRIES = new Set([
   'de', 'eg', 'fr', 'gb', 'gr', 'hk', 'hu', 'id', 'ie', 'il', 'in', 'it', 'jp',
   'kr', 'lt', 'lv', 'ma', 'mx', 'my', 'ng', 'nl', 'no', 'nz', 'ph', 'pl', 'pt',
   'ro', 'rs', 'ru', 'sa', 'se', 'sg', 'si', 'sk', 'th', 'tr', 'tw', 'ua', 'us',
-  've', 'za'
+  've', 'za', 'world'
 ]);
 
 export default function GroupedArticles({ articles, groupBy, selectedKeys = [] }: {

@@ -46,6 +46,8 @@ const COUNTRY_NAMES: Record<string, string> = {
   ci: 'Ivory Coast', cm: 'Cameroon', dz: 'Algeria', tn: 'Tunisia', rw: 'Rwanda',
   // Oceania
   au: 'Australia', nz: 'New Zealand', fj: 'Fiji', pg: 'Papua New Guinea',
+  // Special
+  world: 'World',
 };
 
 const CATEGORY_NAMES = {
@@ -115,11 +117,16 @@ export default function Home() {
         }
       }
 
-      if (cachedArticles.length > 0) {
+      // Only use cached articles if at least some already have AI summaries.
+      // If none do, fall through to a fresh fetch so summaries get generated.
+      const cachedHasSummaries = cachedArticles.some(
+        a => a.summary_points && a.summary_points.length > 0
+      );
+      if (cachedArticles.length > 0 && cachedHasSummaries) {
         setArticles(cachedArticles);
         setLastUpdated(new Date());
         setLoading(false);
-        
+
         const shouldGroup = selectedCountries.length > 1 || selectedCategories.length > 1;
         if (shouldGroup && !groupBy) {
           setGroupBy(selectedCountries.length > 1 ? 'country' : 'category');

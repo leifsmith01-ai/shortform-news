@@ -68,6 +68,69 @@ const COUNTRY_NAMES = {
   au: 'Australia', nz: 'New Zealand', fj: 'Fiji', pg: 'Papua New Guinea',
 };
 
+// Keywords/demonyms for relevance filtering — articles must mention at least one term
+const COUNTRY_RELEVANCE_KEYWORDS = {
+  us: ['united states', 'america', 'american', ' u.s.'],
+  gb: ['united kingdom', 'britain', 'british', ' uk ', 'england', 'scotland', 'wales'],
+  au: ['australia', 'australian'],
+  ca: ['canada', 'canadian'],
+  de: ['germany', 'german'],
+  fr: ['france', 'french'],
+  jp: ['japan', 'japanese'],
+  cn: ['china', 'chinese'],
+  in: ['india', 'indian'],
+  kr: ['korea', 'korean', 'south korea'],
+  br: ['brazil', 'brazilian'],
+  mx: ['mexico', 'mexican'],
+  it: ['italy', 'italian'],
+  es: ['spain', 'spanish'],
+  nl: ['netherlands', 'dutch'],
+  se: ['sweden', 'swedish'],
+  no: ['norway', 'norwegian'],
+  pl: ['poland', 'polish'],
+  ch: ['switzerland', 'swiss'],
+  be: ['belgium', 'belgian'],
+  at: ['austria', 'austrian'],
+  ie: ['ireland', 'irish'],
+  pt: ['portugal', 'portuguese'],
+  dk: ['denmark', 'danish'],
+  fi: ['finland', 'finnish'],
+  gr: ['greece', 'greek'],
+  nz: ['new zealand'],
+  sg: ['singapore'],
+  hk: ['hong kong'],
+  tw: ['taiwan'],
+  za: ['south africa'],
+  ng: ['nigeria', 'nigerian'],
+  eg: ['egypt', 'egyptian'],
+  ke: ['kenya', 'kenyan'],
+  tr: ['turkey', 'turkish'],
+  il: ['israel', 'israeli'],
+  ae: ['uae', 'emirates'],
+  sa: ['saudi', 'saudi arabia'],
+  ar: ['argentina', 'argentinian'],
+  cl: ['chile', 'chilean'],
+  co: ['colombia', 'colombian'],
+  id: ['indonesia', 'indonesian'],
+  th: ['thailand', 'thai'],
+  my: ['malaysia', 'malaysian'],
+  ph: ['philippines', 'philippine'],
+  vn: ['vietnam', 'vietnamese'],
+  pk: ['pakistan', 'pakistani'],
+};
+
+function getCountryTerms(country) {
+  if (COUNTRY_RELEVANCE_KEYWORDS[country]) return COUNTRY_RELEVANCE_KEYWORDS[country];
+  const name = COUNTRY_NAMES[country];
+  return name ? [name.toLowerCase()] : [country.toLowerCase()];
+}
+
+function articleMentionsCountry(article, country) {
+  const terms = getCountryTerms(country);
+  const text = `${article.title} ${article.description || ''}`.toLowerCase();
+  return terms.some(term => text.includes(term));
+}
+
 // Map app categories to Guardian API sections
 const GUARDIAN_SECTION_MAP = {
   technology:    'technology',
@@ -134,7 +197,9 @@ async function fetchFromNewsAPI(country, category, apiKey) {
     politics: 'general', world: 'general'
   };
   const newsApiCategory = categoryMap[category] || 'general';
-  const url = `https://newsapi.org/v2/top-headlines?country=${country}&category=${newsApiCategory}&pageSize=10&apiKey=${apiKey}`;
+  const url = country === 'world'
+    ? `https://newsapi.org/v2/top-headlines?language=en&category=${newsApiCategory}&pageSize=10&apiKey=${apiKey}`
+    : `https://newsapi.org/v2/top-headlines?country=${country}&category=${newsApiCategory}&pageSize=10&apiKey=${apiKey}`;
   const response = await fetch(url);
   if (!response.ok) throw new Error(`NewsAPI error: ${response.status}`);
   const data = await response.json();
@@ -145,16 +210,18 @@ async function fetchFromNewsAPI(country, category, apiKey) {
 // Helper: fetch from WorldNewsAPI (secondary - broad country coverage)
 async function fetchFromWorldNewsAPI(country, category, apiKey) {
   const topic = WORLD_NEWS_TOPIC_MAP[category] || 'politics';
-  const countryName = COUNTRY_NAMES[country] || country;
   const params = new URLSearchParams({
-    'source-country': country,
-    'text': `${countryName} ${category !== 'world' ? category : ''}`.trim(),
     'language': 'en',
     'number': '10',
     'sort': 'publish-time',
     'sort-direction': 'DESC',
     'api-key': apiKey,
   });
+  if (country !== 'world') {
+    const countryName = COUNTRY_NAMES[country] || country;
+    params.set('source-country', country);
+    params.set('text', `${countryName} ${category !== 'world' ? category : ''}`.trim());
+  }
   // topic filter improves precision
   if (topic) params.set('categories', topic);
 
@@ -169,11 +236,11 @@ async function fetchFromWorldNewsAPI(country, category, apiKey) {
 async function fetchFromNewsData(country, category, apiKey) {
   const newsDataCategory = NEWS_DATA_CATEGORY_MAP[category] || 'politics';
   const params = new URLSearchParams({
-    'country': country,
     'category': newsDataCategory,
     'language': 'en',
     'apikey': apiKey,
   });
+  if (country !== 'world') params.set('country', country);
   const url = `https://newsdata.io/api/1/latest?${params.toString()}`;
   const response = await fetch(url);
   if (!response.ok) throw new Error(`NewsData error: ${response.status}`);
@@ -184,13 +251,23 @@ async function fetchFromNewsData(country, category, apiKey) {
 
 // Helper: fetch from The Guardian (final fallback)
 async function fetchFromGuardian(country, category, apiKey) {
-  const countrySection = GUARDIAN_COUNTRY_SECTIONS[country];
   const categorySection = GUARDIAN_SECTION_MAP[category] || 'news';
   let params;
+  if (country === 'world') {
+    // No country restriction — fetch by category section only
+    params = new URLSearchParams({
+      section: categorySection,
+      'show-fields': 'trailText,thumbnail,byline,bodyText',
+      'page-size': '10',
+      'order-by': 'newest',
+      'api-key': apiKey || 'test',
+    });
+  } else {
+  const countrySection = GUARDIAN_COUNTRY_SECTIONS[country];
   if (countrySection) {
     const queryParams = {
       section: countrySection,
-      'show-fields': 'trailText,thumbnail,byline',
+      'show-fields': 'trailText,thumbnail,byline,bodyText',
       'page-size': '10',
       'order-by': 'newest',
       'api-key': apiKey || 'test',
@@ -203,7 +280,7 @@ async function fetchFromGuardian(country, category, apiKey) {
     params = new URLSearchParams({
       q: searchQuery,
       section: categorySection,
-      'show-fields': 'trailText,thumbnail,byline',
+      'show-fields': 'trailText,thumbnail,byline,bodyText',
       'page-size': '10',
       'order-by': 'newest',
       'api-key': apiKey || 'test',
@@ -220,14 +297,26 @@ async function fetchFromGuardian(country, category, apiKey) {
 // Helper: generate AI summary using Gemini
 async function generateSummary(article, geminiKey) {
   if (!geminiKey) return null;
-  const content = `${article.title}. ${article.description || ''}`;
+
+  // Use the best available content — prefer full article text over short description
+  let content = (article.content && article.content.length > (article.description || '').length)
+    ? article.content
+    : `${article.title}. ${article.description || ''}`;
+  // Strip the "[+N chars]" truncation marker that NewsAPI appends to free-tier content
+  content = content.replace(/\s*\[\+\d+ chars\].*$/s, '').trim();
+  // Ensure the title is always in scope for the model
+  if (!content.toLowerCase().includes(article.title.slice(0, 20).toLowerCase())) {
+    content = `${article.title}. ${content}`;
+  }
+  content = content.slice(0, 3000);
+
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${geminiKey}`;
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: `Summarize this news article in 2 to 3 short bullet points. Each point should be one brief sentence. Only output the bullet points, nothing else.\n• Point 1\n• Point 2\n• Point 3 (if needed)\n\nArticle: ${content}` }] }],
-      generationConfig: { temperature: 0.3, maxOutputTokens: 500 }
+      contents: [{ parts: [{ text: `You are a factual news summarizer. Based ONLY on the provided article text, write 2-3 concise bullet points covering the key facts. Do NOT add information that is not in the text.\n\n• Key point 1\n• Key point 2\n• Key point 3 (if warranted)\n\nArticle:\n${content}` }] }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 500 }
     })
   });
   const data = await response.json();
@@ -315,11 +404,13 @@ function formatNewsDataArticle(article, country, category) {
 
 function formatGuardianArticle(result, country, category) {
   const fields = result.fields || {};
+  // bodyText is the full article body; trailText is a short teaser
+  const bodyText = fields.bodyText ? fields.bodyText.slice(0, 3000) : '';
   return {
     id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     title: result.webTitle || 'No title',
     description: fields.trailText || '',
-    content: fields.trailText || '',
+    content: bodyText || fields.trailText || '',
     url: result.webUrl || '#',
     image_url: fields.thumbnail || null,
     source: 'The Guardian',
@@ -368,8 +459,8 @@ export default async function handler(req, res) {
         console.log(`Cache MISS: ${cacheKey} — fetching fresh data`);
         let formattedArticles = [];
 
-        // ── 1. NewsAPI (primary, ~55 countries) ──────────────────────────────
-        if (NEWS_API_SUPPORTED_COUNTRIES.has(country)) {
+        // ── 1. NewsAPI (primary, ~55 countries + world) ──────────────────────────────
+        if (country === 'world' || NEWS_API_SUPPORTED_COUNTRIES.has(country)) {
           console.log(`  [1] NewsAPI [${country}/${category}]`);
           try {
             const raw = await fetchFromNewsAPI(country, category, NEWS_API_KEY);
@@ -381,7 +472,7 @@ export default async function handler(req, res) {
         }
 
         // ── 2. WorldNewsAPI (secondary, very broad) ───────────────────────────
-        if (formattedArticles.length < 5 && WORLD_NEWS_API_KEY && WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country)) {
+        if (formattedArticles.length < 5 && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) {
           console.log(`  [2] WorldNewsAPI [${country}/${category}] (have ${formattedArticles.length} so far)`);
           try {
             const raw = await fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY);
@@ -393,7 +484,7 @@ export default async function handler(req, res) {
         }
 
         // ── 3. NewsData.io (tertiary, broadest coverage) ──────────────────────
-        if (formattedArticles.length < 5 && NEWS_DATA_API_KEY && NEWS_DATA_SUPPORTED_COUNTRIES.has(country)) {
+        if (formattedArticles.length < 5 && NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
           console.log(`  [3] NewsData.io [${country}/${category}] (have ${formattedArticles.length} so far)`);
           try {
             const raw = await fetchFromNewsData(country, category, NEWS_DATA_API_KEY);
@@ -417,9 +508,9 @@ export default async function handler(req, res) {
           }
         }
 
-        // ── AI summaries for first 3 articles ─────────────────────────────────
+        // ── AI summaries for first 5 articles ─────────────────────────────────
         if (GEMINI_API_KEY && formattedArticles.length > 0) {
-          const summaryPromises = formattedArticles.slice(0, 3).map(async (article) => {
+          const summaryPromises = formattedArticles.slice(0, 5).map(async (article) => {
             try {
               const summary = await generateSummary(article, GEMINI_API_KEY);
               if (summary) article.summary_points = summary;
@@ -429,6 +520,14 @@ export default async function handler(req, res) {
             return article;
           });
           await Promise.all(summaryPromises);
+        }
+
+        // ── Relevance filter: only keep articles that mention the country ──────
+        // This removes off-topic articles (e.g. global tech news surfaced by an AU source).
+        // Falls back to all articles if fewer than 3 would remain after filtering.
+        if (country !== 'world' && formattedArticles.length > 0) {
+          const relevant = formattedArticles.filter(a => articleMentionsCountry(a, country));
+          if (relevant.length >= 3) formattedArticles = relevant;
         }
 
         CACHE[cacheKey] = { timestamp: Date.now(), articles: formattedArticles };

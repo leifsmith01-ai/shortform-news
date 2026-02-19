@@ -250,11 +250,28 @@ export default function FilterSidebar({
             <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${countriesOpen ? 'rotate-180' : ''}`} />
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <motion.div 
+            <motion.div
               className="space-y-2 mb-6"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
+              {/* World — pinned global option above continents */}
+              <label
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                  selectedCountries.includes('world')
+                    ? 'bg-slate-800 text-white'
+                    : 'hover:bg-slate-800/50 text-slate-400'
+                }`}
+              >
+                <Checkbox
+                  checked={selectedCountries.includes('world')}
+                  onCheckedChange={() => toggleCountry('world')}
+                  className="border-slate-600 data-[state=checked]:bg-slate-700 data-[state=checked]:border-slate-700"
+                />
+                <span className="text-base">🌍</span>
+                <span className="text-sm">World</span>
+              </label>
+              <div className="h-px bg-slate-800 my-2" />
               {Object.entries(COUNTRIES_BY_CONTINENT).map(([continent, countries]) => (
                 <Collapsible 
                   key={continent}
