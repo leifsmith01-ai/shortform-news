@@ -72,7 +72,6 @@ export default function Home() {
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState('week');
-  const selectedDate = new Date();
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -98,7 +97,7 @@ export default function Home() {
     setLoading(true);
     setError(null);
 
-    const targetDate = selectedDate.toISOString().split('T')[0];
+    const targetDate = new Date().toISOString().split('T')[0];
     
     try {
       // Try to get cached articles first
@@ -184,7 +183,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCountries, selectedCategories, searchQuery, dateRange, selectedDate, groupBy]);
+  }, [selectedCountries, selectedCategories, searchQuery, dateRange, groupBy]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
