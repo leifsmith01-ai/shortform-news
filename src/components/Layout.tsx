@@ -10,7 +10,7 @@ export default function Layout({ children, currentPageName }: { children: React.
     { name: 'Home',     icon: Home,       page: '/' },
     { name: 'Finance',  icon: TrendingUp, page: '/finance' },
     { name: 'For You',  icon: Sparkles,   page: '/personalized' },
-    { name: 'Keywords', icon: Tag,        page: '/keywords', isPremium: true },
+    { name: 'Keywords', icon: Tag,        page: '/keywords' },
     { name: 'Alerts',   icon: Bell,       page: '/alerts' },
     { name: 'Saved',    icon: Bookmark,   page: '/saved' },
     { name: 'History',  icon: Clock,      page: '/history' },
