@@ -295,6 +295,52 @@ async function fetchFromGuardian(country, category, apiKey) {
   return data.response?.results || [];
 }
 
+// ── Keyword search helpers ─────────────────────────────────────────────────
+// These search APIs directly by keyword rather than by country/category top-headlines.
+
+async function searchNewsAPIByKeyword(keyword, apiKey) {
+  const params = new URLSearchParams({
+    q: keyword, language: 'en', sortBy: 'publishedAt', pageSize: '20', apiKey,
+  });
+  const response = await fetch(`https://newsapi.org/v2/everything?${params}`);
+  if (!response.ok) throw new Error(`NewsAPI keyword error: ${response.status}`);
+  const data = await response.json();
+  if (data.status !== 'ok') throw new Error(`NewsAPI keyword error: ${data.message}`);
+  return data.articles || [];
+}
+
+async function searchWorldNewsAPIByKeyword(keyword, apiKey) {
+  const params = new URLSearchParams({
+    text: keyword, language: 'en', number: '20',
+    sort: 'publish-time', 'sort-direction': 'DESC', 'api-key': apiKey,
+  });
+  const response = await fetch(`https://api.worldnewsapi.com/search-news?${params}`);
+  if (!response.ok) throw new Error(`WorldNewsAPI keyword error: ${response.status}`);
+  const data = await response.json();
+  return data.news || [];
+}
+
+async function searchNewsDataByKeyword(keyword, apiKey) {
+  const params = new URLSearchParams({ q: keyword, language: 'en', apikey: apiKey });
+  const response = await fetch(`https://newsdata.io/api/1/latest?${params}`);
+  if (!response.ok) throw new Error(`NewsData keyword error: ${response.status}`);
+  const data = await response.json();
+  if (data.status !== 'success') throw new Error(`NewsData keyword error: ${data.message}`);
+  return data.results || [];
+}
+
+async function searchGuardianByKeyword(keyword, apiKey) {
+  const params = new URLSearchParams({
+    q: keyword, 'show-fields': 'trailText,thumbnail,byline,bodyText',
+    'page-size': '20', 'order-by': 'newest', 'api-key': apiKey || 'test',
+  });
+  const response = await fetch(`https://content.guardianapis.com/search?${params}`);
+  if (!response.ok) throw new Error(`Guardian keyword error: ${response.status}`);
+  const data = await response.json();
+  if (data.response?.status !== 'ok') throw new Error(`Guardian keyword error: ${data.response?.message}`);
+  return data.response?.results || [];
+}
+
 // Helper: generate AI summary using Gemini
 async function generateSummary(article, geminiKey) {
   if (!geminiKey) return null;
@@ -440,6 +486,89 @@ export default async function handler(req, res) {
   const NEWS_DATA_API_KEY  = process.env.NEWS_DATA_API_KEY    || null;
 
   if (!NEWS_API_KEY) return res.status(500).json({ error: 'NewsAPI key not configured' });
+
+  // ── Keyword search: search APIs directly when a searchQuery is provided ────
+  // This replaces the top-headlines + post-filter approach with a real search
+  // so results are actually about the keyword, not just top news that mentions it.
+  if (searchQuery) {
+    const keyword = searchQuery.trim();
+    console.log(`Keyword search: "${keyword}"`);
+    try {
+      const results = [];
+
+      // 1. NewsAPI /v2/everything (supports full-text keyword search)
+      try {
+        const raw = await searchNewsAPIByKeyword(keyword, NEWS_API_KEY);
+        const valid = raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com');
+        results.push(...valid.map(a => formatNewsAPIArticle(a, 'world', 'world')));
+        console.log(`  [1] NewsAPI keyword: ${valid.length} articles`);
+      } catch (err) {
+        console.error('  NewsAPI keyword search failed:', err.message);
+      }
+
+      // 2. WorldNewsAPI
+      if (results.length < 10 && WORLD_NEWS_API_KEY) {
+        try {
+          const raw = await searchWorldNewsAPIByKeyword(keyword, WORLD_NEWS_API_KEY);
+          results.push(...raw.map(a => formatWorldNewsAPIArticle(a, 'world', 'world')));
+          console.log(`  [2] WorldNewsAPI keyword: ${raw.length} articles`);
+        } catch (err) {
+          console.error('  WorldNewsAPI keyword search failed:', err.message);
+        }
+      }
+
+      // 3. NewsData.io
+      if (results.length < 10 && NEWS_DATA_API_KEY) {
+        try {
+          const raw = await searchNewsDataByKeyword(keyword, NEWS_DATA_API_KEY);
+          const valid = raw.filter(a => a.title);
+          results.push(...valid.map(a => formatNewsDataArticle(a, 'world', 'world')));
+          console.log(`  [3] NewsData keyword: ${valid.length} articles`);
+        } catch (err) {
+          console.error('  NewsData keyword search failed:', err.message);
+        }
+      }
+
+      // 4. Guardian (fallback)
+      if (results.length < 5 && GUARDIAN_API_KEY) {
+        try {
+          const raw = await searchGuardianByKeyword(keyword, GUARDIAN_API_KEY);
+          results.push(...raw.map(r => formatGuardianArticle(r, 'world', 'world')));
+          console.log(`  [4] Guardian keyword: ${raw.length} articles`);
+        } catch (err) {
+          console.error('  Guardian keyword search failed:', err.message);
+        }
+      }
+
+      // AI summaries for first 5
+      if (GEMINI_API_KEY && results.length > 0) {
+        await Promise.all(results.slice(0, 5).map(async (article) => {
+          try {
+            const summary = await generateSummary(article, GEMINI_API_KEY);
+            if (summary) article.summary_points = summary;
+          } catch (err) {
+            console.error('Summary failed:', err.message);
+          }
+        }));
+      }
+
+      // Sort newest first, deduplicate by title
+      const seen = new Set();
+      const deduped = results
+        .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
+        .filter(a => {
+          const key = a.title.toLowerCase().slice(0, 60);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+
+      return res.status(200).json({ status: 'ok', articles: deduped, totalResults: deduped.length, cached: false });
+    } catch (error) {
+      console.error('Keyword search error:', error);
+      return res.status(500).json({ error: 'Failed to search news', message: error.message });
+    }
+  }
 
   const countryList  = Array.isArray(countries)  ? countries  : [countries  || 'us'];
   const categoryList = Array.isArray(categories) ? categories : [categories || 'technology'];
