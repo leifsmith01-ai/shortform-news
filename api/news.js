@@ -191,6 +191,26 @@ function isCacheValid(cacheEntry) {
 
 // Helper: fetch from NewsAPI (primary - ~55 countries)
 async function fetchFromNewsAPI(country, category, apiKey) {
+  // For politics + specific country, use /v2/everything with a targeted query
+  // because top-headlines 'general' is too broad and often misses political news
+  if (category === 'politics' && country !== 'world') {
+    const countryName = COUNTRY_NAMES[country] || country;
+    const query = `"${countryName}" AND (politics OR government OR election OR parliament OR president OR minister OR policy OR legislation OR senate OR congress OR political)`;
+    const params = new URLSearchParams({
+      q: query,
+      language: 'en',
+      sortBy: 'publishedAt',
+      pageSize: '10',
+      apiKey,
+    });
+    const url = `https://newsapi.org/v2/everything?${params.toString()}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`NewsAPI politics error: ${response.status}`);
+    const data = await response.json();
+    if (data.status !== 'ok') throw new Error(`NewsAPI politics error: ${data.message}`);
+    return data.articles || [];
+  }
+
   const categoryMap = {
     technology: 'technology', business: 'business', science: 'science',
     health: 'health', sports: 'sports', entertainment: 'entertainment',
@@ -220,7 +240,12 @@ async function fetchFromWorldNewsAPI(country, category, apiKey) {
   if (country !== 'world') {
     const countryName = COUNTRY_NAMES[country] || country;
     params.set('source-country', country);
-    params.set('text', `${countryName} ${category !== 'world' ? category : ''}`.trim());
+    // For politics, use targeted political terms for much better relevance
+    if (category === 'politics') {
+      params.set('text', `${countryName} politics government`);
+    } else {
+      params.set('text', `${countryName} ${category !== 'world' ? category : ''}`.trim());
+    }
   }
   // topic filter improves precision
   if (topic) params.set('categories', topic);
@@ -672,6 +697,73 @@ export default async function handler(req, res) {
       console.error('Keyword search error:', error);
       return res.status(500).json({ error: 'Failed to search news', message: error.message });
     }
+  }
+
+  // ── Trending: fetch across all categories for 'world' and return top 10 by views ──
+  const isTrending = Array.isArray(categories)
+    ? categories.includes('trending')
+    : categories === 'trending';
+
+  if (isTrending) {
+    const trendingCategories = ['technology', 'business', 'politics', 'science', 'health', 'sports', 'entertainment'];
+    const trendingCacheKey = getCacheKey('world', 'trending');
+
+    if (isCacheValid(CACHE[trendingCacheKey])) {
+      console.log(`Cache HIT: ${trendingCacheKey}`);
+      return res.status(200).json({ status: 'ok', articles: CACHE[trendingCacheKey].articles, totalResults: CACHE[trendingCacheKey].articles.length, cached: true });
+    }
+
+    console.log('Fetching trending articles across all categories');
+    const trendingArticles = [];
+
+    for (const cat of trendingCategories) {
+      const catCacheKey = getCacheKey('world', cat);
+      if (isCacheValid(CACHE[catCacheKey])) {
+        trendingArticles.push(...CACHE[catCacheKey].articles);
+        continue;
+      }
+      try {
+        const raw = await fetchFromNewsAPI('world', cat, NEWS_API_KEY);
+        const valid = raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com');
+        const formatted = valid.map(a => formatNewsAPIArticle(a, 'world', cat));
+        // Also try Guardian for broader coverage
+        if (formatted.length < 3 && GUARDIAN_API_KEY) {
+          const guardianRaw = await fetchFromGuardian('world', cat, GUARDIAN_API_KEY).catch(() => []);
+          formatted.push(...guardianRaw.map(r => formatGuardianArticle(r, 'world', cat)));
+        }
+        CACHE[catCacheKey] = { timestamp: Date.now(), articles: formatted };
+        trendingArticles.push(...formatted);
+      } catch (err) {
+        console.error(`Trending fetch failed for ${cat}:`, err.message);
+      }
+    }
+
+    // Deduplicate by title, sort by views desc, take top 10
+    const seen = new Set();
+    const top10 = trendingArticles
+      .filter(a => {
+        const key = a.title.toLowerCase().slice(0, 60);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .sort((a, b) => (b.views || 0) - (a.views || 0))
+      .slice(0, 10);
+
+    // Generate AI summaries for the top 10
+    if (GEMINI_API_KEY && top10.length > 0) {
+      await Promise.all(top10.slice(0, 5).map(async (article) => {
+        try {
+          const summary = await generateSummary(article, GEMINI_API_KEY);
+          if (summary) article.summary_points = summary;
+        } catch (err) {
+          console.error('Trending summary failed:', err.message);
+        }
+      }));
+    }
+
+    CACHE[trendingCacheKey] = { timestamp: Date.now(), articles: top10 };
+    return res.status(200).json({ status: 'ok', articles: top10, totalResults: top10.length, cached: false });
   }
 
   const countryList  = Array.isArray(countries)  ? countries  : [countries  || 'us'];
