@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Tag, Plus, X, Zap, Lock, Newspaper } from 'lucide-react'
+import { Tag, Plus, X, Lock, Newspaper, Search, LogIn } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { toast } from 'sonner'
-import { usePremium } from '@/hooks/usePremium'
-import PremiumModal from '@/components/PremiumModal'
 import NewsCard from '@/components/news/NewsCard'
 import LoadingCard from '@/components/news/LoadingCard'
 import api from '@/api'
-import { useSession, useUser } from '@clerk/clerk-react'
+import { useUser } from '@clerk/clerk-react'
+import { Link } from 'react-router-dom'
 
 interface Keyword {
   id: string
@@ -22,37 +21,8 @@ interface Keyword {
 const SEARCH_COUNTRIES = ['us', 'gb', 'au', 'ca', 'nz', 'in', 'sg', 'za']
 const SEARCH_CATEGORIES = ['technology', 'business', 'science', 'health', 'sports', 'entertainment', 'politics', 'world']
 
-function PremiumGate({ onUpgradeClick }: { onUpgradeClick: () => void }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="flex flex-col items-center justify-center h-full min-h-[500px] text-center px-6"
-    >
-      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center mb-6 border border-amber-200">
-        <Lock className="w-10 h-10 text-amber-500" />
-      </div>
-      <h3 className="text-2xl font-semibold text-stone-900 mb-2">
-        Keyword Tracking is Premium
-      </h3>
-      <p className="text-stone-500 max-w-sm mb-8 leading-relaxed">
-        Create your own custom news feeds for any topic — your brand, your industry, your city. Track what matters to you.
-      </p>
-      <Button
-        onClick={onUpgradeClick}
-        className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold h-11 px-8 gap-2"
-      >
-        <Zap className="w-4 h-4" />
-        Upgrade to Premium
-      </Button>
-    </motion.div>
-  )
-}
-
 export default function Keywords() {
-  const { isPremium, isLoaded } = usePremium()
-  const { session } = useSession()
-  const { isSignedIn } = useUser()
+  const { isSignedIn, isLoaded } = useUser()
   const [keywords, setKeywords] = useState<Keyword[]>([])
   const [selectedKeyword, setSelectedKeyword] = useState<Keyword | null>(null)
   const [inputValue, setInputValue] = useState('')
@@ -60,33 +30,10 @@ export default function Keywords() {
   const [isLoadingKeywords, setIsLoadingKeywords] = useState(false)
   const [articles, setArticles] = useState<any[]>([])
   const [isLoadingArticles, setIsLoadingArticles] = useState(false)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [isUpgrading, setIsUpgrading] = useState(false)
 
-  // Dev/testing: upgrade the signed-in user's account to premium via the backend API
-  const handleEnablePremium = async () => {
-    if (!session) { toast.error('You must be signed in to enable premium'); return }
-    setIsUpgrading(true)
-    try {
-      const token = await session.getToken()
-      const res = await fetch('/api/admin-set-premium', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to upgrade')
-      toast.success('Account upgraded to premium! Refreshing…')
-      setTimeout(() => window.location.reload(), 1500)
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Upgrade failed')
-    } finally {
-      setIsUpgrading(false)
-    }
-  }
-
-  // Load saved keywords on mount
+  // Load saved keywords on mount (sign-in required)
   useEffect(() => {
-    if (!isLoaded || !isPremium) return
+    if (!isLoaded || !isSignedIn) return
     setIsLoadingKeywords(true)
     api.getKeywords()
       .then(kws => {
@@ -95,7 +42,7 @@ export default function Keywords() {
       })
       .catch(() => toast.error('Failed to load keywords'))
       .finally(() => setIsLoadingKeywords(false))
-  }, [isLoaded, isPremium])
+  }, [isLoaded, isSignedIn])
 
   // Fetch articles whenever selected keyword changes
   const fetchArticlesForKeyword = useCallback(async (kw: Keyword) => {
@@ -123,7 +70,7 @@ export default function Keywords() {
 
   const handleAdd = async () => {
     const trimmed = inputValue.trim()
-    if (!trimmed) return
+    if (!trimmed || !isSignedIn) return
 
     setIsSubmitting(true)
     try {
@@ -150,7 +97,6 @@ export default function Keywords() {
 
     setKeywords(prev => prev.filter(k => k.id !== kw.id))
 
-    // Select a neighbouring keyword if we deleted the active one
     if (wasSelected) {
       const remaining = previous.filter(k => k.id !== kw.id)
       setSelectedKeyword(remaining.length > 0 ? remaining[0] : null)
@@ -176,25 +122,22 @@ export default function Keywords() {
       <header className="bg-white border-b border-stone-200 px-4 lg:px-8 py-4 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center">
-            <Tag className="w-5 h-5 text-white" />
+            <Search className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-stone-900 flex items-center gap-2">
-              Keyword Feeds
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                PRO
-              </span>
+            <h1 className="text-2xl font-bold text-stone-900">
+              Custom Keywords &amp; Searches
             </h1>
             <p className="text-sm text-stone-500">
-              {isPremium && isLoaded
-                ? `${keywords.length} custom feed${keywords.length !== 1 ? 's' : ''}`
-                : 'Premium feature'}
+              {isLoaded && isSignedIn
+                ? `${keywords.length} saved keyword${keywords.length !== 1 ? 's' : ''}`
+                : 'Sign in to save and track keywords'}
             </p>
           </div>
         </div>
       </header>
 
-      {/* Body */}
+      {/* Loading skeleton */}
       {!isLoaded && (
         <div className="flex-1 flex items-center justify-center">
           <div className="space-y-3 w-64">
@@ -205,103 +148,114 @@ export default function Keywords() {
         </div>
       )}
 
-      {isLoaded && !isPremium && (
-        <div className="flex-1 overflow-auto flex flex-col">
-          <PremiumGate onUpgradeClick={() => setModalOpen(true)} />
-          {/* Dev tool: enable premium for your account to test this feature */}
-          {isSignedIn && (
-            <div className="border-t border-stone-200 p-4 flex flex-col items-center gap-2">
-              <p className="text-xs text-stone-400 text-center">
-                Developer / testing tool
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleEnablePremium}
-                disabled={isUpgrading}
-                className="text-xs border-stone-300 text-stone-500 hover:text-stone-900"
-              >
-                {isUpgrading ? 'Upgrading…' : 'Enable Premium on my account'}
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {isLoaded && isPremium && (
+      {isLoaded && (
         <div className="flex-1 flex overflow-hidden">
-          {/* Left sidebar — keyword list + add input */}
-          <aside className="w-64 flex-shrink-0 bg-white border-r border-stone-200 flex flex-col">
-            {/* Add keyword */}
+          {/* Left sidebar — search input + keyword tags */}
+          <aside className="w-72 flex-shrink-0 bg-white border-r border-stone-200 flex flex-col">
+
+            {/* Add keyword input */}
             <div className="p-4 border-b border-stone-100">
+              <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-3">
+                Add Keyword or Search
+              </p>
               <div className="flex gap-2">
-                <Input
-                  value={inputValue}
-                  onChange={e => setInputValue(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Add keyword…"
-                  className="flex-1 h-9 rounded-lg border-stone-200 text-sm"
-                  maxLength={60}
-                  disabled={isSubmitting}
-                />
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400 pointer-events-none" />
+                  <Input
+                    value={inputValue}
+                    onChange={e => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={isSignedIn ? 'e.g., climate change, AI…' : 'Sign in to search…'}
+                    className="pl-8 h-9 rounded-lg border-stone-200 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                    maxLength={60}
+                    disabled={!isSignedIn || isSubmitting}
+                  />
+                </div>
                 <Button
                   onClick={handleAdd}
-                  disabled={isSubmitting || !inputValue.trim()}
+                  disabled={!isSignedIn || isSubmitting || !inputValue.trim()}
                   size="icon"
-                  className="h-9 w-9 bg-slate-900 hover:bg-slate-800 rounded-lg flex-shrink-0"
+                  className="h-9 w-9 bg-slate-900 hover:bg-slate-800 rounded-lg flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={isSignedIn ? 'Add keyword' : 'Sign in to add keywords'}
                 >
-                  <Plus className="w-4 h-4" />
+                  {isSignedIn ? <Plus className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
                 </Button>
               </div>
-              <p className="text-xs text-stone-400 mt-2">Press Enter to add</p>
+
+              {isSignedIn ? (
+                <p className="text-xs text-stone-400 mt-2">Press Enter to add</p>
+              ) : (
+                <Link
+                  to="/sign-in"
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 transition-colors"
+                >
+                  <LogIn className="w-3 h-3" />
+                  Sign in to save keywords
+                </Link>
+              )}
             </div>
 
-            {/* Keyword list */}
+            {/* Keyword tags */}
             <ScrollArea className="flex-1">
-              <div className="p-2">
-                {isLoadingKeywords ? (
-                  <div className="space-y-2 p-2">
-                    {[...Array(4)].map((_, i) => (
-                      <div key={i} className="h-9 bg-stone-100 rounded-lg animate-pulse" />
+              <div className="p-4">
+                {!isSignedIn ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-center">
+                    <div className="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center mb-3">
+                      <Lock className="w-5 h-5 text-stone-400" />
+                    </div>
+                    <p className="text-sm text-stone-500 font-medium mb-1">Sign in to get started</p>
+                    <p className="text-xs text-stone-400 mb-4">Save keywords and track custom news feeds.</p>
+                    <Link to="/sign-in">
+                      <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white gap-2 h-8 text-xs">
+                        <LogIn className="w-3.5 h-3.5" />
+                        Sign In
+                      </Button>
+                    </Link>
+                  </div>
+                ) : isLoadingKeywords ? (
+                  <div className="flex flex-wrap gap-2">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="h-8 w-20 bg-stone-100 rounded-full animate-pulse" />
                     ))}
                   </div>
                 ) : keywords.length === 0 ? (
-                  <div className="p-4 text-center">
+                  <div className="flex flex-col items-center justify-center py-10 text-center">
                     <Tag className="w-6 h-6 text-stone-300 mx-auto mb-2" />
                     <p className="text-xs text-stone-400">No keywords yet.</p>
                     <p className="text-xs text-stone-300 mt-1">Add one above to create your first feed.</p>
                   </div>
                 ) : (
                   <AnimatePresence>
-                    {keywords.map(kw => (
-                      <motion.div
-                        key={kw.id}
-                        layout
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -10 }}
-                        className={`group flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg cursor-pointer mb-1 transition-colors ${
-                          selectedKeyword?.id === kw.id
-                            ? 'bg-slate-900 text-white'
-                            : 'hover:bg-stone-100 text-stone-700'
-                        }`}
-                        onClick={() => setSelectedKeyword(kw)}
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Tag className={`w-3.5 h-3.5 flex-shrink-0 ${selectedKeyword?.id === kw.id ? 'text-slate-300' : 'text-stone-400'}`} />
-                          <span className="text-sm font-medium truncate">{kw.keyword}</span>
-                        </div>
-                        <button
-                          onClick={e => { e.stopPropagation(); handleDelete(kw) }}
-                          className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ${
-                            selectedKeyword?.id === kw.id ? 'hover:bg-white/20' : 'hover:bg-stone-200'
+                    <div className="flex flex-wrap gap-2">
+                      {keywords.map(kw => (
+                        <motion.span
+                          key={kw.id}
+                          layout
+                          initial={{ opacity: 0, scale: 0.85 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.85 }}
+                          onClick={() => setSelectedKeyword(kw)}
+                          className={`inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-full text-sm font-medium cursor-pointer select-none transition-colors ${
+                            selectedKeyword?.id === kw.id
+                              ? 'bg-slate-900 text-white'
+                              : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
                           }`}
-                          aria-label={`Remove ${kw.keyword}`}
                         >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </motion.div>
-                    ))}
+                          {kw.keyword}
+                          <button
+                            onClick={e => { e.stopPropagation(); handleDelete(kw) }}
+                            className={`rounded-full p-0.5 transition-colors flex-shrink-0 ${
+                              selectedKeyword?.id === kw.id
+                                ? 'hover:bg-white/20 text-slate-300 hover:text-white'
+                                : 'hover:bg-stone-300 text-stone-400 hover:text-stone-600'
+                            }`}
+                            aria-label={`Remove ${kw.keyword}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </motion.span>
+                      ))}
+                    </div>
                   </AnimatePresence>
                 )}
               </div>
@@ -313,8 +267,22 @@ export default function Keywords() {
             {!selectedKeyword ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
                 <Newspaper className="w-12 h-12 text-stone-300 mb-4" />
-                <h3 className="text-lg font-semibold text-stone-700 mb-1">No keyword selected</h3>
-                <p className="text-stone-400 text-sm">Add a keyword on the left to create your first custom feed.</p>
+                <h3 className="text-lg font-semibold text-stone-700 mb-1">
+                  {isSignedIn ? 'No keyword selected' : 'Sign in to get started'}
+                </h3>
+                <p className="text-stone-400 text-sm max-w-xs">
+                  {isSignedIn
+                    ? 'Add a keyword on the left to create your first custom feed.'
+                    : 'Sign in to save keywords and track custom news feeds.'}
+                </p>
+                {!isSignedIn && (
+                  <Link to="/sign-in" className="mt-4">
+                    <Button className="bg-slate-900 hover:bg-slate-800 text-white gap-2">
+                      <LogIn className="w-4 h-4" />
+                      Sign In
+                    </Button>
+                  </Link>
+                )}
               </div>
             ) : (
               <>
@@ -361,8 +329,6 @@ export default function Keywords() {
           </div>
         </div>
       )}
-
-      <PremiumModal open={modalOpen} onOpenChange={setModalOpen} />
     </div>
   )
 }
