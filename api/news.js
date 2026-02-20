@@ -609,32 +609,29 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'ok', articles: CACHE[trendingCacheKey].articles, totalResults: CACHE[trendingCacheKey].articles.length, cached: true });
     }
 
-    console.log('Fetching trending articles across all categories');
-    const trendingArticles = [];
+    console.log('Fetching trending articles across all categories (parallel)');
 
-    for (const cat of trendingCategories) {
-      const catCacheKey = getCacheKey('world', cat);
-      if (isCacheValid(CACHE[catCacheKey])) {
-        trendingArticles.push(...CACHE[catCacheKey].articles);
-        continue;
-      }
-      try {
+    // Fetch all categories in parallel to avoid serverless timeout
+    const categoryResults = await Promise.allSettled(
+      trendingCategories.map(async (cat) => {
+        const catCacheKey = getCacheKey('world', cat);
+        if (isCacheValid(CACHE[catCacheKey])) {
+          return CACHE[catCacheKey].articles;
+        }
         const raw = await fetchFromNewsAPI('world', cat, NEWS_API_KEY);
         const valid = raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com');
         const formatted = valid.map(a => formatNewsAPIArticle(a, 'world', cat));
-        // Also try Guardian for broader coverage
-        if (formatted.length < 3 && GUARDIAN_API_KEY) {
-          const guardianRaw = await fetchFromGuardian('world', cat, GUARDIAN_API_KEY).catch(() => []);
-          formatted.push(...guardianRaw.map(r => formatGuardianArticle(r, 'world', cat)));
-        }
         CACHE[catCacheKey] = { timestamp: Date.now(), articles: formatted };
-        trendingArticles.push(...formatted);
-      } catch (err) {
-        console.error(`Trending fetch failed for ${cat}:`, err.message);
-      }
+        return formatted;
+      })
+    );
+
+    const trendingArticles = [];
+    for (const result of categoryResults) {
+      if (result.status === 'fulfilled') trendingArticles.push(...result.value);
     }
 
-    // Deduplicate by title, sort by views desc, take top 10
+    // Deduplicate by title, sort by newest first, take top 10
     const seen = new Set();
     const top10 = trendingArticles
       .filter(a => {
@@ -643,7 +640,7 @@ export default async function handler(req, res) {
         seen.add(key);
         return true;
       })
-      .sort((a, b) => (b.views || 0) - (a.views || 0))
+      .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
       .slice(0, 10);
 
     // Generate AI summaries for the top 10
