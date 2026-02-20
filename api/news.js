@@ -609,54 +609,67 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'ok', articles: CACHE[trendingCacheKey].articles, totalResults: CACHE[trendingCacheKey].articles.length, cached: true });
     }
 
-    console.log('Fetching trending articles across all categories (parallel)');
+    try {
+      console.log('Fetching trending articles across all categories (parallel)');
 
-    // Fetch all categories in parallel to avoid serverless timeout
-    const categoryResults = await Promise.allSettled(
-      trendingCategories.map(async (cat) => {
-        const catCacheKey = getCacheKey('world', cat);
-        if (isCacheValid(CACHE[catCacheKey])) {
-          return CACHE[catCacheKey].articles;
+      // Fetch all categories in parallel to avoid serverless timeout
+      const categoryResults = await Promise.allSettled(
+        trendingCategories.map(async (cat) => {
+          const catCacheKey = getCacheKey('world', cat);
+          if (isCacheValid(CACHE[catCacheKey])) {
+            return CACHE[catCacheKey].articles;
+          }
+          const raw = await fetchFromNewsAPI('world', cat, NEWS_API_KEY);
+          const valid = raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com');
+          const formatted = valid.map(a => formatNewsAPIArticle(a, 'world', cat));
+          CACHE[catCacheKey] = { timestamp: Date.now(), articles: formatted };
+          return formatted;
+        })
+      );
+
+      const trendingArticles = [];
+      for (const result of categoryResults) {
+        if (result.status === 'fulfilled' && Array.isArray(result.value)) {
+          trendingArticles.push(...result.value);
+        } else if (result.status === 'rejected') {
+          console.error('Trending category fetch failed:', result.reason?.message);
         }
-        const raw = await fetchFromNewsAPI('world', cat, NEWS_API_KEY);
-        const valid = raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com');
-        const formatted = valid.map(a => formatNewsAPIArticle(a, 'world', cat));
-        CACHE[catCacheKey] = { timestamp: Date.now(), articles: formatted };
-        return formatted;
-      })
-    );
+      }
 
-    const trendingArticles = [];
-    for (const result of categoryResults) {
-      if (result.status === 'fulfilled') trendingArticles.push(...result.value);
+      if (trendingArticles.length === 0) {
+        return res.status(200).json({ status: 'ok', articles: [], totalResults: 0, cached: false });
+      }
+
+      // Deduplicate by title, sort by newest first, take top 10
+      const seen = new Set();
+      const top10 = trendingArticles
+        .filter(a => {
+          const key = a.title.toLowerCase().slice(0, 60);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
+        .slice(0, 10);
+
+      // Generate AI summaries for the top 5
+      if (GEMINI_API_KEY && top10.length > 0) {
+        await Promise.all(top10.slice(0, 5).map(async (article) => {
+          try {
+            const summary = await generateSummary(article, GEMINI_API_KEY);
+            if (summary) article.summary_points = summary;
+          } catch (err) {
+            console.error('Trending summary failed:', err.message);
+          }
+        }));
+      }
+
+      CACHE[trendingCacheKey] = { timestamp: Date.now(), articles: top10 };
+      return res.status(200).json({ status: 'ok', articles: top10, totalResults: top10.length, cached: false });
+    } catch (error) {
+      console.error('Trending fetch error:', error);
+      return res.status(500).json({ error: 'Failed to fetch trending news', message: error.message });
     }
-
-    // Deduplicate by title, sort by newest first, take top 10
-    const seen = new Set();
-    const top10 = trendingArticles
-      .filter(a => {
-        const key = a.title.toLowerCase().slice(0, 60);
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
-      .slice(0, 10);
-
-    // Generate AI summaries for the top 10
-    if (GEMINI_API_KEY && top10.length > 0) {
-      await Promise.all(top10.slice(0, 5).map(async (article) => {
-        try {
-          const summary = await generateSummary(article, GEMINI_API_KEY);
-          if (summary) article.summary_points = summary;
-        } catch (err) {
-          console.error('Trending summary failed:', err.message);
-        }
-      }));
-    }
-
-    CACHE[trendingCacheKey] = { timestamp: Date.now(), articles: top10 };
-    return res.status(200).json({ status: 'ok', articles: top10, totalResults: top10.length, cached: false });
   }
 
   const countryList  = Array.isArray(countries)  ? countries  : [countries  || 'us'];
