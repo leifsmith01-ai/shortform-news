@@ -10,6 +10,7 @@ import SignInPage from './pages/SignInPage'
 import SignUpPage from './pages/SignUpPage'
 import Keywords from './pages/Keywords'
 import Personalized from './pages/Personalized'
+import Trending from './pages/Trending'
 import { api } from './api'
 
 // Placeholder components for routes referenced in Layout
@@ -60,6 +61,12 @@ export default function App() {
         <Route path="/" element={
           <Layout currentPageName="/">
             <Home />
+          </Layout>
+        } />
+
+        <Route path="/trending" element={
+          <Layout currentPageName="/trending">
+            <Trending />
           </Layout>
         } />
 

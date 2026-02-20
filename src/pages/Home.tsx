@@ -1,12 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, Menu, Sparkles, Calendar as CalendarIcon, AlertCircle } from 'lucide-react';
+import { RefreshCw, Menu, Sparkles, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from 'date-fns';
 import { toast } from 'sonner';
 import FilterSidebar from '@/components/news/FilterSidebar';
 import NewsCard from '@/components/news/NewsCard';
@@ -75,7 +72,7 @@ export default function Home() {
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState('week');
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const selectedDate = new Date();
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -198,7 +195,6 @@ export default function Home() {
   }, [fetchNews, searchQuery]);
 
   const hasFilters = selectedCountries.length > 0 && selectedCategories.length > 0;
-  const isToday = selectedDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
 
   const dateRangeLabel = useMemo(() => ({
     '24h': 'Last 24 Hours',
@@ -254,7 +250,7 @@ export default function Home() {
               <div>
                 <h1 className="text-xl lg:text-2xl font-bold text-stone-900 flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-slate-900" />
-                  {isToday ? dateRangeLabel : format(selectedDate, 'MMMM d, yyyy')}
+                  {dateRangeLabel}
                 </h1>
                 <p className="text-sm text-stone-500 hidden sm:block">
                   {hasFilters 
@@ -266,26 +262,6 @@ export default function Home() {
             </div>
 
             <div className="flex items-center gap-3">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <CalendarIcon className="w-4 h-4" />
-                    <span className="hidden sm:inline">
-                      {isToday ? 'Today' : format(selectedDate, 'MMM d')}
-                    </span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={(date) => date && setSelectedDate(date)}
-                    disabled={(date) => date > new Date() || date < new Date('2024-01-01')}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              
               {lastUpdated && (
                 <span className="text-xs text-stone-400 hidden sm:inline">
                   Updated {lastUpdated.toLocaleTimeString()}

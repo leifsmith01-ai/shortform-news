@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Bookmark, Clock, Sparkles, Tag, Bell, TrendingUp, LogIn } from 'lucide-react';
+import { Home, Bookmark, Clock, Sparkles, Tag, Bell, TrendingUp, LogIn, Flame } from 'lucide-react';
 import { UserButton, SignedIn, SignedOut } from '@clerk/clerk-react';
 
 export default function Layout({ children, currentPageName }: { children: React.ReactNode; currentPageName: string }) {
@@ -8,10 +8,10 @@ export default function Layout({ children, currentPageName }: { children: React.
 
   const navItems = [
     { name: 'Home',     icon: Home,       page: '/' },
+    { name: 'Trending', icon: Flame,      page: '/trending' },
     { name: 'Finance',  icon: TrendingUp, page: '/finance' },
     { name: 'For You',  icon: Sparkles,   page: '/personalized' },
     { name: 'Keywords', icon: Tag,        page: '/keywords' },
-    { name: 'Alerts',   icon: Bell,       page: '/alerts' },
     { name: 'Saved',    icon: Bookmark,   page: '/saved' },
     { name: 'History',  icon: Clock,      page: '/history' },
   ];
@@ -105,26 +105,35 @@ export default function Layout({ children, currentPageName }: { children: React.
       </div>
 
       {/* ── Mobile bottom navigation (hidden on md+) ──────────────────── */}
-      <nav className="md:hidden flex-shrink-0 bg-slate-900 border-t border-slate-800 flex justify-around px-1 py-1.5">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.page);
-          return (
-            <Link
-              key={item.page}
-              to={item.page}
-              className={`relative flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-colors ${
-                active ? 'text-white' : 'text-slate-400'
-              }`}
-            >
-              <Icon className="w-5 h-5" />
-              <span className="text-[9px] font-medium">{item.name}</span>
-              {item.isPremium && (
-                <span className="absolute top-1 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
-              )}
-            </Link>
-          );
-        })}
+      <nav className="md:hidden flex-shrink-0 bg-slate-900 border-t border-slate-800 px-1 py-2">
+        <div className="flex justify-around items-center overflow-x-auto scrollbar-none gap-0.5">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.page);
+            return (
+              <Link
+                key={item.page}
+                to={item.page}
+                className={`relative flex flex-col items-center gap-1 min-w-[52px] px-1.5 py-2 rounded-xl transition-all duration-200 ${
+                  active
+                    ? 'bg-white/15 text-white'
+                    : 'text-slate-500 hover:text-slate-300 active:bg-white/10'
+                }`}
+              >
+                <Icon className={`w-5 h-5 flex-shrink-0 ${active ? 'text-white' : ''}`} />
+                <span className={`text-[10px] font-medium leading-tight text-center ${active ? 'text-white' : 'text-slate-500'}`}>
+                  {item.name}
+                </span>
+                {active && (
+                  <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white" />
+                )}
+                {item.isPremium && (
+                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
+                )}
+              </Link>
+            );
+          })}
+        </div>
       </nav>
 
     </div>
