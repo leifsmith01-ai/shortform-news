@@ -30,10 +30,12 @@ export default function Trending() {
     setError(null);
 
     try {
-      const result = await api.fetchNews({
-        countries: ['world'],
-        categories: ['trending'],
-      });
+      const response = await fetch('/api/trending', { method: 'GET' });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.message || `Server error: ${response.status}`);
+      }
+      const result = await response.json();
 
       if (result?.articles) {
         setArticles(result.articles);
