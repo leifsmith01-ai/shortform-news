@@ -341,47 +341,143 @@ async function searchGuardianByKeyword(keyword, apiKey) {
   return data.response?.results || [];
 }
 
-// Helper: generate AI summary using Gemini
-async function generateSummary(article, geminiKey) {
-  if (!geminiKey) return null;
+// ── AI Summarisation — multi-provider fallback chain ─────────────────────────
+// Order: Gemini → Groq → OpenAI → Cohere
+// Each provider throws QuotaExceededError on 429/quota so the next is tried.
 
-  // Use the best available content — prefer full article text over short description
+class QuotaExceededError extends Error {
+  constructor(provider) {
+    super(`${provider} quota exceeded`);
+    this.name = 'QuotaExceededError';
+  }
+}
+
+const SUMMARY_PROMPT = (content) =>
+  `You are a factual news summarizer. Based ONLY on the provided article text, write 2-3 concise bullet points covering the key facts. Do NOT add information that is not in the text.\n\n• Key point 1\n• Key point 2\n• Key point 3 (if warranted)\n\nArticle:\n${content}`;
+
+// Shared: prepare article text (strip truncation markers, cap length)
+function prepareArticleContent(article) {
   let content = (article.content && article.content.length > (article.description || '').length)
     ? article.content
     : `${article.title}. ${article.description || ''}`;
-  // Strip the "[+N chars]" truncation marker that NewsAPI appends to free-tier content
   content = content.replace(/\s*\[\+\d+ chars\].*$/s, '').trim();
-  // Ensure the title is always in scope for the model
   if (!content.toLowerCase().includes(article.title.slice(0, 20).toLowerCase())) {
     content = `${article.title}. ${content}`;
   }
-  content = content.slice(0, 3000);
+  return content.slice(0, 3000);
+}
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${geminiKey}`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: `You are a factual news summarizer. Based ONLY on the provided article text, write 2-3 concise bullet points covering the key facts. Do NOT add information that is not in the text.\n\n• Key point 1\n• Key point 2\n• Key point 3 (if warranted)\n\nArticle:\n${content}` }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 500 }
-    })
-  });
-  const data = await response.json();
-  if (!response.ok) { console.error(`Gemini error: ${data.error?.message?.slice(0, 100)}`); return null; }
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+// Shared: extract bullet points from any LLM response text
+function parseBullets(text) {
   if (!text) return null;
-  // Try matching common bullet styles: •, *, -, –, —
   let bullets = text.split('\n')
     .filter(line => /^[\s]*[•*\-–—]/.test(line))
     .map(line => line.replace(/^[\s]*[•*\-–—]+\s*/, '').trim())
     .filter(Boolean);
-  // Fallback: if Gemini returned a numbered list (1. 2. 3.) or plain lines, use those
   if (bullets.length === 0) {
     bullets = text.split('\n')
       .map(line => line.replace(/^[\s]*\d+[\.\)]\s*/, '').trim())
       .filter(line => line.length > 15);
   }
   return bullets.length > 0 ? bullets.slice(0, 3) : null;
+}
+
+async function summarizeWithGemini(content, key) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${key}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: SUMMARY_PROMPT(content) }] }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 500 }
+    })
+  });
+  const data = await res.json();
+  if (res.status === 429 || data.error?.code === 429 || data.error?.status === 'RESOURCE_EXHAUSTED') {
+    throw new QuotaExceededError('Gemini');
+  }
+  if (!res.ok) { console.error(`Gemini error: ${data.error?.message?.slice(0, 100)}`); return null; }
+  return parseBullets(data.candidates?.[0]?.content?.parts?.[0]?.text);
+}
+
+async function summarizeWithGroq(content, key) {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({
+      model: 'llama-3.1-8b-instant',
+      messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
+      temperature: 0.2,
+      max_tokens: 500
+    })
+  });
+  const data = await res.json();
+  if (res.status === 429 || data.error?.code === 'rate_limit_exceeded') {
+    throw new QuotaExceededError('Groq');
+  }
+  if (!res.ok) { console.error(`Groq error: ${data.error?.message?.slice(0, 100)}`); return null; }
+  return parseBullets(data.choices?.[0]?.message?.content);
+}
+
+async function summarizeWithOpenAI(content, key) {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
+      temperature: 0.2,
+      max_tokens: 500
+    })
+  });
+  const data = await res.json();
+  if (res.status === 429 || data.error?.type === 'insufficient_quota' || data.error?.type === 'rate_limit_exceeded') {
+    throw new QuotaExceededError('OpenAI');
+  }
+  if (!res.ok) { console.error(`OpenAI error: ${data.error?.message?.slice(0, 100)}`); return null; }
+  return parseBullets(data.choices?.[0]?.message?.content);
+}
+
+async function summarizeWithCohere(content, key) {
+  const res = await fetch('https://api.cohere.com/v2/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({
+      model: 'command-r-08-2024',
+      messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
+      temperature: 0.2,
+      max_tokens: 500
+    })
+  });
+  const data = await res.json();
+  if (res.status === 429) { throw new QuotaExceededError('Cohere'); }
+  if (!res.ok) { console.error(`Cohere error: ${JSON.stringify(data).slice(0, 100)}`); return null; }
+  return parseBullets(data.message?.content?.[0]?.text);
+}
+
+// Main: try each configured provider in order; skip to next on quota exhaustion
+async function generateSummary(article, llmKeys) {
+  const content = prepareArticleContent(article);
+  const providers = [
+    llmKeys.gemini && (() => summarizeWithGemini(content, llmKeys.gemini)),
+    llmKeys.groq   && (() => summarizeWithGroq(content, llmKeys.groq)),
+    llmKeys.openai && (() => summarizeWithOpenAI(content, llmKeys.openai)),
+    llmKeys.cohere && (() => summarizeWithCohere(content, llmKeys.cohere)),
+  ].filter(Boolean);
+
+  for (const attempt of providers) {
+    try {
+      const result = await attempt();
+      if (result) return result;
+    } catch (err) {
+      if (err.name === 'QuotaExceededError') {
+        console.warn(`[summary] ${err.message} — trying next provider`);
+        continue;
+      }
+      console.error('[summary] unexpected error:', err.message);
+    }
+  }
+  return null;
 }
 
 // Helper: human-readable time ago (e.g. "2h ago", "3d ago")
@@ -481,9 +577,17 @@ export default async function handler(req, res) {
 
   const NEWS_API_KEY       = process.env.VITE_NEWS_API_KEY    || process.env.NEWS_API_KEY;
   const GUARDIAN_API_KEY   = process.env.GUARDIAN_API_KEY     || null;
-  const GEMINI_API_KEY     = process.env.VITE_GEMINI_API_KEY  || process.env.GEMINI_API_KEY;
   const WORLD_NEWS_API_KEY = process.env.WORLD_NEWS_API_KEY   || null;
   const NEWS_DATA_API_KEY  = process.env.NEWS_DATA_API_KEY    || null;
+
+  // LLM summarisation — collect all configured keys; generateSummary tries them in order
+  const LLM_KEYS = {
+    gemini: process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || null,
+    groq:   process.env.GROQ_API_KEY   || null,
+    openai: process.env.OPENAI_API_KEY || null,
+    cohere: process.env.COHERE_API_KEY || null,
+  };
+  const HAS_LLM = Object.values(LLM_KEYS).some(Boolean);
 
   if (!NEWS_API_KEY) return res.status(500).json({ error: 'NewsAPI key not configured' });
 
@@ -540,11 +644,11 @@ export default async function handler(req, res) {
         }
       }
 
-      // AI summaries for first 5
-      if (GEMINI_API_KEY && results.length > 0) {
+      // AI summaries for first 5 (tries all configured LLM providers in order)
+      if (HAS_LLM && results.length > 0) {
         await Promise.all(results.slice(0, 5).map(async (article) => {
           try {
-            const summary = await generateSummary(article, GEMINI_API_KEY);
+            const summary = await generateSummary(article, LLM_KEYS);
             if (summary) article.summary_points = summary;
           } catch (err) {
             console.error('Summary failed:', err.message);
@@ -638,11 +742,11 @@ export default async function handler(req, res) {
           }
         }
 
-        // ── AI summaries for first 5 articles ─────────────────────────────────
-        if (GEMINI_API_KEY && formattedArticles.length > 0) {
+        // ── AI summaries for first 5 articles (tries all configured LLM providers) ──
+        if (HAS_LLM && formattedArticles.length > 0) {
           const summaryPromises = formattedArticles.slice(0, 5).map(async (article) => {
             try {
-              const summary = await generateSummary(article, GEMINI_API_KEY);
+              const summary = await generateSummary(article, LLM_KEYS);
               if (summary) article.summary_points = summary;
             } catch (err) {
               console.error('Summary failed:', err.message);
