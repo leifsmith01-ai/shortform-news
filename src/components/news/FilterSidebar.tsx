@@ -1,9 +1,10 @@
 import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Globe, Newspaper, ChevronDown, Search, Calendar } from 'lucide-react';
+import { Globe, Newspaper, ChevronDown, Search, Calendar, Flame, TrendingUp, Tag, Sparkles, Bookmark, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Collapsible,
@@ -17,6 +18,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+const NAV_LINKS = [
+  { name: 'Trending',  icon: Flame,      page: '/trending' },
+  { name: 'Finance',   icon: TrendingUp, page: '/finance' },
+  { name: 'Keywords',  icon: Tag,        page: '/keywords' },
+  { name: 'For You',   icon: Sparkles,   page: '/personalized' },
+  { name: 'Saved',     icon: Bookmark,   page: '/saved' },
+  { name: 'History',   icon: Clock,      page: '/history' },
+];
 
 const COUNTRIES_BY_CONTINENT = {
   'North America': [
@@ -145,16 +155,17 @@ const CATEGORIES = [
   { id: 'world', name: 'World', icon: '🌍' },
 ];
 
-export default function FilterSidebar({ 
-  selectedCountries, 
-  setSelectedCountries, 
-  selectedCategories, 
+export default function FilterSidebar({
+  selectedCountries,
+  setSelectedCountries,
+  selectedCategories,
   setSelectedCategories,
   searchQuery,
   setSearchQuery,
   dateRange,
   setDateRange
 }) {
+  const location = useLocation();
   const [countriesOpen, setCountriesOpen] = React.useState(true);
   const [categoriesOpen, setCategoriesOpen] = React.useState(true);
   const [continentStates, setContinentStates] = React.useState<Record<string, boolean>>({
@@ -195,6 +206,30 @@ export default function FilterSidebar({
             <h1 className="text-lg font-semibold tracking-tight">Shortform</h1>
             <p className="text-xs text-slate-400">Your news, in short</p>
           </div>
+        </div>
+      </div>
+
+      {/* Quick navigation — visible on mobile where bottom nav can be hard to reach */}
+      <div className="px-4 py-3 border-b border-slate-800 lg:hidden">
+        <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">Go to</p>
+        <div className="grid grid-cols-3 gap-1.5">
+          {NAV_LINKS.map(({ name, icon: Icon, page }) => {
+            const active = location.pathname === page;
+            return (
+              <Link
+                key={page}
+                to={page}
+                className={`flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-center transition-colors ${
+                  active
+                    ? 'bg-white text-slate-900'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                }`}
+              >
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                <span className="text-[10px] font-medium leading-tight">{name}</span>
+              </Link>
+            );
+          })}
         </div>
       </div>
 
