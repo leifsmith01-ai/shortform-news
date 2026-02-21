@@ -68,6 +68,30 @@ const COUNTRY_NAMES = {
   au: 'Australia', nz: 'New Zealand', fj: 'Fiji', pg: 'Papua New Guinea',
 };
 
+// Trusted news sources — only pull from reputable outlets
+// Used as `domains` for /v2/everything and `sources` for /v2/top-headlines
+const TRUSTED_DOMAINS = [
+  'reuters.com', 'bbc.co.uk', 'bbc.com', 'apnews.com',
+  'theguardian.com', 'abc.net.au', 'nytimes.com', 'washingtonpost.com',
+  'aljazeera.com', 'npr.org', 'politico.com', 'economist.com',
+  'ft.com', 'bloomberg.com', 'wsj.com', 'cnn.com',
+  'abcnews.go.com', 'cbsnews.com', 'nbcnews.com', 'pbs.org',
+  'smh.com.au', 'theaustralian.com.au', 'france24.com',
+  'dw.com', 'scmp.com', 'timesofindia.indiatimes.com',
+  'thehindu.com', 'japantimes.co.jp', 'straitstimes.com',
+].join(',');
+
+// NewsAPI source IDs corresponding to trusted outlets (for top-headlines endpoint)
+const TRUSTED_SOURCE_IDS = [
+  'reuters', 'bbc-news', 'associated-press', 'abc-news-au',
+  'the-guardian-uk', 'the-guardian-au', 'the-new-york-times',
+  'the-washington-post', 'al-jazeera-english', 'cnn', 'nbc-news',
+  'cbs-news', 'abc-news', 'bloomberg', 'the-wall-street-journal',
+  'politico', 'bbc-sport', 'espn', 'the-times-of-india',
+  'the-hindu', 'ars-technica', 'wired', 'techcrunch',
+  'the-verge', 'national-geographic', 'new-scientist',
+].join(',');
+
 // Keywords/demonyms for relevance filtering — articles must mention at least one term
 const COUNTRY_RELEVANCE_KEYWORDS = {
   us: ['united states', 'america', 'american', ' u.s.'],
@@ -190,14 +214,17 @@ function isCacheValid(cacheEntry) {
 }
 
 // Helper: fetch from NewsAPI (primary - ~55 countries)
+// Uses trusted source filtering: `domains` for /v2/everything, `sources` for /v2/top-headlines
 async function fetchFromNewsAPI(country, category, apiKey) {
-  // For politics + specific country, use /v2/everything with a targeted query
-  // because top-headlines 'general' is too broad and often misses political news
-  if (category === 'politics' && country !== 'world') {
-    const countryName = COUNTRY_NAMES[country] || country;
-    const query = `"${countryName}" AND (politics OR government OR election OR parliament OR president OR minister OR policy OR legislation OR senate OR congress OR political)`;
+  // For politics, use /v2/everything with a targeted query + trusted domains
+  // because top-headlines 'general' is too broad and pulls entertainment/sports
+  if (category === 'politics') {
+    const politicsQuery = country !== 'world'
+      ? `"${COUNTRY_NAMES[country] || country}" AND (politics OR government OR election OR parliament OR president OR minister OR policy OR legislation)`
+      : '(politics OR government OR election OR parliament OR president OR minister OR policy OR legislation)';
     const params = new URLSearchParams({
-      q: query,
+      q: politicsQuery,
+      domains: TRUSTED_DOMAINS,
       language: 'en',
       sortBy: 'publishedAt',
       pageSize: '10',
@@ -211,21 +238,63 @@ async function fetchFromNewsAPI(country, category, apiKey) {
     return data.articles || [];
   }
 
+  // For "world" category, use /v2/everything with trusted domains
+  // When a specific country is selected, add international relations context
+  if (category === 'world') {
+    const params = new URLSearchParams({
+      domains: TRUSTED_DOMAINS,
+      language: 'en',
+      sortBy: 'publishedAt',
+      pageSize: '10',
+      apiKey,
+    });
+    if (country !== 'world') {
+      const countryName = COUNTRY_NAMES[country] || country;
+      params.set('q', `"${countryName}" AND (international OR diplomacy OR foreign OR global OR trade OR summit OR UN)`);
+    }
+    const url = `https://newsapi.org/v2/everything?${params.toString()}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`NewsAPI world error: ${response.status}`);
+    const data = await response.json();
+    if (data.status !== 'ok') throw new Error(`NewsAPI world error: ${data.message}`);
+    return data.articles || [];
+  }
+
+  // For standard categories (technology, business, science, health, sports, entertainment),
+  // use top-headlines. Note: NewsAPI top-headlines doesn't allow both `sources` and `country`,
+  // so when filtering by country we can't also filter by sources.
   const categoryMap = {
     technology: 'technology', business: 'business', science: 'science',
     health: 'health', sports: 'sports', entertainment: 'entertainment',
-    politics: 'general', world: 'general'
   };
   const newsApiCategory = categoryMap[category] || 'general';
-  const url = country === 'world'
-    ? `https://newsapi.org/v2/top-headlines?language=en&category=${newsApiCategory}&pageSize=10&apiKey=${apiKey}`
-    : `https://newsapi.org/v2/top-headlines?country=${country}&category=${newsApiCategory}&pageSize=10&apiKey=${apiKey}`;
+
+  let url;
+  if (country === 'world') {
+    // No country restriction — use sources filter for quality
+    url = `https://newsapi.org/v2/top-headlines?sources=${TRUSTED_SOURCE_IDS}&pageSize=10&apiKey=${apiKey}`;
+  } else {
+    // Country-specific: can't combine with sources param, so just use country+category
+    url = `https://newsapi.org/v2/top-headlines?country=${country}&category=${newsApiCategory}&pageSize=10&apiKey=${apiKey}`;
+  }
   const response = await fetch(url);
   if (!response.ok) throw new Error(`NewsAPI error: ${response.status}`);
   const data = await response.json();
   if (data.status !== 'ok') throw new Error(`NewsAPI error: ${data.message}`);
   return data.articles || [];
 }
+
+// Category-specific search terms for WorldNewsAPI — improves relevance over bare category names
+const WORLD_NEWS_QUERY_TERMS = {
+  technology: 'technology software AI computing',
+  business:   'business economy market finance',
+  science:    'science research discovery study',
+  health:     'health medical hospital disease treatment',
+  sports:     'sports match championship tournament',
+  entertainment: 'entertainment film music celebrity',
+  politics:   'politics government election parliament',
+  world:      'international diplomacy foreign global',
+};
 
 // Helper: fetch from WorldNewsAPI (secondary - broad country coverage)
 async function fetchFromWorldNewsAPI(country, category, apiKey) {
@@ -240,12 +309,9 @@ async function fetchFromWorldNewsAPI(country, category, apiKey) {
   if (country !== 'world') {
     const countryName = COUNTRY_NAMES[country] || country;
     params.set('source-country', country);
-    // For politics, use targeted political terms for much better relevance
-    if (category === 'politics') {
-      params.set('text', `${countryName} politics government`);
-    } else {
-      params.set('text', `${countryName} ${category !== 'world' ? category : ''}`.trim());
-    }
+    // Use category-specific search terms for better precision
+    const queryTerms = WORLD_NEWS_QUERY_TERMS[category] || category;
+    params.set('text', `${countryName} ${queryTerms}`);
   }
   // topic filter improves precision
   if (topic) params.set('categories', topic);
@@ -325,7 +391,7 @@ async function fetchFromGuardian(country, category, apiKey) {
 
 async function searchNewsAPIByKeyword(keyword, apiKey) {
   const params = new URLSearchParams({
-    q: keyword, language: 'en', sortBy: 'publishedAt', pageSize: '20', apiKey,
+    q: keyword, domains: TRUSTED_DOMAINS, language: 'en', sortBy: 'publishedAt', pageSize: '20', apiKey,
   });
   const response = await fetch(`https://newsapi.org/v2/everything?${params}`);
   if (!response.ok) throw new Error(`NewsAPI keyword error: ${response.status}`);
@@ -531,7 +597,6 @@ function formatNewsAPIArticle(article, country, category) {
     publishedAt: article.publishedAt || new Date().toISOString(),
     time_ago: timeAgo(article.publishedAt),
     country, category,
-    views: Math.floor(Math.random() * 5000) + 100,
     summary_points: null
   };
 }
@@ -548,7 +613,6 @@ function formatWorldNewsAPIArticle(article, country, category) {
     publishedAt: article.publish_date || new Date().toISOString(),
     time_ago: timeAgo(article.publish_date),
     country, category,
-    views: Math.floor(Math.random() * 5000) + 100,
     summary_points: null
   };
 }
@@ -565,7 +629,6 @@ function formatNewsDataArticle(article, country, category) {
     publishedAt: article.pubDate || new Date().toISOString(),
     time_ago: timeAgo(article.pubDate),
     country, category,
-    views: Math.floor(Math.random() * 5000) + 100,
     summary_points: null
   };
 }
@@ -585,7 +648,6 @@ function formatGuardianArticle(result, country, category) {
     publishedAt: result.webPublicationDate || new Date().toISOString(),
     time_ago: timeAgo(result.webPublicationDate),
     country, category,
-    views: Math.floor(Math.random() * 5000) + 100,
     summary_points: null
   };
 }
@@ -757,10 +819,10 @@ export default async function handler(req, res) {
         .slice(0, 10);
 
       // Generate AI summaries for the top 5
-      if (GEMINI_API_KEY && top10.length > 0) {
+      if (HAS_LLM && top10.length > 0) {
         await Promise.all(top10.slice(0, 5).map(async (article) => {
           try {
-            const summary = await generateSummary(article, GEMINI_API_KEY);
+            const summary = await generateSummary(article, LLM_KEYS);
             if (summary) article.summary_points = summary;
           } catch (err) {
             console.error('Trending summary failed:', err.message);

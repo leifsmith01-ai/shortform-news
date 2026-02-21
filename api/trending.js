@@ -4,6 +4,17 @@
 const CACHE = {};
 const CACHE_TTL_HOURS = 6; // Refresh trending more frequently than regular news
 
+// Trusted NewsAPI source IDs — only surface articles from reputable outlets
+const TRUSTED_SOURCE_IDS = [
+  'reuters', 'bbc-news', 'associated-press', 'abc-news-au',
+  'the-guardian-uk', 'the-guardian-au', 'the-new-york-times',
+  'the-washington-post', 'al-jazeera-english', 'cnn', 'nbc-news',
+  'cbs-news', 'abc-news', 'bloomberg', 'the-wall-street-journal',
+  'politico', 'bbc-sport', 'espn', 'the-times-of-india',
+  'the-hindu', 'ars-technica', 'wired', 'techcrunch',
+  'the-verge', 'national-geographic', 'new-scientist',
+].join(',');
+
 function getCacheKey() {
   const now = new Date();
   const date = now.toISOString().split('T')[0];
@@ -39,19 +50,13 @@ function formatArticle(article, category) {
     time_ago: timeAgo(article.publishedAt),
     country: 'world',
     category,
-    views: Math.floor(Math.random() * 5000) + 100,
     summary_points: null,
   };
 }
 
 async function fetchCategory(category, apiKey) {
-  const categoryMap = {
-    technology: 'technology', business: 'business', science: 'science',
-    health: 'health', sports: 'sports', entertainment: 'entertainment',
-    general: 'general',
-  };
-  const mapped = categoryMap[category] || 'general';
-  const url = `https://newsapi.org/v2/top-headlines?language=en&category=${mapped}&pageSize=8&apiKey=${apiKey}`;
+  // Use trusted sources for trending — ensures only reputable outlets appear
+  const url = `https://newsapi.org/v2/top-headlines?sources=${TRUSTED_SOURCE_IDS}&pageSize=8&apiKey=${apiKey}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`NewsAPI ${category}: ${res.status}`);
   const data = await res.json();

@@ -238,11 +238,10 @@ export default function NewsCard({ article, index, rank }) {
           </div>
         </div>
 
-        {/* Views */}
-        {article.views && (
+        {/* Published date */}
+        {article.publishedAt && (
           <div className="flex items-center gap-1 text-xs text-stone-500 mb-3">
-            <span className="font-semibold">{article.views.toLocaleString()}</span>
-            <span>views</span>
+            <span>{new Date(article.publishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
           </div>
         )}
 

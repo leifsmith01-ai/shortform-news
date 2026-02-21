@@ -256,11 +256,10 @@ export default function FinanceCard({ article, index, rank }: { article: Finance
           )}
         </div>
 
-        {/* Views */}
-        {article.views && (
+        {/* Time ago */}
+        {article.time_ago && (
           <div className="flex items-center gap-1 text-xs text-stone-500 mb-3">
-            <span className="font-semibold">{article.views.toLocaleString()}</span>
-            <span>views</span>
+            <span>{article.time_ago}</span>
           </div>
         )}
 
