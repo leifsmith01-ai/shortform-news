@@ -395,6 +395,21 @@ const NEWS_DATA_CATEGORY_MAP = {
   world:         'world'
 };
 
+// Map app categories to GNews API categories
+// GNews categories: general, world, nation, business, technology, entertainment, sports, science, health
+const GNEWS_CATEGORY_MAP = {
+  technology:    'technology',
+  business:      'business',
+  science:       'science',
+  health:        'health',
+  sports:        'sports',
+  gaming:        'entertainment',
+  film:          'entertainment',
+  tv:            'entertainment',
+  politics:      'nation',   // 'nation' covers national politics better than 'general'
+  world:         'world',
+};
+
 // Helper: generate cache key (slot = "am" or "pm" to refresh twice a day)
 function getCacheKey(country, category, dateRange) {
   const now = new Date();
@@ -879,6 +894,28 @@ async function fetchFromGuardian(country, category, apiKey, opts = {}) {
   return data.response?.results || [];
 }
 
+// Helper: fetch from GNews API (extra fallback - broad country/category coverage)
+// GNews top-headlines supports both country and category simultaneously, which
+// makes it a clean fit for country+category queries that exhaust other sources.
+async function fetchFromGNews(country, category, apiKey, opts = {}) {
+  const gnewsCategory = GNEWS_CATEGORY_MAP[category] || 'general';
+  const params = new URLSearchParams({
+    lang:    'en',
+    max:     '10',
+    token:   apiKey,
+    sortby:  opts.sortByPopularity ? 'relevance' : 'publishedAt',
+  });
+  if (opts.from) params.set('from', opts.from); // ISO 8601, e.g. 2024-01-01T00:00:00Z
+  params.set('category', gnewsCategory);
+  if (country !== 'world') params.set('country', country);
+  const url = `https://gnews.io/api/v4/top-headlines?${params}`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`GNews error: ${response.status}`);
+  const data = await response.json();
+  if (data.errors) throw new Error(`GNews error: ${JSON.stringify(data.errors)}`);
+  return data.articles || [];
+}
+
 // ── Keyword search helpers ─────────────────────────────────────────────────
 // These search APIs directly by keyword rather than by country/category top-headlines.
 
@@ -1235,6 +1272,26 @@ function formatGuardianArticle(result, country, category) {
   };
 }
 
+function formatGNewsArticle(article, country, category) {
+  const sourceUrl = article.url || '#';
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    title: article.title || 'No title',
+    description: article.description || '',
+    content: article.content || article.description || '',
+    url: sourceUrl,
+    image_url: article.image || null,
+    source: article.source?.name || 'GNews',
+    publishedAt: article.publishedAt || new Date().toISOString(),
+    time_ago: timeAgo(article.publishedAt),
+    country, category,
+    summary_points: null,
+    _meta: {
+      sourceCountry: inferCountryFromUrl(article.source?.url || sourceUrl),
+    },
+  };
+}
+
 // Main handler
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -1268,6 +1325,7 @@ export default async function handler(req, res) {
   const GUARDIAN_API_KEY   = process.env.GUARDIAN_API_KEY     || null;
   const WORLD_NEWS_API_KEY = process.env.WORLD_NEWS_API_KEY   || null;
   const NEWS_DATA_API_KEY  = process.env.NEWS_DATA_API_KEY    || null;
+  const GNEWS_API_KEY      = process.env.GNEWS_API_KEY        || null;
 
   // LLM summarisation — collect all configured keys; generateSummary tries them in order
   const LLM_KEYS = {
@@ -1504,6 +1562,19 @@ export default async function handler(req, res) {
           }
         }
 
+        // ── 5. GNews (extra fallback - broad country+category support) ────────
+        if (formattedArticles.length < 30 && GNEWS_API_KEY) {
+          console.log(`  [5] GNews [${country}/${category}] (have ${formattedArticles.length} so far)`);
+          try {
+            const raw = await fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort });
+            const valid = raw.filter(a => a.title);
+            const extra = valid.map(a => formatGNewsArticle(a, country, category));
+            formattedArticles = [...formattedArticles, ...extra];
+          } catch (err) {
+            console.error(`  GNews failed:`, err.message);
+          }
+        }
+
         // ── Category relevance filter ────────────────────────────────────────
         // Drop articles that don't match the requested category at all.
         // This catches off-topic articles that APIs return (e.g. human interest
@@ -1593,6 +1664,14 @@ export default async function handler(req, res) {
                 const widerDateOnly = widerFromISO.split('T')[0];
                 const gResults = await fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: widerDateOnly });
                 backfill.push(...gResults.map(r => formatGuardianArticle(r, country, category)));
+              } catch {}
+            }
+
+            // Also try GNews for wider window
+            if (GNEWS_API_KEY && backfill.length < 20) {
+              try {
+                const raw = await fetchFromGNews(country, category, GNEWS_API_KEY, { from: widerFromISO, sortByPopularity: true });
+                backfill.push(...raw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category)));
               } catch {}
             }
 
