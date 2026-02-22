@@ -98,6 +98,8 @@ const ALL_TRUSTED_SOURCES = [
   { domain: 'thehindu.com',                   sourceId: 'the-hindu',          name: 'The Hindu',                group: 'regional' },
   { domain: 'japantimes.co.jp',               sourceId: null,                 name: 'Japan Times',              group: 'regional' },
   { domain: 'straitstimes.com',               sourceId: null,                 name: 'Straits Times',            group: 'regional' },
+  { domain: 'caixinglobal.com',               sourceId: null,                 name: 'Caixin Global',            group: 'regional' },
+  { domain: 'asia.nikkei.com',               sourceId: null,                 name: 'Nikkei Asia',              group: 'regional' },
   // ── Business & Finance ────────────────────────────────────────────────────
   { domain: 'politico.com',  sourceId: 'politico',               name: 'Politico',           group: 'business' },
   { domain: 'economist.com', sourceId: null,                     name: 'The Economist',      group: 'business' },
@@ -395,6 +397,46 @@ const NEWS_DATA_CATEGORY_MAP = {
   world:         'world'
 };
 
+// Countries considered part of the Asia-Pacific region for RSS feed targeting.
+// Nikkei Asia covers this whole region so its feed is fetched for all of them.
+const ASIA_COUNTRIES = new Set([
+  'cn', 'jp', 'kr', 'hk', 'tw', 'sg', 'in', 'id', 'th', 'my', 'ph', 'vn',
+  'pk', 'bd', 'lk', 'mm', 'kh', 'np', 'au', 'nz',
+]);
+
+// RSS feed registry — each entry is fetched for applicable countries and merged
+// into the article pool alongside API sources. Errors are caught and skipped.
+//
+// url:       Feed URL. Override via environment variable if the default stops working.
+//            IMPORTANT: Verify each URL is accessible from your production environment
+//            before relying on it — both sites are behind paywalls and may restrict
+//            datacenter IPs. Use a browser or RSS reader to confirm the feed loads.
+// countries: Set of country codes this feed is relevant for.
+// name/domain/tier: used for article formatting and ranking.
+const RSS_SOURCES = [
+  {
+    name: 'Caixin Global',
+    domain: 'caixinglobal.com',
+    // Primary English-language source for Chinese business/economy/finance news.
+    // TODO: confirm this URL works from your host — try it in a browser first.
+    // Alternatives if the gateway URL fails:
+    //   https://www.caixinglobal.com/rss.xml
+    //   https://www.caixinglobal.com/feed
+    url: process.env.CAIXIN_RSS_URL || 'https://gateway.caixin.com/api/data/global/feedlyRss.xml',
+    countries: new Set(['cn']),
+  },
+  {
+    name: 'Nikkei Asia',
+    domain: 'asia.nikkei.com',
+    // Official Nikkei Asia RSS feed (NAR = Nikkei Asia Report).
+    // TODO: confirm this URL works from your host. Category-specific feeds may exist
+    // at /rss/feed/business, /rss/feed/technology etc — check info.asia.nikkei.com/rss
+    // and swap in a more targeted URL if available.
+    url: process.env.NIKKEI_RSS_URL || 'https://asia.nikkei.com/rss/feed/nar',
+    countries: ASIA_COUNTRIES,
+  },
+];
+
 // Map app categories to GNews API categories
 // GNews categories: general, world, nation, business, technology, entertainment, sports, science, health
 const GNEWS_CATEGORY_MAP = {
@@ -442,6 +484,7 @@ const SOURCE_AUTHORITY_TIER = {
   'arstechnica.com': 2, 'wired.com': 2, 'techcrunch.com': 2, 'theverge.com': 2,
   'espn.com': 2, 'scmp.com': 2, 'theconversation.com': 2,
   'timesofindia.indiatimes.com': 2, 'thehindu.com': 2,
+  'caixinglobal.com': 2, 'asia.nikkei.com': 2,
 };
 
 // Normalise a source name or URL to a domain key for tier lookup
@@ -722,13 +765,16 @@ async function fetchFromNewsAPI(country, category, apiKey, activeDomains, active
   const sourceIds = activeSourceIds || TRUSTED_SOURCE_IDS;
   const { from, sortByPopularity } = opts;
 
-  // Categories that need /v2/everything for precise targeting
-  if (EVERYTHING_QUERY_MAP[category]) {
-    // For country-specific queries, use tightly paired phrases ("Australian politics")
-    // instead of loose AND ("Australia" AND "politics") to ensure national relevance.
-    const query = country !== 'world'
-      ? buildNationalQuery(country, category)
-      : EVERYTHING_QUERY_MAP[category];
+  // For country-specific requests, always use /v2/everything with buildNationalQuery
+  // and the trusted-domains filter. This applies to ALL categories, not just those in
+  // EVERYTHING_QUERY_MAP. The top-headlines endpoint cannot combine `country` with
+  // `sources`, so country-specific top-headlines bypass quality filtering entirely and
+  // return whatever domestic sources NewsAPI associates with that country code — often
+  // non-English or low-quality outlets. The /v2/everything approach searches across
+  // trusted domains (Reuters, SCMP, Bloomberg, FT, etc.) for paired phrases like
+  // "Chinese economy" or "Chinese tech", giving far better results for all categories.
+  if (country !== 'world') {
+    const query = buildNationalQuery(country, category);
     const params = new URLSearchParams({
       q: query,
       domains,
@@ -746,23 +792,30 @@ async function fetchFromNewsAPI(country, category, apiKey, activeDomains, active
     return data.articles || [];
   }
 
-  // For standard categories (technology, business, science, health, sports),
-  // use top-headlines. Note: NewsAPI top-headlines doesn't allow both `sources` and `country`,
-  // so when filtering by country we can't also filter by sources.
-  const categoryMap = {
-    technology: 'technology', business: 'business', science: 'science',
-    health: 'health', sports: 'sports',
-  };
-  const newsApiCategory = categoryMap[category] || 'general';
-
-  let url;
-  if (country === 'world') {
-    // No country restriction — use sources filter for quality
-    url = `https://newsapi.org/v2/top-headlines?sources=${sourceIds}&pageSize=30&apiKey=${apiKey}`;
-  } else {
-    // Country-specific: can't combine with sources param, so just use country+category
-    url = `https://newsapi.org/v2/top-headlines?country=${country}&category=${newsApiCategory}&pageSize=30&apiKey=${apiKey}`;
+  // World (no country filter): use category-specific strategies below.
+  // Categories in EVERYTHING_QUERY_MAP use /v2/everything with keyword queries.
+  if (EVERYTHING_QUERY_MAP[category]) {
+    const params = new URLSearchParams({
+      q: EVERYTHING_QUERY_MAP[category],
+      domains,
+      language: 'en',
+      sortBy: sortByPopularity ? 'popularity' : 'publishedAt',
+      pageSize: '30',
+      apiKey,
+    });
+    if (from) params.set('from', from);
+    const url = `https://newsapi.org/v2/everything?${params.toString()}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`NewsAPI ${category} error: ${response.status}`);
+    const data = await response.json();
+    if (data.status !== 'ok') throw new Error(`NewsAPI ${category} error: ${data.message}`);
+    return data.articles || [];
   }
+
+  // Standard categories for world: top-headlines with trusted sources filter.
+  // (NewsAPI prohibits combining `sources` with `country` or `category`, so we
+  // omit `category` here and rely on post-fetch filtering for topic relevance.)
+  const url = `https://newsapi.org/v2/top-headlines?sources=${sourceIds}&pageSize=30&apiKey=${apiKey}`;
   const response = await fetch(url);
   if (!response.ok) throw new Error(`NewsAPI error: ${response.status}`);
   const data = await response.json();
@@ -914,6 +967,68 @@ async function fetchFromGNews(country, category, apiKey, opts = {}) {
   const data = await response.json();
   if (data.errors) throw new Error(`GNews error: ${JSON.stringify(data.errors)}`);
   return data.articles || [];
+}
+
+// ── RSS support ───────────────────────────────────────────────────────────
+// Minimal RSS 2.0 / Atom parser — no external XML library needed.
+// Handles CDATA sections, HTML entities, and both RSS <link> (text node)
+// and Atom <link href="..."> (attribute) formats.
+
+function parseRSSFeed(xml) {
+  const items = [];
+  // Match <item> (RSS 2.0) or <entry> (Atom) blocks
+  const blockRe = /<(?:item|entry)[\s>]([\s\S]*?)<\/(?:item|entry)>/gi;
+  let m;
+  while ((m = blockRe.exec(xml)) !== null) {
+    const block = m[1];
+
+    // Extract text content of a named tag, unwrapping CDATA and decoding entities
+    const get = (tag) => {
+      const cdataM = block.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]>`, 'i'));
+      if (cdataM) return cdataM[1].trim();
+      const plainM = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'));
+      if (!plainM) return null;
+      return plainM[1]
+        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+        .replace(/<[^>]+>/g, '') // strip any inline HTML tags
+        .trim();
+    };
+
+    // Atom feeds use <link rel="alternate" href="..."/> rather than a text node
+    const getAtomLink = () => {
+      const hrefM = block.match(/<link[^>]+href="([^"]+)"/i);
+      return hrefM ? hrefM[1] : null;
+    };
+
+    const title = get('title');
+    const link  = get('link') || getAtomLink();
+    // description/summary/content — prefer longer of description vs summary
+    const desc    = get('description') || '';
+    const summary = get('summary')     || '';
+    const description = desc.length >= summary.length ? desc : summary;
+    const pubDate = get('pubDate') || get('published') || get('updated') || get('dc:date');
+
+    if (title && link) {
+      items.push({ title, link, description, pubDate: pubDate || null });
+    }
+  }
+  return items;
+}
+
+// Fetch an RSS/Atom feed and return parsed items.
+// Sends a browser-like User-Agent and Accept header — many feed servers
+// return 403 for bare fetch() calls without these.
+async function fetchRSSFeed(url) {
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (compatible; RSS reader)',
+      'Accept':     'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
+    },
+  });
+  if (!response.ok) throw new Error(`RSS ${response.status}: ${url}`);
+  const xml = await response.text();
+  return parseRSSFeed(xml);
 }
 
 // ── Keyword search helpers ─────────────────────────────────────────────────
@@ -1292,6 +1407,28 @@ function formatGNewsArticle(article, country, category) {
   };
 }
 
+function formatRSSArticle(item, feedSource, country, category) {
+  const publishedAt = item.pubDate
+    ? new Date(item.pubDate).toISOString()
+    : new Date().toISOString();
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    title: item.title,
+    description: item.description || '',
+    content: item.description || '',  // RSS items rarely carry full body text
+    url: item.link,
+    image_url: null,
+    source: feedSource.name,
+    publishedAt,
+    time_ago: timeAgo(publishedAt),
+    country, category,
+    summary_points: null,
+    _meta: {
+      sourceCountry: inferCountryFromUrl(item.link),
+    },
+  };
+}
+
 // Main handler
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -1562,9 +1699,34 @@ export default async function handler(req, res) {
           }
         }
 
-        // ── 5. GNews (extra fallback - broad country+category support) ────────
+        // ── 5. RSS feeds (Caixin Global, Nikkei Asia, …) ─────────────────────
+        // Fetched for any country that appears in a feed's `countries` set.
+        // Always attempted for applicable countries (like Guardian for AU/GB/US)
+        // since these are high-quality, region-specific sources. Errors are
+        // silently caught so a blocked or missing feed never breaks the response.
+        // Feeds are fetched in parallel to keep latency low.
+        {
+          const applicableFeeds = RSS_SOURCES.filter(f => f.url && f.countries.has(country));
+          if (applicableFeeds.length > 0) {
+            console.log(`  [5] RSS [${country}/${category}]: ${applicableFeeds.map(f => f.name).join(', ')}`);
+            const rssResults = await Promise.allSettled(
+              applicableFeeds.map(f => fetchRSSFeed(f.url).then(items =>
+                items.map(item => formatRSSArticle(item, f, country, category))
+              ))
+            );
+            for (const result of rssResults) {
+              if (result.status === 'fulfilled') {
+                formattedArticles = [...formattedArticles, ...result.value];
+              } else {
+                console.error(`  RSS feed failed:`, result.reason?.message);
+              }
+            }
+          }
+        }
+
+        // ── 6. GNews (extra fallback - broad country+category support) ────────
         if (formattedArticles.length < 30 && GNEWS_API_KEY) {
-          console.log(`  [5] GNews [${country}/${category}] (have ${formattedArticles.length} so far)`);
+          console.log(`  [6] GNews [${country}/${category}] (have ${formattedArticles.length} so far)`);
           try {
             const raw = await fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort });
             const valid = raw.filter(a => a.title);
