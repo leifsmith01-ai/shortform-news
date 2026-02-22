@@ -108,49 +108,26 @@ export default function Home() {
     localStorage.setItem('selectedSources', JSON.stringify(selectedSources));
   }, [selectedSources]);
 
+  // Ref for aborting in-flight requests when filters change
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+
   const fetchNews = useCallback(async () => {
     if (selectedCountries.length === 0 || selectedCategories.length === 0) {
       setArticles([]);
       return;
     }
 
+    // Cancel any in-flight request before starting a new one
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
     setError(null);
 
-    const targetDate = new Date().toISOString().split('T')[0];
-    
     try {
-      // Try to get cached articles first
-      const cachedArticles = [];
-      
-      for (const country of selectedCountries) {
-        for (const category of selectedCategories) {
-          const cached = await api.getCachedNews(targetDate, country, category);
-          
-          if (cached && cached.articles) {
-            cachedArticles.push(...cached.articles);
-          }
-        }
-      }
-
-      // Only use cached articles if at least some already have AI summaries.
-      // If none do, fall through to a fresh fetch so summaries get generated.
-      const cachedHasSummaries = cachedArticles.some(
-        a => a.summary_points && a.summary_points.length > 0
-      );
-      if (cachedArticles.length > 0 && cachedHasSummaries) {
-        setArticles(cachedArticles);
-        setLastUpdated(new Date());
-        setLoading(false);
-
-        const shouldGroup = selectedCountries.length > 1 || selectedCategories.length > 1;
-        if (shouldGroup && !groupBy) {
-          setGroupBy(selectedCountries.length > 1 ? 'country' : 'category');
-        }
-        return;
-      }
-
-      // Fetch fresh news
       const result = await api.fetchNews({
         countries: selectedCountries,
         categories: selectedCategories,
@@ -159,40 +136,30 @@ export default function Home() {
         sources: selectedSources.length > 0 ? selectedSources : undefined,
       });
 
+      // If this request was aborted while in flight, discard the result
+      if (controller.signal.aborted) return;
+
       if (result?.articles) {
         const fetchedArticles = result.articles;
         setArticles(fetchedArticles);
         setLastUpdated(new Date());
-        
-        // Auto-detect grouping
+
+        // Auto-detect grouping (reads groupBy via closure but doesn't depend on it)
         const shouldGroup = selectedCountries.length > 1 || selectedCategories.length > 1;
-        if (shouldGroup && !groupBy) {
-          setGroupBy(selectedCountries.length > 1 ? 'country' : 'category');
-        }
-        
-        // Cache the results
-        for (const country of selectedCountries) {
-          for (const category of selectedCategories) {
-            const relevantArticles = fetchedArticles.filter(
-              a => a.country === country && a.category === category
-            );
-            
-            if (relevantArticles.length > 0) {
-              await api.cacheNews({
-                fetch_date: targetDate,
-                country: country,
-                category: category,
-                articles: relevantArticles
-              });
-            }
+        setGroupBy(prev => {
+          if (shouldGroup && !prev) {
+            return selectedCountries.length > 1 ? 'country' : 'category';
           }
-        }
-        
+          return prev;
+        });
+
         toast.success(`Loaded ${fetchedArticles.length} articles`);
       } else {
         throw new Error('No articles returned from API');
       }
     } catch (error) {
+      // Don't show errors for intentionally aborted requests
+      if (error?.name === 'AbortError' || controller.signal.aborted) return;
       console.error('Failed to fetch news:', error);
       setError({
         message: 'Failed to load news articles',
@@ -202,9 +169,12 @@ export default function Home() {
       toast.error('Unable to fetch news. Please try again.');
       setArticles([]);
     } finally {
-      setLoading(false);
+      // Only clear loading if this is still the active request
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
-  }, [selectedCountries, selectedCategories, selectedSources, searchQuery, dateRange, groupBy]);
+  }, [selectedCountries, selectedCategories, selectedSources, searchQuery, dateRange]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -212,7 +182,7 @@ export default function Home() {
     }, searchQuery ? 500 : 0);
 
     return () => clearTimeout(timeoutId);
-  }, [fetchNews, searchQuery]);
+  }, [fetchNews]);
 
   const hasFilters = selectedCountries.length > 0 && selectedCategories.length > 0;
 
