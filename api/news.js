@@ -399,9 +399,13 @@ const NEWS_DATA_CATEGORY_MAP = {
 
 // Countries considered part of the Asia-Pacific region for RSS feed targeting.
 // Nikkei Asia covers this whole region so its feed is fetched for all of them.
+// NOTE: au and nz are intentionally excluded — they are already well-served by
+// Guardian (dedicated au section), NewsAPI, and GNews. Nikkei is Japan/China-
+// centric and adding it for AU queries dilutes Australian content with Asian
+// articles that only mention Australia tangentially.
 const ASIA_COUNTRIES = new Set([
   'cn', 'jp', 'kr', 'hk', 'tw', 'sg', 'in', 'id', 'th', 'my', 'ph', 'vn',
-  'pk', 'bd', 'lk', 'mm', 'kh', 'np', 'au', 'nz',
+  'pk', 'bd', 'lk', 'mm', 'kh', 'np',
 ]);
 
 // RSS feed registry — each entry is fetched for applicable countries and merged
@@ -436,6 +440,13 @@ const RSS_SOURCES = [
     countries: ASIA_COUNTRIES,
   },
 ];
+
+// Countries already well-served by targeted API sources (NewsAPI top-headlines,
+// Guardian native sections, WorldNewsAPI). For these, RSS feeds are a supplement
+// used only when the article count is low — not always-on. This prevents broad
+// regional feeds (e.g. Nikkei) from flooding results for countries that have
+// strong dedicated API coverage. Underserved countries always get RSS.
+const RSS_WELL_SERVED_COUNTRIES = new Set(['us', 'gb', 'au', 'ca', 'nz', 'ie']);
 
 // Map app categories to GNews API categories
 // GNews categories: general, world, nation, business, technology, entertainment, sports, science, health
@@ -624,6 +635,8 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
     timestamp: new Date(a.publishedAt).getTime() || 0,
     depth: contentDepthScore(a),
     catRelevance: categoryRelevanceScore(a, category || a.category),
+    // _countryScore is set by the country relevance filter (-1 = not set, i.e. world query)
+    countryRel: a._countryScore ?? -1,
     domain: getSourceDomain(a),
   }));
 
@@ -687,9 +700,19 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
     const maxCatRelevance = Math.max(...cluster.map(c => c.catRelevance));
     const catScore = maxCatRelevance * 8;
 
+    // ── Signal 6: Country Relevance (0-8) ──
+    // Derived from the score computed in the country filter:
+    //   6 = in title + meta match (most relevant)
+    //   4 = in title only
+    //   2 = in body/description only
+    //   0 = not mentioned (passed via filler path)
+    //  -1 = not set (world query — use neutral midpoint to avoid penalising)
+    const bestCountryRel = best.countryRel;
+    const countryRelScore = bestCountryRel === -1 ? 4 : (bestCountryRel / 6) * 8;
+
     return {
       article: { ...best.article, _coverage: coverageCount > 1 ? { count: coverageCount, sources: uniqueSources } : undefined },
-      signals: { authority, coverage, freshness, depth, catScore },
+      signals: { authority, coverage, freshness, depth, catScore, countryRelScore },
       coverageCount,
       domain: best.domain,
     };
@@ -697,26 +720,28 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
 
   // 5. Apply time-window-dependent weights
   //
-  //   Signal          | 24h (breaking)  | 3d+ (popular)
-  //   ────────────────|────────────────|──────────────
-  //   Freshness       |  3.0            |  1.0
-  //   Authority       |  1.5            |  2.5
-  //   Coverage        |  1.5            |  3.0
-  //   Category Match  |  2.0            |  1.5
-  //   Content Depth   |  1.0            |  1.0
+  //   Signal            | 24h (breaking)  | 3d+ (popular)
+  //   ──────────────────|────────────────|──────────────
+  //   Freshness         |  3.0            |  1.0
+  //   Authority         |  1.5            |  2.5
+  //   Coverage          |  1.5            |  3.0
+  //   Category Match    |  2.0            |  1.5
+  //   Content Depth     |  1.0            |  1.0
+  //   Country Relevance |  2.0            |  2.0   ← constant: user's country choice always matters
   //
   const W = usePopularity
-    ? { freshness: 1.0, authority: 2.5, coverage: 3.0, cat: 1.5, depth: 1.0 }
-    : { freshness: 3.0, authority: 1.5, coverage: 1.5, cat: 2.0, depth: 1.0 };
+    ? { freshness: 1.0, authority: 2.5, coverage: 3.0, cat: 1.5, depth: 1.0, countryRel: 2.0 }
+    : { freshness: 3.0, authority: 1.5, coverage: 1.5, cat: 2.0, depth: 1.0, countryRel: 2.0 };
 
   for (const s of scored) {
-    const { authority, coverage, freshness, depth, catScore } = s.signals;
+    const { authority, coverage, freshness, depth, catScore, countryRelScore } = s.signals;
     s.totalScore =
-      authority  * W.authority +
-      coverage   * W.coverage +
-      freshness  * W.freshness +
-      depth      * W.depth +
-      catScore   * W.cat;
+      authority       * W.authority +
+      coverage        * W.coverage +
+      freshness       * W.freshness +
+      depth           * W.depth +
+      catScore        * W.cat +
+      countryRelScore * W.countryRel;
   }
 
   // 6. Sort by total score, then apply source diversity re-ranking
@@ -1706,7 +1731,14 @@ export default async function handler(req, res) {
         // silently caught so a blocked or missing feed never breaks the response.
         // Feeds are fetched in parallel to keep latency low.
         {
-          const applicableFeeds = RSS_SOURCES.filter(f => f.url && f.countries.has(country));
+          const applicableFeeds = RSS_SOURCES.filter(f => {
+            if (!f.url || !f.countries.has(country)) return false;
+            // For countries already well-served by targeted API sources, only
+            // use RSS when we're short on articles (< 20). For underserved
+            // countries (CN, JP, IN, etc.) always fetch RSS — it's a primary source.
+            if (RSS_WELL_SERVED_COUNTRIES.has(country) && formattedArticles.length >= 20) return false;
+            return true;
+          });
           if (applicableFeeds.length > 0) {
             console.log(`  [5] RSS [${country}/${category}]: ${applicableFeeds.map(f => f.name).join(', ')}`);
             const rssResults = await Promise.allSettled(
@@ -1779,6 +1811,10 @@ export default async function handler(req, res) {
             else if (inText) score += 2;
             const metaCountry = a._meta?.sourceCountry;
             if (metaCountry === country) score += 2;
+            // Attach score so the ranker can use it as a country-relevance signal
+            // (Signal 6). Without this, articles that barely pass the filter
+            // compete equally with strongly on-topic articles in the ranking step.
+            a._countryScore = score;
             return { article: a, score };
           });
           scored.sort((a, b) => b.score - a.score);
