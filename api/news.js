@@ -229,6 +229,80 @@ const CATEGORY_QUERY_NOUNS = {
   tv:         ['television', 'TV', 'streaming'],
 };
 
+// Category relevance keywords — used in post-fetch filtering to verify articles
+// actually match the requested topic. Broader than query nouns to allow reasonable matches.
+const CATEGORY_RELEVANCE_KEYWORDS = {
+  politics: [
+    'politi', 'government', 'elect', 'parliament', 'legislat', 'minister',
+    'president', 'senator', 'congress', 'vote', 'voter', 'ballot', 'party',
+    'opposition', 'coalition', 'campaign', 'democrat', 'republican', 'labor',
+    'liberal', 'conservative', 'cabinet', 'bill', 'law', 'regulation',
+    'policy', 'reform', 'referendum', 'constitutional', 'bipartisan',
+    'geopoliti', 'sanction', 'diplomatic', 'nato', 'tariff',
+  ],
+  world: [
+    'international', 'diplomacy', 'diplomat', 'foreign', 'global', 'trade',
+    'summit', 'united nations', ' un ', 'nato', 'treaty', 'sanction',
+    'geopoliti', 'embassy', 'refugee', 'humanitarian', 'conflict',
+    'bilateral', 'multilateral', 'alliance',
+  ],
+  business: [
+    'business', 'econom', 'market', 'stock', 'financ', 'bank', 'trade',
+    'invest', 'profit', 'revenue', 'gdp', 'inflation', 'interest rate',
+    'startup', 'merger', 'acquisition', 'ipo', 'ceo', 'industry',
+    'commodit', 'oil price', 'crypto', 'bitcoin',
+  ],
+  technology: [
+    'tech', 'software', 'hardware', 'ai ', 'artificial intelligen',
+    'startup', 'app', 'digital', 'cyber', 'robot', 'comput', 'chip',
+    'semiconductor', 'cloud', 'data', 'algorithm', 'machine learning',
+    'blockchain', 'quantum', 'internet', 'silicon valley',
+  ],
+  science: [
+    'scien', 'research', 'study', 'discover', 'experiment', 'nasa',
+    'space', 'climate', 'species', 'fossil', 'dna', 'genome', 'physics',
+    'chemist', 'biolog', 'astrono', 'geolog', 'environ', 'carbon',
+  ],
+  health: [
+    'health', 'medical', 'hospital', 'doctor', 'patient', 'disease',
+    'virus', 'vaccine', 'treatment', 'drug', 'pharma', 'surgery',
+    'mental health', 'cancer', 'diabet', 'obesity', 'pandemic',
+    'clinic', 'diagnosis', 'symptom', 'therapy', 'who ',
+  ],
+  sports: [
+    'sport', 'game', 'match', 'team', 'player', 'coach', 'league',
+    'championship', 'tournament', 'goal', 'score', 'win', 'defeat',
+    'season', 'final', 'olympic', 'fifa', 'nba', 'nfl', 'cricket',
+    'football', 'soccer', 'tennis', 'rugby', 'athlet',
+  ],
+  gaming: [
+    'gaming', 'video game', 'esport', 'console', 'playstation', 'xbox',
+    'nintendo', 'steam', 'gamer', 'fps', 'rpg', 'multiplayer',
+    'twitch', 'game developer', 'gameplay',
+  ],
+  film: [
+    'film', 'movie', 'cinema', 'box office', 'director', 'actor',
+    'actress', 'oscar', 'screenplay', 'hollywood', 'blockbuster',
+    'premiere', 'sequel', 'franchise', 'animation', 'documentary',
+  ],
+  tv: [
+    'television', 'tv show', 'tv series', 'streaming', 'showrunner',
+    'netflix', 'hbo', 'disney+', 'series finale', 'episode',
+    'renewal', 'cancell', 'sitcom', 'drama series',
+  ],
+};
+
+// Check if an article's title+description match the requested category.
+// Returns true if at least one category keyword appears.
+function articleMatchesCategory(article, category) {
+  // 'world' is too broad to filter usefully — we rely on query-level filtering
+  if (category === 'world') return true;
+  const keywords = CATEGORY_RELEVANCE_KEYWORDS[category];
+  if (!keywords) return true; // unknown category, don't filter
+  const text = `${article.title || ''} ${article.description || ''}`.toLowerCase();
+  return keywords.some(kw => text.includes(kw));
+}
+
 function getCountryTerms(country) {
   if (COUNTRY_RELEVANCE_KEYWORDS[country]) return COUNTRY_RELEVANCE_KEYWORDS[country];
   const name = COUNTRY_NAMES[country];
@@ -322,11 +396,11 @@ const NEWS_DATA_CATEGORY_MAP = {
 };
 
 // Helper: generate cache key (slot = "am" or "pm" to refresh twice a day)
-function getCacheKey(country, category) {
+function getCacheKey(country, category, dateRange) {
   const now = new Date();
   const date = now.toISOString().split('T')[0];
   const slot = now.getUTCHours() < 12 ? 'am' : 'pm';
-  return `${date}-${slot}-${country}-${category}`;
+  return `${date}-${slot}-${country}-${category}-${dateRange || '24h'}`;
 }
 
 // Helper: check if cache is still valid
@@ -619,15 +693,19 @@ async function fetchFromGuardian(country, category, apiKey, opts = {}) {
   } else {
     const countrySection = GUARDIAN_COUNTRY_SECTIONS[country];
     if (countrySection) {
-      const queryParams = {
-        section: countrySection,
+      // For AU/GB/US, Guardian has dedicated country news sections.
+      // Use category-specific query terms to ensure topical relevance,
+      // and also search the category section with a country keyword.
+      const catNouns = CATEGORY_QUERY_NOUNS[category];
+      const queryTerms = catNouns ? catNouns.slice(0, 4).join(' OR ') : category;
+      params = new URLSearchParams({
+        q: queryTerms,
+        section: `${countrySection}|${categorySection}`,
         'show-fields': 'trailText,thumbnail,byline,bodyText',
         'page-size': '20',
-        'order-by': 'newest',
+        'order-by': 'relevance',
         'api-key': apiKey || 'test',
-      };
-      if (category !== 'world') queryParams.q = category;
-      params = new URLSearchParams(queryParams);
+      });
     } else {
       const countryName = COUNTRY_NAMES[country] || country;
       const demonym = COUNTRY_DEMONYMS[country];
@@ -1142,7 +1220,7 @@ export default async function handler(req, res) {
 
   if (isTrending) {
     const trendingCategories = ['technology', 'business', 'politics', 'science', 'health', 'sports', 'gaming', 'film', 'tv'];
-    const trendingCacheKey = getCacheKey('world', 'trending');
+    const trendingCacheKey = getCacheKey('world', 'trending', dateRange);
 
     if (isCacheValid(CACHE[trendingCacheKey])) {
       console.log(`Cache HIT: ${trendingCacheKey}`);
@@ -1155,7 +1233,7 @@ export default async function handler(req, res) {
       // Fetch all categories in parallel to avoid serverless timeout
       const categoryResults = await Promise.allSettled(
         trendingCategories.map(async (cat) => {
-          const catCacheKey = getCacheKey('world', cat);
+          const catCacheKey = getCacheKey('world', cat, dateRange);
           if (isCacheValid(CACHE[catCacheKey])) {
             return CACHE[catCacheKey].articles;
           }
@@ -1214,7 +1292,7 @@ export default async function handler(req, res) {
 
     for (const country of countryList) {
       for (const category of categoryList) {
-        const cacheKey = getCacheKey(country, category);
+        const cacheKey = getCacheKey(country, category, dateRange);
 
         if (isCacheValid(CACHE[cacheKey])) {
           console.log(`Cache HIT: ${cacheKey}`);
@@ -1274,7 +1352,39 @@ export default async function handler(req, res) {
           }
         }
 
-        // ── AI summaries for first 5 articles (tries all configured LLM providers) ──
+        // ── Category relevance filter ────────────────────────────────────────
+        // Drop articles that don't match the requested category at all.
+        // This catches off-topic articles that APIs return (e.g. human interest
+        // stories from a country section when we asked for politics).
+        const beforeCatFilter = formattedArticles.length;
+        formattedArticles = formattedArticles.filter(a => articleMatchesCategory(a, category));
+        if (formattedArticles.length < beforeCatFilter) {
+          console.log(`  Category filter: kept ${formattedArticles.length}/${beforeCatFilter} for [${category}]`);
+        }
+
+        // ── Country relevance filter (multi-signal) ─────────────────────────
+        // Scores each article and sorts so most relevant appear first.
+        // Only articles with a positive relevance score are kept.
+        if (country !== 'world' && formattedArticles.length > 0) {
+          const scored = formattedArticles.map(a => {
+            let score = 0;
+            const { inTitle, inText } = articleMentionsCountry(a, country);
+            if (inTitle) score += 4;
+            else if (inText) score += 2;
+            const metaCountry = a._meta?.sourceCountry;
+            if (metaCountry === country) score += 2;
+            return { article: a, score };
+          });
+          scored.sort((a, b) => b.score - a.score);
+          const relevant = scored.filter(s => s.score > 0).map(s => s.article);
+          // Only keep relevant articles — no score-0 padding
+          if (relevant.length > 0) {
+            formattedArticles = relevant;
+          }
+          console.log(`  Country filter: ${relevant.length} relevant of ${scored.length} for [${country}]`);
+        }
+
+        // ── AI summaries for first 5 filtered articles ──────────────────────
         if (HAS_LLM && formattedArticles.length > 0) {
           const summaryPromises = formattedArticles.slice(0, 5).map(async (article) => {
             try {
@@ -1286,36 +1396,6 @@ export default async function handler(req, res) {
             return article;
           });
           await Promise.all(summaryPromises);
-        }
-
-        // ── Multi-signal relevance filter ──────────────────────────────────────
-        // Scores each article using multiple signals to determine national relevance:
-        //   +4  country name/demonym in article TITLE (strongest — article is about the country)
-        //   +2  country in description/body only (may be a passing reference)
-        //   +2  source metadata matches country (_meta.sourceCountry from domain, TLD, or API)
-        // Articles are sorted by score so the most relevant appear first.
-        // Low-scoring articles are kept as padding to ensure we return enough results.
-        const TARGET_ARTICLES = 10;
-        if (country !== 'world' && formattedArticles.length > 0) {
-          const scored = formattedArticles.map(a => {
-            let score = 0;
-            const { inTitle, inText } = articleMentionsCountry(a, country);
-            if (inTitle) score += 4;
-            else if (inText) score += 2;
-            // Check source-country metadata (domain, TLD, API-provided)
-            const metaCountry = a._meta?.sourceCountry;
-            if (metaCountry === country) score += 2;
-            return { article: a, score };
-          });
-          scored.sort((a, b) => b.score - a.score);
-          const relevant = scored.filter(s => s.score > 0).map(s => s.article);
-          // Prioritise relevant articles, but pad with remaining ones up to target
-          if (relevant.length >= TARGET_ARTICLES) {
-            formattedArticles = relevant;
-          } else {
-            const remaining = scored.filter(s => s.score === 0).map(s => s.article);
-            formattedArticles = [...relevant, ...remaining].slice(0, Math.max(TARGET_ARTICLES, relevant.length));
-          }
         }
 
         // Strip _meta before caching so cached responses are clean
