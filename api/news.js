@@ -1056,6 +1056,118 @@ async function fetchRSSFeed(url) {
   return parseRSSFeed(xml);
 }
 
+// ── Keyword query expansion ────────────────────────────────────────────────
+// Maps a normalised search term to an array of related terms that are ORed
+// together in the API query. This solves cases where articles use an alternate
+// name (e.g. "UFC" instead of "MMA") that the user didn't type.
+//
+// Multi-word phrases are quoted ("mixed martial arts") so APIs treat them as
+// phrases. Single-word/acronym terms are unquoted. Both directions of an alias
+// are listed so users get consistent results regardless of which name they use.
+//
+// To add a new topic: add an entry to _EXP and map each alias to it below.
+
+// Shared expansion arrays — referenced by multiple alias keys to avoid duplication
+const _EXP = {
+  MMA:      ['MMA', 'UFC', 'Bellator', '"mixed martial arts"'],
+  NBA:      ['NBA', 'basketball', '"National Basketball Association"'],
+  NFL:      ['NFL', '"American football"', '"National Football League"'],
+  MLB:      ['MLB', 'baseball', '"Major League Baseball"'],
+  NHL:      ['NHL', 'hockey', '"National Hockey League"'],
+  F1:       ['F1', '"Formula 1"', '"Formula One"', '"Grand Prix"'],
+  EPL:      ['"Premier League"', 'EPL', '"English Premier League"'],
+  FIFA:     ['FIFA', 'football', 'soccer', '"World Cup"'],
+  TENNIS:   ['tennis', 'ATP', 'WTA', 'Wimbledon', '"US Open"', '"French Open"', '"Australian Open"'],
+  WWE:      ['WWE', '"World Wrestling Entertainment"', 'wrestling', 'AEW'],
+  PGA:      ['PGA', 'golf', '"PGA Tour"', '"Masters Tournament"'],
+  OLYMPICS: ['Olympics', '"Olympic Games"', '"Summer Games"', '"Winter Games"'],
+  CRYPTO:   ['crypto', 'cryptocurrency', 'bitcoin', 'ethereum', 'blockchain'],
+  BITCOIN:  ['bitcoin', 'cryptocurrency', 'crypto', 'BTC'],
+  CHATGPT:  ['ChatGPT', 'OpenAI', '"GPT-4"', '"large language model"'],
+  EV:       ['"electric vehicle"', '"electric car"', 'Tesla', 'EV'],
+  NATO:     ['NATO', '"North Atlantic Treaty"', '"Alliance"'],
+  WHO:      ['WHO', '"World Health Organization"', '"World Health Organisation"'],
+  UN:       ['UN', '"United Nations"', '"Security Council"', '"General Assembly"'],
+};
+
+const KEYWORD_EXPANSION_MAP = {
+  // ── Combat sports ───────────────────────────────────────────────────────
+  'mma':                _EXP.MMA,
+  'ufc':                _EXP.MMA,
+  'bellator':           _EXP.MMA,
+  'mixed martial arts': _EXP.MMA,
+  // ── Basketball ──────────────────────────────────────────────────────────
+  'nba':                _EXP.NBA,
+  'basketball':         _EXP.NBA,
+  // ── American football ────────────────────────────────────────────────────
+  'nfl':                _EXP.NFL,
+  // ── Baseball ─────────────────────────────────────────────────────────────
+  'mlb':                _EXP.MLB,
+  'baseball':           _EXP.MLB,
+  // ── Ice hockey ──────────────────────────────────────────────────────────
+  'nhl':                _EXP.NHL,
+  'hockey':             _EXP.NHL,
+  'ice hockey':         _EXP.NHL,
+  // ── Formula 1 ───────────────────────────────────────────────────────────
+  'f1':                 _EXP.F1,
+  'formula 1':          _EXP.F1,
+  'formula one':        _EXP.F1,
+  'formula1':           _EXP.F1,
+  // ── Soccer / Football ───────────────────────────────────────────────────
+  'premier league':     _EXP.EPL,
+  'epl':                _EXP.EPL,
+  'fifa':               _EXP.FIFA,
+  'world cup':          _EXP.FIFA,
+  // ── Tennis ──────────────────────────────────────────────────────────────
+  'tennis':             _EXP.TENNIS,
+  'atp':                _EXP.TENNIS,
+  'wta':                _EXP.TENNIS,
+  'wimbledon':          _EXP.TENNIS,
+  // ── Wrestling ───────────────────────────────────────────────────────────
+  'wwe':                _EXP.WWE,
+  'wrestling':          _EXP.WWE,
+  'aew':                _EXP.WWE,
+  // ── Golf ────────────────────────────────────────────────────────────────
+  'pga':                _EXP.PGA,
+  'golf':               _EXP.PGA,
+  // ── Olympics ────────────────────────────────────────────────────────────
+  'olympics':           _EXP.OLYMPICS,
+  'olympic games':      _EXP.OLYMPICS,
+  // ── Crypto ──────────────────────────────────────────────────────────────
+  'crypto':             _EXP.CRYPTO,
+  'cryptocurrency':     _EXP.CRYPTO,
+  'bitcoin':            _EXP.BITCOIN,
+  'btc':                _EXP.BITCOIN,
+  // ── AI / Tech ───────────────────────────────────────────────────────────
+  'chatgpt':            _EXP.CHATGPT,
+  'openai':             _EXP.CHATGPT,
+  // ── Electric vehicles ───────────────────────────────────────────────────
+  'ev':                 _EXP.EV,
+  'electric vehicle':   _EXP.EV,
+  'electric car':       _EXP.EV,
+  // ── International organisations ─────────────────────────────────────────
+  'nato':               _EXP.NATO,
+  'who':                _EXP.WHO,
+  'united nations':     _EXP.UN,
+};
+
+// Build the actual query string to send to APIs.
+// If the keyword has a known expansion, returns an OR query covering all related terms.
+// Multi-word phrases not in the map are auto-quoted for precision (reduces noise).
+function buildSearchQuery(rawKeyword) {
+  const normalized = rawKeyword.trim().toLowerCase();
+  const expansions = KEYWORD_EXPANSION_MAP[normalized];
+  if (expansions && expansions.length > 0) {
+    return expansions.join(' OR ');
+  }
+  // Auto-quote multi-word phrases to avoid partial-word noise
+  const kw = rawKeyword.trim();
+  if (kw.includes(' ') && !kw.startsWith('"')) {
+    return `"${kw}"`;
+  }
+  return kw;
+}
+
 // ── Keyword search helpers ─────────────────────────────────────────────────
 // These search APIs directly by keyword rather than by country/category top-headlines.
 
@@ -1505,13 +1617,15 @@ export default async function handler(req, res) {
   // so results are actually about the keyword, not just top news that mentions it.
   if (searchQuery) {
     const keyword = searchQuery.trim();
-    console.log(`Keyword search: "${keyword}"`);
+    const expandedQuery = buildSearchQuery(keyword);
+    const isExpanded = expandedQuery !== keyword;
+    console.log(`Keyword search: "${keyword}"${isExpanded ? ` → expanded: ${expandedQuery}` : ''}`);
     try {
       const results = [];
 
       // 1. NewsAPI /v2/everything (supports full-text keyword search)
       try {
-        const raw = await searchNewsAPIByKeyword(keyword, NEWS_API_KEY, activeDomains, { from: fromISO, sortByPopularity: usePopularitySort });
+        const raw = await searchNewsAPIByKeyword(expandedQuery, NEWS_API_KEY, activeDomains, { from: fromISO, sortByPopularity: usePopularitySort });
         const valid = raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com');
         results.push(...valid.map(a => formatNewsAPIArticle(a, 'world', 'world')));
         console.log(`  [1] NewsAPI keyword: ${valid.length} articles`);
@@ -1522,7 +1636,7 @@ export default async function handler(req, res) {
       // 2. WorldNewsAPI
       if (results.length < 30 && WORLD_NEWS_API_KEY) {
         try {
-          const raw = await searchWorldNewsAPIByKeyword(keyword, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort });
+          const raw = await searchWorldNewsAPIByKeyword(expandedQuery, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort });
           results.push(...raw.map(a => formatWorldNewsAPIArticle(a, 'world', 'world')));
           console.log(`  [2] WorldNewsAPI keyword: ${raw.length} articles`);
         } catch (err) {
@@ -1533,7 +1647,7 @@ export default async function handler(req, res) {
       // 3. NewsData.io
       if (results.length < 30 && NEWS_DATA_API_KEY) {
         try {
-          const raw = await searchNewsDataByKeyword(keyword, NEWS_DATA_API_KEY, { from: fromDateOnly });
+          const raw = await searchNewsDataByKeyword(expandedQuery, NEWS_DATA_API_KEY, { from: fromDateOnly });
           const valid = raw.filter(a => a.title);
           results.push(...valid.map(a => formatNewsDataArticle(a, 'world', 'world')));
           console.log(`  [3] NewsData keyword: ${valid.length} articles`);
@@ -1545,7 +1659,7 @@ export default async function handler(req, res) {
       // 4. Guardian (fallback)
       if (results.length < 30 && GUARDIAN_API_KEY) {
         try {
-          const raw = await searchGuardianByKeyword(keyword, GUARDIAN_API_KEY, { from: fromDateOnly });
+          const raw = await searchGuardianByKeyword(expandedQuery, GUARDIAN_API_KEY, { from: fromDateOnly });
           results.push(...raw.map(r => formatGuardianArticle(r, 'world', 'world')));
           console.log(`  [4] Guardian keyword: ${raw.length} articles`);
         } catch (err) {
