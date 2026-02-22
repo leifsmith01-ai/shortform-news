@@ -722,13 +722,16 @@ async function fetchFromNewsAPI(country, category, apiKey, activeDomains, active
   const sourceIds = activeSourceIds || TRUSTED_SOURCE_IDS;
   const { from, sortByPopularity } = opts;
 
-  // Categories that need /v2/everything for precise targeting
-  if (EVERYTHING_QUERY_MAP[category]) {
-    // For country-specific queries, use tightly paired phrases ("Australian politics")
-    // instead of loose AND ("Australia" AND "politics") to ensure national relevance.
-    const query = country !== 'world'
-      ? buildNationalQuery(country, category)
-      : EVERYTHING_QUERY_MAP[category];
+  // For country-specific requests, always use /v2/everything with buildNationalQuery
+  // and the trusted-domains filter. This applies to ALL categories, not just those in
+  // EVERYTHING_QUERY_MAP. The top-headlines endpoint cannot combine `country` with
+  // `sources`, so country-specific top-headlines bypass quality filtering entirely and
+  // return whatever domestic sources NewsAPI associates with that country code — often
+  // non-English or low-quality outlets. The /v2/everything approach searches across
+  // trusted domains (Reuters, SCMP, Bloomberg, FT, etc.) for paired phrases like
+  // "Chinese economy" or "Chinese tech", giving far better results for all categories.
+  if (country !== 'world') {
+    const query = buildNationalQuery(country, category);
     const params = new URLSearchParams({
       q: query,
       domains,
@@ -746,23 +749,30 @@ async function fetchFromNewsAPI(country, category, apiKey, activeDomains, active
     return data.articles || [];
   }
 
-  // For standard categories (technology, business, science, health, sports),
-  // use top-headlines. Note: NewsAPI top-headlines doesn't allow both `sources` and `country`,
-  // so when filtering by country we can't also filter by sources.
-  const categoryMap = {
-    technology: 'technology', business: 'business', science: 'science',
-    health: 'health', sports: 'sports',
-  };
-  const newsApiCategory = categoryMap[category] || 'general';
-
-  let url;
-  if (country === 'world') {
-    // No country restriction — use sources filter for quality
-    url = `https://newsapi.org/v2/top-headlines?sources=${sourceIds}&pageSize=30&apiKey=${apiKey}`;
-  } else {
-    // Country-specific: can't combine with sources param, so just use country+category
-    url = `https://newsapi.org/v2/top-headlines?country=${country}&category=${newsApiCategory}&pageSize=30&apiKey=${apiKey}`;
+  // World (no country filter): use category-specific strategies below.
+  // Categories in EVERYTHING_QUERY_MAP use /v2/everything with keyword queries.
+  if (EVERYTHING_QUERY_MAP[category]) {
+    const params = new URLSearchParams({
+      q: EVERYTHING_QUERY_MAP[category],
+      domains,
+      language: 'en',
+      sortBy: sortByPopularity ? 'popularity' : 'publishedAt',
+      pageSize: '30',
+      apiKey,
+    });
+    if (from) params.set('from', from);
+    const url = `https://newsapi.org/v2/everything?${params.toString()}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`NewsAPI ${category} error: ${response.status}`);
+    const data = await response.json();
+    if (data.status !== 'ok') throw new Error(`NewsAPI ${category} error: ${data.message}`);
+    return data.articles || [];
   }
+
+  // Standard categories for world: top-headlines with trusted sources filter.
+  // (NewsAPI prohibits combining `sources` with `country` or `category`, so we
+  // omit `category` here and rely on post-fetch filtering for topic relevance.)
+  const url = `https://newsapi.org/v2/top-headlines?sources=${sourceIds}&pageSize=30&apiKey=${apiKey}`;
   const response = await fetch(url);
   if (!response.ok) throw new Error(`NewsAPI error: ${response.status}`);
   const data = await response.json();
