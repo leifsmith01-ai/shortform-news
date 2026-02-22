@@ -59,7 +59,7 @@ const COUNTRY_NAMES = {
   hk: 'Hong Kong', tw: 'Taiwan', id: 'Indonesia', th: 'Thailand', my: 'Malaysia',
   ph: 'Philippines', vn: 'Vietnam', pk: 'Pakistan', bd: 'Bangladesh', lk: 'Sri Lanka',
   mm: 'Myanmar', kh: 'Cambodia', np: 'Nepal',
-  il: 'Israel', ae: 'UAE', sa: 'Saudi Arabia', tr: 'Turkey', qa: 'Qatar',
+  il: 'Israel', ps: 'Palestine', ae: 'UAE', sa: 'Saudi Arabia', tr: 'Turkey', qa: 'Qatar',
   kw: 'Kuwait', bh: 'Bahrain', om: 'Oman', jo: 'Jordan', lb: 'Lebanon',
   iq: 'Iraq', ir: 'Iran',
   za: 'South Africa', ng: 'Nigeria', eg: 'Egypt', ke: 'Kenya', ma: 'Morocco',
@@ -181,6 +181,7 @@ const COUNTRY_RELEVANCE_KEYWORDS = {
   ke: ['kenya', 'kenyan'],
   tr: ['turkey', 'turkish'],
   il: ['israel', 'israeli'],
+  ps: ['palestine', 'palestinian', 'gaza', 'west bank', 'ramallah'],
   ae: ['uae', 'emirates', 'emirati'],
   sa: ['saudi', 'saudi arabia'],
   ar: ['argentina', 'argentinian'],
@@ -206,7 +207,7 @@ const COUNTRY_DEMONYMS = {
   fi: 'Finnish',    gr: 'Greek',       nz: 'New Zealand',  sg: 'Singaporean',
   hk: 'Hong Kong',  tw: 'Taiwanese',   za: 'South African', ng: 'Nigerian',
   eg: 'Egyptian',   ke: 'Kenyan',      tr: 'Turkish',      il: 'Israeli',
-  ae: 'Emirati',    sa: 'Saudi',       ar: 'Argentine',    cl: 'Chilean',
+  ps: 'Palestinian', ae: 'Emirati',    sa: 'Saudi',        ar: 'Argentine',    cl: 'Chilean',
   co: 'Colombian',  id: 'Indonesian',  th: 'Thai',         my: 'Malaysian',
   ph: 'Philippine',  vn: 'Vietnamese', pk: 'Pakistani',    ua: 'Ukrainian',
   ro: 'Romanian',   hu: 'Hungarian',   cz: 'Czech',        rs: 'Serbian',
@@ -705,20 +706,92 @@ function timeAgo(dateStr) {
   return `${Math.floor(days / 7)}w ago`;
 }
 
-// Formatters — normalise each API's shape to our app format
+// ── Source-country inference ─────────────────────────────────────────────────
+// Map common country-code TLDs to our country codes.
+// Used to infer a source's home country from its domain (e.g. smh.com.au → au).
+const TLD_TO_COUNTRY = {
+  au: 'au', uk: 'gb', nz: 'nz', ca: 'ca', de: 'de', fr: 'fr', jp: 'jp',
+  in: 'in', br: 'br', mx: 'mx', it: 'it', es: 'es', nl: 'nl', se: 'se',
+  no: 'no', pl: 'pl', ch: 'ch', be: 'be', at: 'at', ie: 'ie', pt: 'pt',
+  dk: 'dk', fi: 'fi', gr: 'gr', za: 'za', ng: 'ng', eg: 'eg', ke: 'ke',
+  tr: 'tr', il: 'il', ae: 'ae', sa: 'sa', ar: 'ar', cl: 'cl', co: 'co',
+  id: 'id', th: 'th', my: 'my', ph: 'ph', vn: 'vn', pk: 'pk', sg: 'sg',
+  hk: 'hk', tw: 'tw', cn: 'cn', kr: 'kr', ua: 'ua', ro: 'ro', hu: 'hu',
+  cz: 'cz', rs: 'rs', hr: 'hr', bg: 'bg', sk: 'sk', ps: 'ps',
+};
+
+// Map well-known source domains to their home countries.
+// More reliable than TLD for domains like aljazeera.com (Qatar-based, English service).
+const DOMAIN_TO_COUNTRY = {
+  'reuters.com': 'gb',   'bbc.co.uk': 'gb',     'bbc.com': 'gb',
+  'theguardian.com': 'gb', 'ft.com': 'gb',       'economist.com': 'gb',
+  'nytimes.com': 'us',   'washingtonpost.com': 'us', 'cnn.com': 'us',
+  'abcnews.go.com': 'us', 'cbsnews.com': 'us',   'nbcnews.com': 'us',
+  'npr.org': 'us',       'pbs.org': 'us',        'politico.com': 'us',
+  'wsj.com': 'us',       'bloomberg.com': 'us',  'apnews.com': 'us',
+  'arstechnica.com': 'us', 'wired.com': 'us',    'techcrunch.com': 'us',
+  'theverge.com': 'us',  'engadget.com': 'us',   'espn.com': 'us',
+  'ign.com': 'us',       'polygon.com': 'us',    'ew.com': 'us',
+  'buzzfeed.com': 'us',
+  'abc.net.au': 'au',    'smh.com.au': 'au',     'theaustralian.com.au': 'au',
+  'aljazeera.com': 'qa', 'france24.com': 'fr',   'dw.com': 'de',
+  'scmp.com': 'hk',      'thenextweb.com': 'nl',
+  'timesofindia.indiatimes.com': 'in', 'thehindu.com': 'in',
+  'japantimes.co.jp': 'jp', 'straitstimes.com': 'sg',
+  'theconversation.com': 'au',
+  'nationalgeographic.com': 'us', 'newscientist.com': 'gb',
+};
+
+// Guardian section IDs that map directly to countries
+const GUARDIAN_SECTION_TO_COUNTRY = {
+  'australia-news': 'au', 'uk-news': 'gb', 'us-news': 'us',
+  'world': null, // global
+};
+
+// Infer source country from a URL's domain
+function inferCountryFromUrl(url) {
+  if (!url) return null;
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, '');
+    // Check explicit domain map first
+    if (DOMAIN_TO_COUNTRY[hostname]) return DOMAIN_TO_COUNTRY[hostname];
+    // Check subdomains (e.g. news.com.au → au)
+    for (const [domain, country] of Object.entries(DOMAIN_TO_COUNTRY)) {
+      if (hostname.endsWith('.' + domain) || hostname === domain) return country;
+    }
+    // Fall back to TLD
+    const parts = hostname.split('.');
+    const tld = parts[parts.length - 1];
+    if (TLD_TO_COUNTRY[tld]) return TLD_TO_COUNTRY[tld];
+    // Handle .co.uk, .com.au etc.
+    if (parts.length >= 3) {
+      const secondLevel = parts[parts.length - 1];
+      if (TLD_TO_COUNTRY[secondLevel]) return TLD_TO_COUNTRY[secondLevel];
+    }
+  } catch {}
+  return null;
+}
+
+// Formatters — normalise each API's shape to our app format.
+// Each includes a `_meta` object with source-country inference signals
+// used by the relevance filter (stripped before sending to the client).
 function formatNewsAPIArticle(article, country, category) {
+  const sourceUrl = article.url || '#';
   return {
     id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     title: article.title || 'No title',
     description: article.description || '',
     content: article.content || article.description || '',
-    url: article.url || '#',
+    url: sourceUrl,
     image_url: article.urlToImage || null,
     source: article.source?.name || 'Unknown',
     publishedAt: article.publishedAt || new Date().toISOString(),
     time_ago: timeAgo(article.publishedAt),
     country, category,
-    summary_points: null
+    summary_points: null,
+    _meta: {
+      sourceCountry: inferCountryFromUrl(sourceUrl),
+    },
   };
 }
 
@@ -734,23 +807,31 @@ function formatWorldNewsAPIArticle(article, country, category) {
     publishedAt: article.publish_date || new Date().toISOString(),
     time_ago: timeAgo(article.publish_date),
     country, category,
-    summary_points: null
+    summary_points: null,
+    _meta: {
+      // WorldNewsAPI provides explicit source_country — most reliable signal
+      sourceCountry: article.source_country?.toLowerCase() || inferCountryFromUrl(article.url),
+    },
   };
 }
 
 function formatNewsDataArticle(article, country, category) {
+  const sourceUrl = article.link || '#';
   return {
     id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     title: article.title || 'No title',
     description: article.description || article.content?.slice(0, 200) || '',
     content: article.content || article.description || '',
-    url: article.link || '#',
+    url: sourceUrl,
     image_url: article.image_url || null,
     source: article.source_id || 'NewsData',
     publishedAt: article.pubDate || new Date().toISOString(),
     time_ago: timeAgo(article.pubDate),
     country, category,
-    summary_points: null
+    summary_points: null,
+    _meta: {
+      sourceCountry: inferCountryFromUrl(sourceUrl),
+    },
   };
 }
 
@@ -769,7 +850,12 @@ function formatGuardianArticle(result, country, category) {
     publishedAt: result.webPublicationDate || new Date().toISOString(),
     time_ago: timeAgo(result.webPublicationDate),
     country, category,
-    summary_points: null
+    summary_points: null,
+    _meta: {
+      // Guardian sectionId often encodes country (e.g. 'australia-news')
+      sourceCountry: GUARDIAN_SECTION_TO_COUNTRY[result.sectionId] ?? inferCountryFromUrl(result.webUrl),
+      sectionId: result.sectionId || null,
+    },
   };
 }
 
@@ -917,8 +1003,9 @@ export default async function handler(req, res) {
           const raw = await fetchFromNewsAPI('world', cat, NEWS_API_KEY, activeDomains, activeSourceIds);
           const valid = raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com');
           const formatted = valid.map(a => formatNewsAPIArticle(a, 'world', cat));
-          CACHE[catCacheKey] = { timestamp: Date.now(), articles: formatted };
-          return formatted;
+          const clean = formatted.map(({ _meta, ...rest }) => rest);
+          CACHE[catCacheKey] = { timestamp: Date.now(), articles: clean };
+          return clean;
         })
       );
 
@@ -1049,30 +1136,36 @@ export default async function handler(req, res) {
           await Promise.all(summaryPromises);
         }
 
-        // ── Relevance filter: rank and filter articles by national relevance ────
-        // Tier 1: country mentioned in title (strongest signal — article is ABOUT this country)
-        // Tier 2: country mentioned in title+description only (may just reference the country)
-        // Tier 3: no country mention at all (likely off-topic)
-        // We keep tier 1 first, then tier 2, dropping tier 3 entirely when we have enough.
+        // ── Multi-signal relevance filter ──────────────────────────────────────
+        // Scores each article using multiple signals to determine national relevance:
+        //   +4  country name/demonym in article TITLE (strongest — article is about the country)
+        //   +2  country in description/body only (may be a passing reference)
+        //   +2  source metadata matches country (_meta.sourceCountry from domain, TLD, or API)
+        //   +1  source is based in same country (domain-level inference)
+        // Articles are sorted by score; those scoring 0 are dropped when we have enough.
         if (country !== 'world' && formattedArticles.length > 0) {
-          const tier1 = []; // title mention
-          const tier2 = []; // description-only mention
-          const tier3 = []; // no mention
-          for (const a of formattedArticles) {
+          const scored = formattedArticles.map(a => {
+            let score = 0;
             const { inTitle, inText } = articleMentionsCountry(a, country);
-            if (inTitle) tier1.push(a);
-            else if (inText) tier2.push(a);
-            else tier3.push(a);
-          }
-          const ranked = [...tier1, ...tier2];
-          // Use ranked results if we have at least 2, otherwise fall back to all
-          if (ranked.length >= 2) {
-            formattedArticles = ranked;
+            if (inTitle) score += 4;
+            else if (inText) score += 2;
+            // Check source-country metadata (domain, TLD, API-provided)
+            const metaCountry = a._meta?.sourceCountry;
+            if (metaCountry === country) score += 2;
+            return { article: a, score };
+          });
+          scored.sort((a, b) => b.score - a.score);
+          const relevant = scored.filter(s => s.score > 0).map(s => s.article);
+          // Use scored results if we have at least 2, otherwise fall back to all
+          if (relevant.length >= 2) {
+            formattedArticles = relevant;
           }
         }
 
-        CACHE[cacheKey] = { timestamp: Date.now(), articles: formattedArticles };
-        allArticles.push(...formattedArticles);
+        // Strip _meta before caching so cached responses are clean
+        const cleanForCache = formattedArticles.map(({ _meta, ...rest }) => rest);
+        CACHE[cacheKey] = { timestamp: Date.now(), articles: cleanForCache };
+        allArticles.push(...cleanForCache);
       }
     }
 
@@ -1097,10 +1190,13 @@ export default async function handler(req, res) {
         return true;
       });
 
+    // Strip internal _meta before sending to the client
+    const cleanArticles = filteredArticles.map(({ _meta, ...rest }) => rest);
+
     return res.status(200).json({
       status: 'ok',
-      articles: filteredArticles,
-      totalResults: filteredArticles.length,
+      articles: cleanArticles,
+      totalResults: cleanArticles.length,
       cached: false
     });
 

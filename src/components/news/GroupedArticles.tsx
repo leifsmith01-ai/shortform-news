@@ -22,7 +22,7 @@ const COUNTRY_NAMES: Record<string, string> = {
   ph: 'Philippines', vn: 'Vietnam', pk: 'Pakistan', bd: 'Bangladesh', lk: 'Sri Lanka',
   mm: 'Myanmar', kh: 'Cambodia', np: 'Nepal',
   // Middle East
-  il: 'Israel', ae: 'UAE', sa: 'Saudi Arabia', tr: 'Turkey', qa: 'Qatar',
+  il: 'Israel', ps: 'Palestine', ae: 'UAE', sa: 'Saudi Arabia', tr: 'Turkey', qa: 'Qatar',
   kw: 'Kuwait', bh: 'Bahrain', om: 'Oman', jo: 'Jordan', lb: 'Lebanon',
   iq: 'Iraq', ir: 'Iran',
   // Africa
