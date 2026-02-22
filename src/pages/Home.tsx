@@ -49,7 +49,13 @@ const COUNTRY_NAMES: Record<string, string> = {
 
 const CATEGORY_NAMES = {
   technology: 'Technology', business: 'Business', science: 'Science', health: 'Health',
-  sports: 'Sports', entertainment: 'Entertainment', politics: 'Politics', world: 'World'
+  sports: 'Sports', gaming: 'Gaming', film: 'Film', tv: 'TV',
+  politics: 'Politics', world: 'World'
+};
+
+// Migrate old "entertainment" category to the new subcategories
+const CATEGORY_MIGRATIONS: Record<string, string[]> = {
+  entertainment: ['gaming', 'film', 'tv'],
 };
 
 function getStoredList(key: string, fallback: string[]): string[] {
@@ -57,7 +63,14 @@ function getStoredList(key: string, fallback: string[]): string[] {
     const stored = localStorage.getItem(key);
     if (stored) {
       const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Apply migrations (e.g. entertainment → gaming, film, tv)
+        if (key === 'selectedCategories') {
+          const migrated = parsed.flatMap(v => CATEGORY_MIGRATIONS[v] ?? [v]);
+          return [...new Set(migrated)];
+        }
+        return parsed;
+      }
     }
   } catch {}
   return fallback;
@@ -69,6 +82,9 @@ export default function Home() {
   );
   const [selectedCategories, setSelectedCategories] = useState<string[]>(() =>
     getStoredList('selectedCategories', ['technology'])
+  );
+  const [selectedSources, setSelectedSources] = useState<string[]>(() =>
+    getStoredList('selectedSources', [])
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState('week');
@@ -87,6 +103,10 @@ export default function Home() {
   useEffect(() => {
     localStorage.setItem('selectedCategories', JSON.stringify(selectedCategories));
   }, [selectedCategories]);
+
+  useEffect(() => {
+    localStorage.setItem('selectedSources', JSON.stringify(selectedSources));
+  }, [selectedSources]);
 
   const fetchNews = useCallback(async () => {
     if (selectedCountries.length === 0 || selectedCategories.length === 0) {
@@ -135,7 +155,8 @@ export default function Home() {
         countries: selectedCountries,
         categories: selectedCategories,
         searchQuery,
-        dateRange
+        dateRange,
+        sources: selectedSources.length > 0 ? selectedSources : undefined,
       });
 
       if (result?.articles) {
@@ -183,7 +204,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCountries, selectedCategories, searchQuery, dateRange, groupBy]);
+  }, [selectedCountries, selectedCategories, selectedSources, searchQuery, dateRange, groupBy]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -216,6 +237,8 @@ export default function Home() {
           setSearchQuery={setSearchQuery}
           dateRange={dateRange}
           setDateRange={setDateRange}
+          selectedSources={selectedSources}
+          setSelectedSources={setSelectedSources}
         />
       </aside>
 

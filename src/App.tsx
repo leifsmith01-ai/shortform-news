@@ -12,6 +12,7 @@ import SignUpPage from './pages/SignUpPage'
 import Keywords from './pages/Keywords'
 import Personalized from './pages/Personalized'
 import Trending from './pages/Trending'
+import Settings from './pages/Settings'
 import { api } from './api'
 
 // Placeholder components for routes referenced in Layout
@@ -88,6 +89,12 @@ export default function App() {
         <Route path="/keywords" element={
           <Layout currentPageName="/keywords">
             <Keywords />
+          </Layout>
+        } />
+
+        <Route path="/settings" element={
+          <Layout currentPageName="/settings">
+            <Settings />
           </Layout>
         } />
 

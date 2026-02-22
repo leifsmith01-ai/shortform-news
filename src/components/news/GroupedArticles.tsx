@@ -37,7 +37,8 @@ const COUNTRY_NAMES: Record<string, string> = {
 
 const CATEGORY_NAMES = {
   technology: 'Technology', business: 'Business', science: 'Science', health: 'Health',
-  sports: 'Sports', entertainment: 'Entertainment', politics: 'Politics', world: 'World'
+  sports: 'Sports', gaming: 'Gaming', film: 'Film', tv: 'TV',
+  politics: 'Politics', world: 'World'
 };
 
 // NewsAPI free tier only supports top-headlines for these country codes

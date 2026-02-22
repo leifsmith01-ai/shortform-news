@@ -68,29 +68,80 @@ const COUNTRY_NAMES = {
   au: 'Australia', nz: 'New Zealand', fj: 'Fiji', pg: 'Papua New Guinea',
 };
 
-// Trusted news sources — only pull from reputable outlets
-// Used as `domains` for /v2/everything and `sources` for /v2/top-headlines
-const TRUSTED_DOMAINS = [
-  'reuters.com', 'bbc.co.uk', 'bbc.com', 'apnews.com',
-  'theguardian.com', 'abc.net.au', 'nytimes.com', 'washingtonpost.com',
-  'aljazeera.com', 'npr.org', 'politico.com', 'economist.com',
-  'ft.com', 'bloomberg.com', 'wsj.com', 'cnn.com',
-  'abcnews.go.com', 'cbsnews.com', 'nbcnews.com', 'pbs.org',
-  'smh.com.au', 'theaustralian.com.au', 'france24.com',
-  'dw.com', 'scmp.com', 'timesofindia.indiatimes.com',
-  'thehindu.com', 'japantimes.co.jp', 'straitstimes.com',
-].join(',');
+// Trusted news sources — single registry used to derive domain and source-ID lists.
+// Each entry: { domain, sourceId (NewsAPI ID, nullable), name, group }
+const ALL_TRUSTED_SOURCES = [
+  // ── General / Wire ────────────────────────────────────────────────────────
+  { domain: 'reuters.com',        sourceId: 'reuters',              name: 'Reuters',               group: 'general' },
+  { domain: 'bbc.co.uk',          sourceId: 'bbc-news',             name: 'BBC News',              group: 'general' },
+  { domain: 'bbc.com',            sourceId: null,                   name: 'BBC (intl)',             group: 'general' },
+  { domain: 'apnews.com',         sourceId: 'associated-press',     name: 'Associated Press',      group: 'general' },
+  { domain: 'theguardian.com',    sourceId: 'the-guardian-uk',      name: 'The Guardian',          group: 'general' },
+  { domain: 'abc.net.au',         sourceId: 'abc-news-au',          name: 'ABC Australia',         group: 'general' },
+  { domain: 'nytimes.com',        sourceId: 'the-new-york-times',   name: 'New York Times',        group: 'general' },
+  { domain: 'washingtonpost.com', sourceId: 'the-washington-post',  name: 'Washington Post',       group: 'general' },
+  { domain: 'aljazeera.com',      sourceId: 'al-jazeera-english',   name: 'Al Jazeera',            group: 'general' },
+  { domain: 'npr.org',            sourceId: null,                   name: 'NPR',                   group: 'general' },
+  { domain: 'cnn.com',            sourceId: 'cnn',                  name: 'CNN',                   group: 'general' },
+  { domain: 'abcnews.go.com',     sourceId: 'abc-news',             name: 'ABC News',              group: 'general' },
+  { domain: 'cbsnews.com',        sourceId: 'cbs-news',             name: 'CBS News',              group: 'general' },
+  { domain: 'nbcnews.com',        sourceId: 'nbc-news',             name: 'NBC News',              group: 'general' },
+  { domain: 'pbs.org',            sourceId: null,                   name: 'PBS',                   group: 'general' },
+  { domain: 'theconversation.com',sourceId: null,                   name: 'The Conversation',      group: 'general' },
+  // ── Regional ──────────────────────────────────────────────────────────────
+  { domain: 'smh.com.au',                    sourceId: null,                 name: 'Sydney Morning Herald',     group: 'regional' },
+  { domain: 'theaustralian.com.au',           sourceId: null,                 name: 'The Australian',            group: 'regional' },
+  { domain: 'france24.com',                   sourceId: null,                 name: 'France 24',                 group: 'regional' },
+  { domain: 'dw.com',                         sourceId: null,                 name: 'Deutsche Welle',            group: 'regional' },
+  { domain: 'scmp.com',                       sourceId: null,                 name: 'South China Morning Post',  group: 'regional' },
+  { domain: 'timesofindia.indiatimes.com',    sourceId: 'the-times-of-india', name: 'Times of India',           group: 'regional' },
+  { domain: 'thehindu.com',                   sourceId: 'the-hindu',          name: 'The Hindu',                group: 'regional' },
+  { domain: 'japantimes.co.jp',               sourceId: null,                 name: 'Japan Times',              group: 'regional' },
+  { domain: 'straitstimes.com',               sourceId: null,                 name: 'Straits Times',            group: 'regional' },
+  // ── Business & Finance ────────────────────────────────────────────────────
+  { domain: 'politico.com',  sourceId: 'politico',               name: 'Politico',           group: 'business' },
+  { domain: 'economist.com', sourceId: null,                     name: 'The Economist',      group: 'business' },
+  { domain: 'ft.com',        sourceId: null,                     name: 'Financial Times',    group: 'business' },
+  { domain: 'bloomberg.com', sourceId: 'bloomberg',              name: 'Bloomberg',          group: 'business' },
+  { domain: 'wsj.com',       sourceId: 'the-wall-street-journal', name: 'Wall Street Journal', group: 'business' },
+  // ── Technology ────────────────────────────────────────────────────────────
+  { domain: 'arstechnica.com', sourceId: 'ars-technica',  name: 'Ars Technica',  group: 'technology' },
+  { domain: 'wired.com',      sourceId: 'wired',         name: 'Wired',         group: 'technology' },
+  { domain: 'techcrunch.com', sourceId: 'techcrunch',     name: 'TechCrunch',    group: 'technology' },
+  { domain: 'theverge.com',   sourceId: 'the-verge',     name: 'The Verge',     group: 'technology' },
+  { domain: 'engadget.com',   sourceId: 'engadget',      name: 'Engadget',      group: 'technology' },
+  { domain: 'thenextweb.com', sourceId: 'the-next-web',  name: 'The Next Web',  group: 'technology' },
+  // ── Science ───────────────────────────────────────────────────────────────
+  { domain: 'nationalgeographic.com', sourceId: 'national-geographic', name: 'National Geographic', group: 'science' },
+  { domain: 'newscientist.com',       sourceId: 'new-scientist',      name: 'New Scientist',       group: 'science' },
+  // ── Sports ────────────────────────────────────────────────────────────────
+  { domain: 'espn.com',  sourceId: 'espn',      name: 'ESPN',      group: 'sports' },
+  // ── Gaming ────────────────────────────────────────────────────────────────
+  { domain: 'ign.com',     sourceId: 'ign',     name: 'IGN',     group: 'gaming' },
+  { domain: 'polygon.com', sourceId: 'polygon', name: 'Polygon', group: 'gaming' },
+  // ── Film & TV ─────────────────────────────────────────────────────────────
+  { domain: 'ew.com',       sourceId: 'entertainment-weekly', name: 'Entertainment Weekly', group: 'film' },
+  { domain: 'buzzfeed.com', sourceId: 'buzzfeed',             name: 'BuzzFeed',             group: 'tv' },
+];
 
-// NewsAPI source IDs corresponding to trusted outlets (for top-headlines endpoint)
-const TRUSTED_SOURCE_IDS = [
-  'reuters', 'bbc-news', 'associated-press', 'abc-news-au',
-  'the-guardian-uk', 'the-guardian-au', 'the-new-york-times',
-  'the-washington-post', 'al-jazeera-english', 'cnn', 'nbc-news',
-  'cbs-news', 'abc-news', 'bloomberg', 'the-wall-street-journal',
-  'politico', 'bbc-sport', 'espn', 'the-times-of-india',
-  'the-hindu', 'ars-technica', 'wired', 'techcrunch',
-  'the-verge', 'national-geographic', 'new-scientist',
-].join(',');
+// Build domain and source-ID strings, optionally filtered by a user-supplied domain list
+function buildTrustedDomains(userDomains) {
+  const sources = userDomains && userDomains.length > 0
+    ? ALL_TRUSTED_SOURCES.filter(s => userDomains.includes(s.domain))
+    : ALL_TRUSTED_SOURCES;
+  return sources.map(s => s.domain).join(',');
+}
+
+function buildTrustedSourceIds(userDomains) {
+  const sources = userDomains && userDomains.length > 0
+    ? ALL_TRUSTED_SOURCES.filter(s => userDomains.includes(s.domain))
+    : ALL_TRUSTED_SOURCES;
+  return sources.filter(s => s.sourceId).map(s => s.sourceId).join(',');
+}
+
+// Default (all sources) — used when no user selection is provided
+const TRUSTED_DOMAINS = buildTrustedDomains(null);
+const TRUSTED_SOURCE_IDS = buildTrustedSourceIds(null);
 
 // Keywords/demonyms for relevance filtering — articles must mention at least one term
 const COUNTRY_RELEVANCE_KEYWORDS = {
@@ -162,7 +213,9 @@ const GUARDIAN_SECTION_MAP = {
   science:       'science',
   health:        'society',
   sports:        'sport',
-  entertainment: 'culture',
+  gaming:        'games',
+  film:          'film',
+  tv:            'tv-and-radio',
   politics:      'politics',
   world:         'world'
 };
@@ -181,7 +234,9 @@ const WORLD_NEWS_TOPIC_MAP = {
   science:       'science',
   health:        'health',
   sports:        'sports',
-  entertainment: 'entertainment',
+  gaming:        'entertainment',
+  film:          'entertainment',
+  tv:            'entertainment',
   politics:      'politics',
   world:         'politics'  // closest match
 };
@@ -193,7 +248,9 @@ const NEWS_DATA_CATEGORY_MAP = {
   science:       'science',
   health:        'health',
   sports:        'sports',
-  entertainment: 'entertainment',
+  gaming:        'entertainment',
+  film:          'entertainment',
+  tv:            'entertainment',
   politics:      'politics',
   world:         'world'
 };
@@ -213,18 +270,31 @@ function isCacheValid(cacheEntry) {
   return ageInHours < CACHE_TTL_HOURS;
 }
 
+// Search-query templates for categories that use /v2/everything (more targeted than top-headlines)
+const EVERYTHING_QUERY_MAP = {
+  politics: '(politics OR government OR election OR parliament OR president OR minister OR policy OR legislation)',
+  world:    '(international OR diplomacy OR foreign OR global OR trade OR summit OR UN)',
+  gaming:   '(gaming OR "video game" OR esports OR console OR PlayStation OR Xbox OR Nintendo)',
+  film:     '(film OR movie OR cinema OR "box office" OR director OR screenplay)',
+  tv:       '(television OR "TV series" OR streaming OR "TV show" OR showrunner OR Netflix OR HBO)',
+};
+
 // Helper: fetch from NewsAPI (primary - ~55 countries)
 // Uses trusted source filtering: `domains` for /v2/everything, `sources` for /v2/top-headlines
-async function fetchFromNewsAPI(country, category, apiKey) {
-  // For politics, use /v2/everything with a targeted query + trusted domains
-  // because top-headlines 'general' is too broad and pulls entertainment/sports
-  if (category === 'politics') {
-    const politicsQuery = country !== 'world'
-      ? `"${COUNTRY_NAMES[country] || country}" AND (politics OR government OR election OR parliament OR president OR minister OR policy OR legislation)`
-      : '(politics OR government OR election OR parliament OR president OR minister OR policy OR legislation)';
+// `activeDomains` and `activeSourceIds` allow per-request source overrides (user selection)
+async function fetchFromNewsAPI(country, category, apiKey, activeDomains, activeSourceIds) {
+  const domains = activeDomains || TRUSTED_DOMAINS;
+  const sourceIds = activeSourceIds || TRUSTED_SOURCE_IDS;
+
+  // Categories that need /v2/everything for precise targeting
+  if (EVERYTHING_QUERY_MAP[category]) {
+    const baseQuery = EVERYTHING_QUERY_MAP[category];
+    const query = country !== 'world'
+      ? `"${COUNTRY_NAMES[country] || country}" AND ${baseQuery}`
+      : baseQuery;
     const params = new URLSearchParams({
-      q: politicsQuery,
-      domains: TRUSTED_DOMAINS,
+      q: query,
+      domains,
       language: 'en',
       sortBy: 'publishedAt',
       pageSize: '10',
@@ -232,47 +302,25 @@ async function fetchFromNewsAPI(country, category, apiKey) {
     });
     const url = `https://newsapi.org/v2/everything?${params.toString()}`;
     const response = await fetch(url);
-    if (!response.ok) throw new Error(`NewsAPI politics error: ${response.status}`);
+    if (!response.ok) throw new Error(`NewsAPI ${category} error: ${response.status}`);
     const data = await response.json();
-    if (data.status !== 'ok') throw new Error(`NewsAPI politics error: ${data.message}`);
+    if (data.status !== 'ok') throw new Error(`NewsAPI ${category} error: ${data.message}`);
     return data.articles || [];
   }
 
-  // For "world" category, use /v2/everything with trusted domains
-  // When a specific country is selected, add international relations context
-  if (category === 'world') {
-    const params = new URLSearchParams({
-      domains: TRUSTED_DOMAINS,
-      language: 'en',
-      sortBy: 'publishedAt',
-      pageSize: '10',
-      apiKey,
-    });
-    if (country !== 'world') {
-      const countryName = COUNTRY_NAMES[country] || country;
-      params.set('q', `"${countryName}" AND (international OR diplomacy OR foreign OR global OR trade OR summit OR UN)`);
-    }
-    const url = `https://newsapi.org/v2/everything?${params.toString()}`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`NewsAPI world error: ${response.status}`);
-    const data = await response.json();
-    if (data.status !== 'ok') throw new Error(`NewsAPI world error: ${data.message}`);
-    return data.articles || [];
-  }
-
-  // For standard categories (technology, business, science, health, sports, entertainment),
+  // For standard categories (technology, business, science, health, sports),
   // use top-headlines. Note: NewsAPI top-headlines doesn't allow both `sources` and `country`,
   // so when filtering by country we can't also filter by sources.
   const categoryMap = {
     technology: 'technology', business: 'business', science: 'science',
-    health: 'health', sports: 'sports', entertainment: 'entertainment',
+    health: 'health', sports: 'sports',
   };
   const newsApiCategory = categoryMap[category] || 'general';
 
   let url;
   if (country === 'world') {
     // No country restriction — use sources filter for quality
-    url = `https://newsapi.org/v2/top-headlines?sources=${TRUSTED_SOURCE_IDS}&pageSize=10&apiKey=${apiKey}`;
+    url = `https://newsapi.org/v2/top-headlines?sources=${sourceIds}&pageSize=10&apiKey=${apiKey}`;
   } else {
     // Country-specific: can't combine with sources param, so just use country+category
     url = `https://newsapi.org/v2/top-headlines?country=${country}&category=${newsApiCategory}&pageSize=10&apiKey=${apiKey}`;
@@ -291,7 +339,9 @@ const WORLD_NEWS_QUERY_TERMS = {
   science:    'science research discovery study',
   health:     'health medical hospital disease treatment',
   sports:     'sports match championship tournament',
-  entertainment: 'entertainment film music celebrity',
+  gaming:     'gaming video game esports console',
+  film:       'film movie cinema box office',
+  tv:         'television TV series streaming show',
   politics:   'politics government election parliament',
   world:      'international diplomacy foreign global',
 };
@@ -389,9 +439,9 @@ async function fetchFromGuardian(country, category, apiKey) {
 // ── Keyword search helpers ─────────────────────────────────────────────────
 // These search APIs directly by keyword rather than by country/category top-headlines.
 
-async function searchNewsAPIByKeyword(keyword, apiKey) {
+async function searchNewsAPIByKeyword(keyword, apiKey, domains) {
   const params = new URLSearchParams({
-    q: keyword, domains: TRUSTED_DOMAINS, language: 'en', sortBy: 'publishedAt', pageSize: '20', apiKey,
+    q: keyword, domains: domains || TRUSTED_DOMAINS, language: 'en', sortBy: 'publishedAt', pageSize: '20', apiKey,
   });
   const response = await fetch(`https://newsapi.org/v2/everything?${params}`);
   if (!response.ok) throw new Error(`NewsAPI keyword error: ${response.status}`);
@@ -660,7 +710,15 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { countries, categories, searchQuery } = req.method === 'POST' ? req.body : req.query;
+  const { countries, categories, searchQuery, sources: userSources } = req.method === 'POST' ? req.body : req.query;
+
+  // Build per-request domain/source-ID strings when the user has selected specific sources
+  const activeDomains = (userSources && userSources.length > 0)
+    ? buildTrustedDomains(userSources)
+    : TRUSTED_DOMAINS;
+  const activeSourceIds = (userSources && userSources.length > 0)
+    ? buildTrustedSourceIds(userSources)
+    : TRUSTED_SOURCE_IDS;
 
   const NEWS_API_KEY       = process.env.VITE_NEWS_API_KEY    || process.env.NEWS_API_KEY;
   const GUARDIAN_API_KEY   = process.env.GUARDIAN_API_KEY     || null;
@@ -689,7 +747,7 @@ export default async function handler(req, res) {
 
       // 1. NewsAPI /v2/everything (supports full-text keyword search)
       try {
-        const raw = await searchNewsAPIByKeyword(keyword, NEWS_API_KEY);
+        const raw = await searchNewsAPIByKeyword(keyword, NEWS_API_KEY, activeDomains);
         const valid = raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com');
         results.push(...valid.map(a => formatNewsAPIArticle(a, 'world', 'world')));
         console.log(`  [1] NewsAPI keyword: ${valid.length} articles`);
@@ -767,7 +825,7 @@ export default async function handler(req, res) {
     : categories === 'trending';
 
   if (isTrending) {
-    const trendingCategories = ['technology', 'business', 'politics', 'science', 'health', 'sports', 'entertainment'];
+    const trendingCategories = ['technology', 'business', 'politics', 'science', 'health', 'sports', 'gaming', 'film', 'tv'];
     const trendingCacheKey = getCacheKey('world', 'trending');
 
     if (isCacheValid(CACHE[trendingCacheKey])) {
@@ -785,7 +843,7 @@ export default async function handler(req, res) {
           if (isCacheValid(CACHE[catCacheKey])) {
             return CACHE[catCacheKey].articles;
           }
-          const raw = await fetchFromNewsAPI('world', cat, NEWS_API_KEY);
+          const raw = await fetchFromNewsAPI('world', cat, NEWS_API_KEY, activeDomains, activeSourceIds);
           const valid = raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com');
           const formatted = valid.map(a => formatNewsAPIArticle(a, 'world', cat));
           CACHE[catCacheKey] = { timestamp: Date.now(), articles: formatted };
@@ -861,7 +919,7 @@ export default async function handler(req, res) {
         if (country === 'world' || NEWS_API_SUPPORTED_COUNTRIES.has(country)) {
           console.log(`  [1] NewsAPI [${country}/${category}]`);
           try {
-            const raw = await fetchFromNewsAPI(country, category, NEWS_API_KEY);
+            const raw = await fetchFromNewsAPI(country, category, NEWS_API_KEY, activeDomains, activeSourceIds);
             const valid = raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com');
             formattedArticles = valid.map(a => formatNewsAPIArticle(a, country, category));
           } catch (err) {

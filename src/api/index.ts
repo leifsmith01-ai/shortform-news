@@ -36,6 +36,7 @@ class ApiService {
     categories: string[]
     searchQuery?: string
     dateRange?: string
+    sources?: string[]
   }) {
     try {
       return await this.client.fetchNews(params)
