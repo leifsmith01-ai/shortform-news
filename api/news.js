@@ -247,10 +247,8 @@ function articleMentionsCountry(article, country) {
 }
 
 // Build a nationally-focused search query for /v2/everything.
-// Instead of `"Australia" AND (politics OR government OR ...)`, this produces:
-//   ("Australian politics" OR "Australian government" OR "Australian election" OR
-//    "Australia politics" OR "Australia government" OR ...)
-// This dramatically improves relevance because articles must pair the country with the topic.
+// Combines tight exact phrases ("Australian politics") with a looser fallback
+// (country AND topic keywords) so we get both precision and recall.
 function buildNationalQuery(country, category) {
   const demonym = COUNTRY_DEMONYMS[country];
   const countryName = COUNTRY_NAMES[country] || country;
@@ -264,7 +262,14 @@ function buildNationalQuery(country, category) {
     phrases.push(`"${countryName} ${noun}"`);
   }
 
-  return `(${phrases.join(' OR ')})`;
+  // Tight phrases get priority (NewsAPI ranks by query match), but also include
+  // a looser term so articles mentioning the country in a political context aren't missed.
+  const topicKeywords = nouns.slice(0, 3).join(' OR ');
+  const looseTerm = demonym
+    ? `(${demonym} OR ${countryName}) AND (${topicKeywords})`
+    : `${countryName} AND (${topicKeywords})`;
+
+  return `(${phrases.join(' OR ')} OR ${looseTerm})`;
 }
 
 // Map app categories to Guardian API sections
@@ -496,7 +501,7 @@ async function fetchFromNewsAPI(country, category, apiKey, activeDomains, active
       domains,
       language: 'en',
       sortBy: sortByPopularity ? 'popularity' : 'publishedAt',
-      pageSize: '10',
+      pageSize: '30',
       apiKey,
     });
     if (from) params.set('from', from);
@@ -520,10 +525,10 @@ async function fetchFromNewsAPI(country, category, apiKey, activeDomains, active
   let url;
   if (country === 'world') {
     // No country restriction — use sources filter for quality
-    url = `https://newsapi.org/v2/top-headlines?sources=${sourceIds}&pageSize=10&apiKey=${apiKey}`;
+    url = `https://newsapi.org/v2/top-headlines?sources=${sourceIds}&pageSize=20&apiKey=${apiKey}`;
   } else {
     // Country-specific: can't combine with sources param, so just use country+category
-    url = `https://newsapi.org/v2/top-headlines?country=${country}&category=${newsApiCategory}&pageSize=10&apiKey=${apiKey}`;
+    url = `https://newsapi.org/v2/top-headlines?country=${country}&category=${newsApiCategory}&pageSize=20&apiKey=${apiKey}`;
   }
   const response = await fetch(url);
   if (!response.ok) throw new Error(`NewsAPI error: ${response.status}`);
@@ -551,7 +556,7 @@ async function fetchFromWorldNewsAPI(country, category, apiKey, opts = {}) {
   const topic = WORLD_NEWS_TOPIC_MAP[category] || 'politics';
   const params = new URLSearchParams({
     'language': 'en',
-    'number': '10',
+    'number': '20',
     'sort': 'publish-time',
     'sort-direction': 'DESC',
     'api-key': apiKey,
@@ -607,7 +612,7 @@ async function fetchFromGuardian(country, category, apiKey, opts = {}) {
     params = new URLSearchParams({
       section: categorySection,
       'show-fields': 'trailText,thumbnail,byline,bodyText',
-      'page-size': '10',
+      'page-size': '20',
       'order-by': 'newest',
       'api-key': apiKey || 'test',
     });
@@ -617,7 +622,7 @@ async function fetchFromGuardian(country, category, apiKey, opts = {}) {
       const queryParams = {
         section: countrySection,
         'show-fields': 'trailText,thumbnail,byline,bodyText',
-        'page-size': '10',
+        'page-size': '20',
         'order-by': 'newest',
         'api-key': apiKey || 'test',
       };
@@ -636,7 +641,7 @@ async function fetchFromGuardian(country, category, apiKey, opts = {}) {
         q: searchQuery,
         section: categorySection,
         'show-fields': 'trailText,thumbnail,byline,bodyText',
-        'page-size': '10',
+        'page-size': '20',
         'order-by': 'newest',
         'api-key': apiKey || 'test',
       });
@@ -1028,14 +1033,14 @@ export default async function handler(req, res) {
 
   // ── Date range → ISO "from" date ─────────────────────────────────────────
   const dateRangeHours = { '24h': 24, '3d': 72, 'week': 168, 'month': 720 };
-  const rangeHours = dateRangeHours[dateRange] || 24; // default to 24h
-  const fromDate = new Date(Date.now() - rangeHours * 60 * 60 * 1000);
-  const fromISO = fromDate.toISOString(); // full ISO for APIs that accept it
-  const fromDateOnly = fromISO.split('T')[0]; // YYYY-MM-DD for APIs that want a date
+  const rangeHours = dateRangeHours[dateRange] || null; // null = no date restriction (e.g. 'all')
+  const fromDate = rangeHours ? new Date(Date.now() - rangeHours * 60 * 60 * 1000) : null;
+  const fromISO = fromDate ? fromDate.toISOString() : null; // full ISO for APIs that accept it
+  const fromDateOnly = fromISO ? fromISO.split('T')[0] : null; // YYYY-MM-DD for APIs that want a date
 
-  // For wider time windows, sort by popularity instead of recency.
+  // For wider time windows (or no date filter), sort by popularity instead of recency.
   // This surfaces the biggest stories rather than just the latest.
-  const usePopularitySort = rangeHours > 24;
+  const usePopularitySort = !rangeHours || rangeHours > 24;
 
   const NEWS_API_KEY       = process.env.VITE_NEWS_API_KEY    || process.env.NEWS_API_KEY;
   const GUARDIAN_API_KEY   = process.env.GUARDIAN_API_KEY     || null;
@@ -1233,37 +1238,37 @@ export default async function handler(req, res) {
         }
 
         // ── 2. WorldNewsAPI (secondary, very broad) ───────────────────────────
-        if (formattedArticles.length < 5 && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) {
+        if (formattedArticles.length < 10 && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) {
           console.log(`  [2] WorldNewsAPI [${country}/${category}] (have ${formattedArticles.length} so far)`);
           try {
             const raw = await fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort });
             const extra = raw.map(a => formatWorldNewsAPIArticle(a, country, category));
-            formattedArticles = [...formattedArticles, ...extra].slice(0, 15);
+            formattedArticles = [...formattedArticles, ...extra];
           } catch (err) {
             console.error(`  WorldNewsAPI failed:`, err.message);
           }
         }
 
         // ── 3. NewsData.io (tertiary, broadest coverage) ──────────────────────
-        if (formattedArticles.length < 5 && NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
+        if (formattedArticles.length < 10 && NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
           console.log(`  [3] NewsData.io [${country}/${category}] (have ${formattedArticles.length} so far)`);
           try {
             const raw = await fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly });
             const valid = raw.filter(a => a.title && a.title !== '[Removed]');
             const extra = valid.map(a => formatNewsDataArticle(a, country, category));
-            formattedArticles = [...formattedArticles, ...extra].slice(0, 15);
+            formattedArticles = [...formattedArticles, ...extra];
           } catch (err) {
             console.error(`  NewsData failed:`, err.message);
           }
         }
 
-        // ── 4. The Guardian (final fallback) ──────────────────────────────────
-        if (formattedArticles.length < 3) {
-          console.log(`  [4] Guardian fallback [${country}/${category}]`);
+        // ── 4. The Guardian (always tried — strong for AU/GB/US) ──────────────
+        if (formattedArticles.length < 10 && GUARDIAN_API_KEY) {
+          console.log(`  [4] Guardian [${country}/${category}] (have ${formattedArticles.length} so far)`);
           try {
             const results = await fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: fromDateOnly });
             const extra = results.map(r => formatGuardianArticle(r, country, category));
-            formattedArticles = [...formattedArticles, ...extra].slice(0, 15);
+            formattedArticles = [...formattedArticles, ...extra];
           } catch (err) {
             console.error(`  Guardian failed:`, err.message);
           }
@@ -1288,8 +1293,9 @@ export default async function handler(req, res) {
         //   +4  country name/demonym in article TITLE (strongest — article is about the country)
         //   +2  country in description/body only (may be a passing reference)
         //   +2  source metadata matches country (_meta.sourceCountry from domain, TLD, or API)
-        //   +1  source is based in same country (domain-level inference)
-        // Articles are sorted by score; those scoring 0 are dropped when we have enough.
+        // Articles are sorted by score so the most relevant appear first.
+        // Low-scoring articles are kept as padding to ensure we return enough results.
+        const TARGET_ARTICLES = 10;
         if (country !== 'world' && formattedArticles.length > 0) {
           const scored = formattedArticles.map(a => {
             let score = 0;
@@ -1303,9 +1309,12 @@ export default async function handler(req, res) {
           });
           scored.sort((a, b) => b.score - a.score);
           const relevant = scored.filter(s => s.score > 0).map(s => s.article);
-          // Use scored results if we have at least 2, otherwise fall back to all
-          if (relevant.length >= 2) {
+          // Prioritise relevant articles, but pad with remaining ones up to target
+          if (relevant.length >= TARGET_ARTICLES) {
             formattedArticles = relevant;
+          } else {
+            const remaining = scored.filter(s => s.score === 0).map(s => s.article);
+            formattedArticles = [...relevant, ...remaining].slice(0, Math.max(TARGET_ARTICLES, relevant.length));
           }
         }
 
