@@ -109,6 +109,7 @@ const COUNTRIES_BY_CONTINENT = {
   ],
   'Middle East': [
     { code: 'il', name: 'Israel', flag: '🇮🇱' },
+    { code: 'ps', name: 'Palestine', flag: '🇵🇸' },
     { code: 'ae', name: 'UAE', flag: '🇦🇪' },
     { code: 'sa', name: 'Saudi Arabia', flag: '🇸🇦' },
     { code: 'tr', name: 'Turkey', flag: '🇹🇷' },
