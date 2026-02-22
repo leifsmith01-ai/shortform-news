@@ -442,46 +442,124 @@ function getSourceTier(article) {
   return SOURCE_AUTHORITY_TIER[domain] || 1; // default tier 1 for known trusted sources
 }
 
-// ── Cross-source story clustering & importance ranking ───────────────────
-// Detects the same story covered by multiple outlets by comparing normalised
-// title prefixes.  Stories covered by more sources get a coverage bonus.
-// Combined score = authority + coverage + recency, producing a ranking that
-// surfaces the most important/popular stories.
+// ── Advanced multi-signal ranking engine ─────────────────────────────────
+// Clusters duplicate stories, then scores each cluster using 6 weighted signals:
+//
+//   1. Source Authority    — tier of the outlet (wire service > national > niche)
+//   2. Cross-Source Coverage — how many distinct outlets cover this story
+//   3. Freshness          — exponential decay (recent articles score much higher)
+//   4. Content Depth      — articles with fuller text rank above thin stubs
+//   5. Category Relevance — how strongly the article matches the requested topic
+//   6. Source Diversity    — penalty if the same domain already dominates results
+//
+// The final ranking weight shifts based on time window:
+//   24h:   freshness dominates (breaking news)
+//   3d+:   authority + coverage dominate (biggest stories)
+
+// ── Stop words for smarter title matching ────────────────────────────────
+const STOP_WORDS = new Set([
+  'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+  'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been',
+  'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+  'should', 'may', 'might', 'shall', 'can', 'need', 'it', 'its', 'that',
+  'this', 'these', 'those', 'what', 'which', 'who', 'whom', 'how', 'when',
+  'where', 'why', 'not', 'no', 'nor', 'than', 'too', 'very', 'just',
+  'about', 'over', 'after', 'before', 'between', 'under', 'above', 'into',
+  'through', 'during', 'each', 'some', 'such', 'only', 'also', 'more',
+  'most', 'other', 'new', 'says', 'said', 'according', 'report', 'news',
+]);
 
 function normaliseTitle(title) {
   return (title || '')
     .toLowerCase()
-    .replace(/[''"""\-–—:,.|!?]/g, ' ')
+    .replace(/[''"""\-–—:,.|!?'()[\]{}]/g, ' ')
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 80);
+    .trim();
 }
 
-// Simple word-overlap similarity (Jaccard-like)
-function titleSimilarity(a, b) {
-  const wordsA = new Set(a.split(' ').filter(w => w.length > 3));
-  const wordsB = new Set(b.split(' ').filter(w => w.length > 3));
-  if (wordsA.size === 0 || wordsB.size === 0) return 0;
-  let intersection = 0;
-  for (const w of wordsA) if (wordsB.has(w)) intersection++;
-  return intersection / Math.max(wordsA.size, wordsB.size);
+// Extract meaningful words (no stop words, length > 2)
+function extractKeywords(normTitle) {
+  return normTitle.split(' ').filter(w => w.length > 2 && !STOP_WORDS.has(w));
 }
 
-// Cluster articles about the same story, pick the best representative from
-// each cluster, and rank by combined score.
-function rankAndDeduplicateArticles(articles, { usePopularity = false } = {}) {
+// Improved title similarity: uses keyword overlap with IDF-like weighting.
+// Rare words (proper nouns, specific terms) contribute more than common ones.
+function titleSimilarity(keywordsA, keywordsB, idfMap) {
+  if (keywordsA.length === 0 || keywordsB.length === 0) return 0;
+  const setB = new Set(keywordsB);
+  let weightedIntersection = 0;
+  let weightedUnion = 0;
+
+  const allWords = new Set([...keywordsA, ...keywordsB]);
+  for (const w of allWords) {
+    const weight = idfMap.get(w) || 1;
+    const inA = keywordsA.includes(w);
+    const inB = setB.has(w);
+    if (inA && inB) weightedIntersection += weight;
+    weightedUnion += weight;
+  }
+  return weightedUnion > 0 ? weightedIntersection / weightedUnion : 0;
+}
+
+// Content depth score (0-1): rewards articles with substantial text
+function contentDepthScore(article) {
+  const title = (article.title || '').length;
+  const desc = (article.description || '').length;
+  const content = (article.content || '').length;
+  // Penalise stub articles that have almost no content beyond a title
+  if (content < 50 && desc < 30) return 0;
+  // Good description = 0.3, good content = 0.7
+  const descScore = Math.min(desc / 150, 1) * 0.3;
+  const contentScore = Math.min(content / 500, 1) * 0.7;
+  return descScore + contentScore;
+}
+
+// Category relevance strength (0-1): how many category keywords appear
+function categoryRelevanceScore(article, category) {
+  if (category === 'world') return 0.5; // neutral
+  const keywords = CATEGORY_RELEVANCE_KEYWORDS[category];
+  if (!keywords) return 0.5;
+  const text = `${article.title || ''} ${article.description || ''}`.toLowerCase();
+  let hits = 0;
+  for (const kw of keywords) {
+    if (text.includes(kw)) hits++;
+  }
+  // Normalise: 1 hit = 0.3, 2 = 0.5, 3+ = 0.7-1.0
+  return Math.min(hits / 4, 1);
+}
+
+// ── Main ranking function ────────────────────────────────────────────────
+function rankAndDeduplicateArticles(articles, { usePopularity = false, category = null } = {}) {
   if (articles.length === 0) return [];
 
-  // 1. Normalise titles
-  const items = articles.map(a => ({
+  // 1. Build IDF map — words that appear in many titles are less distinctive
+  const allTitles = articles.map(a => normaliseTitle(a.title));
+  const allKeywords = allTitles.map(t => extractKeywords(t));
+  const docFreq = new Map();
+  for (const kws of allKeywords) {
+    const unique = new Set(kws);
+    for (const w of unique) docFreq.set(w, (docFreq.get(w) || 0) + 1);
+  }
+  const n = articles.length;
+  const idfMap = new Map();
+  for (const [word, freq] of docFreq) {
+    // IDF: rare words get high weight, ubiquitous words get low weight
+    idfMap.set(word, Math.log(n / freq) + 1);
+  }
+
+  // 2. Prepare items with pre-computed signals
+  const items = articles.map((a, i) => ({
     article: a,
-    normTitle: normaliseTitle(a.title),
+    keywords: allKeywords[i],
     tier: getSourceTier(a),
     timestamp: new Date(a.publishedAt).getTime() || 0,
+    depth: contentDepthScore(a),
+    catRelevance: categoryRelevanceScore(a, category || a.category),
+    domain: getSourceDomain(a),
   }));
 
-  // 2. Cluster by title similarity (greedy single-pass)
-  const clusters = [];      // array of { articles: [...items], coverageCount }
+  // 3. Cluster by title similarity (IDF-weighted)
+  const clusters = [];
   const assigned = new Set();
 
   for (let i = 0; i < items.length; i++) {
@@ -491,7 +569,8 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false } = {}) {
 
     for (let j = i + 1; j < items.length; j++) {
       if (assigned.has(j)) continue;
-      if (titleSimilarity(items[i].normTitle, items[j].normTitle) > 0.5) {
+      const sim = titleSimilarity(items[i].keywords, items[j].keywords, idfMap);
+      if (sim > 0.35) { // lower threshold with IDF weighting is more accurate
         cluster.push(items[j]);
         assigned.add(j);
       }
@@ -499,50 +578,104 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false } = {}) {
     clusters.push(cluster);
   }
 
-  // 3. From each cluster, pick the best representative and compute a combined score.
-  const ranked = clusters.map(cluster => {
-    // Sort within cluster: highest tier first, then newest
-    cluster.sort((a, b) => b.tier - a.tier || b.timestamp - a.timestamp);
-    const best = cluster[0];
-    const coverageCount = cluster.length;
-    const sources = [...new Set(cluster.map(c => getSourceDomain(c.article)))];
+  // 4. Score each cluster
+  const now = Date.now();
+  // Half-life for freshness decay (in ms)
+  // 24h mode: 6-hour half-life (recent articles much more valuable)
+  // Week mode: 48-hour half-life (still rewards recent but more tolerant)
+  const halfLife = usePopularity ? 48 * 3600_000 : 6 * 3600_000;
 
-    // Combined score:
-    //   authority:  tier value (1-3)
-    //   coverage:   2 points per additional source covering the story
-    //   recency:    normalised 0-3 based on how recent (most recent article gets 3)
-    const authorityScore = best.tier;
-    const coverageScore = Math.min((coverageCount - 1) * 2, 6); // cap at 6
+  const scored = clusters.map(cluster => {
+    // Pick best representative: highest tier first, then best depth, then newest
+    cluster.sort((a, b) =>
+      b.tier - a.tier ||
+      b.depth - a.depth ||
+      b.timestamp - a.timestamp
+    );
+    const best = cluster[0];
+    const uniqueSources = [...new Set(cluster.map(c => c.domain))];
+    const coverageCount = uniqueSources.length;
+
+    // ── Signal 1: Source Authority (0-10) ──
+    // Tier 3 = 10, Tier 2 = 7, Tier 1 = 4
+    const authority = best.tier === 3 ? 10 : best.tier === 2 ? 7 : 4;
+
+    // ── Signal 2: Cross-Source Coverage (0-10) ──
+    // Each additional unique source adds 3 points, capped at 10
+    const coverage = Math.min((coverageCount - 1) * 3, 10);
+
+    // ── Signal 3: Freshness — exponential decay (0-10) ──
+    // Score = 10 * 2^(-age/halfLife)
+    // At t=0: 10,  at t=halfLife: 5,  at t=2*halfLife: 2.5
+    const ageMs = Math.max(now - best.timestamp, 0);
+    const freshness = 10 * Math.pow(2, -ageMs / halfLife);
+
+    // ── Signal 4: Content Depth (0-5) ──
+    const depth = best.depth * 5;
+
+    // ── Signal 5: Category Relevance (0-8) ──
+    // Highest category score in the cluster (any version of the story may match better)
+    const maxCatRelevance = Math.max(...cluster.map(c => c.catRelevance));
+    const catScore = maxCatRelevance * 8;
 
     return {
-      article: { ...best.article, _coverage: coverageCount > 1 ? { count: coverageCount, sources } : undefined },
-      authority: authorityScore,
-      coverage: coverageScore,
-      timestamp: best.timestamp,
+      article: { ...best.article, _coverage: coverageCount > 1 ? { count: coverageCount, sources: uniqueSources } : undefined },
+      signals: { authority, coverage, freshness, depth, catScore },
+      coverageCount,
+      domain: best.domain,
     };
   });
 
-  // 4. Normalise recency across all clusters
-  const now = Date.now();
-  const oldest = Math.min(...ranked.map(r => r.timestamp));
-  const range = now - oldest || 1;
+  // 5. Apply time-window-dependent weights
+  //
+  //   Signal          | 24h (breaking)  | 3d+ (popular)
+  //   ────────────────|────────────────|──────────────
+  //   Freshness       |  3.0            |  1.0
+  //   Authority       |  1.5            |  2.5
+  //   Coverage        |  1.5            |  3.0
+  //   Category Match  |  2.0            |  1.5
+  //   Content Depth   |  1.0            |  1.0
+  //
+  const W = usePopularity
+    ? { freshness: 1.0, authority: 2.5, coverage: 3.0, cat: 1.5, depth: 1.0 }
+    : { freshness: 3.0, authority: 1.5, coverage: 1.5, cat: 2.0, depth: 1.0 };
 
-  for (const r of ranked) {
-    r.recency = ((r.timestamp - oldest) / range) * 3; // 0-3 scale
+  for (const s of scored) {
+    const { authority, coverage, freshness, depth, catScore } = s.signals;
+    s.totalScore =
+      authority  * W.authority +
+      coverage   * W.coverage +
+      freshness  * W.freshness +
+      depth      * W.depth +
+      catScore   * W.cat;
   }
 
-  // 5. Final sort: when usePopularity, weight authority+coverage more; otherwise emphasise recency
-  ranked.sort((a, b) => {
-    const scoreA = usePopularity
-      ? (a.authority * 2 + a.coverage * 2 + a.recency)
-      : (a.authority + a.coverage + a.recency * 3);
-    const scoreB = usePopularity
-      ? (b.authority * 2 + b.coverage * 2 + b.recency)
-      : (b.authority + b.coverage + b.recency * 3);
-    return scoreB - scoreA;
+  // 6. Sort by total score, then apply source diversity re-ranking
+  scored.sort((a, b) => b.totalScore - a.totalScore);
+
+  // Diversity pass: if a domain already has 2 articles in the top results,
+  // apply a penalty to push later articles from the same source down.
+  // This ensures varied perspectives rather than one outlet dominating.
+  const domainCount = {};
+  const MAX_PER_DOMAIN = 2;
+  const diversified = [];
+
+  for (const s of scored) {
+    domainCount[s.domain] = (domainCount[s.domain] || 0) + 1;
+    if (domainCount[s.domain] > MAX_PER_DOMAIN) {
+      // Mark for demotion but don't drop entirely
+      s._demoted = true;
+    }
+    diversified.push(s);
+  }
+
+  // Put non-demoted first, then demoted (both groups maintain their score order)
+  diversified.sort((a, b) => {
+    if (a._demoted !== b._demoted) return a._demoted ? 1 : -1;
+    return b.totalScore - a.totalScore;
   });
 
-  return ranked.map(r => r.article);
+  return diversified.map(s => s.article);
 }
 
 // Search-query templates for categories that use /v2/everything (more targeted than top-headlines)
@@ -1415,8 +1548,9 @@ export default async function handler(req, res) {
       );
     }
 
-    // Rank by authority + coverage + recency, deduplicating similar stories
-    const rankedArticles = rankAndDeduplicateArticles(filteredArticles, { usePopularity: usePopularitySort });
+    // Rank by authority + coverage + freshness + depth + category, deduplicating similar stories
+    const singleCategory = categoryList.length === 1 ? categoryList[0] : null;
+    const rankedArticles = rankAndDeduplicateArticles(filteredArticles, { usePopularity: usePopularitySort, category: singleCategory });
 
     // Strip internal fields before sending to the client
     const cleanArticles = rankedArticles.map(({ _meta, _coverage, ...rest }) => rest);
