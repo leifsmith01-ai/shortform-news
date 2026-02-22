@@ -145,7 +145,7 @@ const TRUSTED_SOURCE_IDS = buildTrustedSourceIds(null);
 
 // Keywords/demonyms for relevance filtering — articles must mention at least one term
 const COUNTRY_RELEVANCE_KEYWORDS = {
-  us: ['united states', 'america', 'american', ' u.s.'],
+  us: ['united states', 'america', 'american', 'u.s.', ' us '],
   gb: ['united kingdom', 'britain', 'british', ' uk ', 'england', 'scotland', 'wales'],
   au: ['australia', 'australian'],
   ca: ['canada', 'canadian'],
@@ -732,10 +732,10 @@ async function fetchFromNewsAPI(country, category, apiKey, activeDomains, active
   let url;
   if (country === 'world') {
     // No country restriction — use sources filter for quality
-    url = `https://newsapi.org/v2/top-headlines?sources=${sourceIds}&pageSize=20&apiKey=${apiKey}`;
+    url = `https://newsapi.org/v2/top-headlines?sources=${sourceIds}&pageSize=30&apiKey=${apiKey}`;
   } else {
     // Country-specific: can't combine with sources param, so just use country+category
-    url = `https://newsapi.org/v2/top-headlines?country=${country}&category=${newsApiCategory}&pageSize=20&apiKey=${apiKey}`;
+    url = `https://newsapi.org/v2/top-headlines?country=${country}&category=${newsApiCategory}&pageSize=30&apiKey=${apiKey}`;
   }
   const response = await fetch(url);
   if (!response.ok) throw new Error(`NewsAPI error: ${response.status}`);
@@ -1449,7 +1449,11 @@ export default async function handler(req, res) {
         }
 
         // ── 2. WorldNewsAPI (secondary, very broad) ───────────────────────────
-        if (formattedArticles.length < 10 && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) {
+        // Gate raised to 30 so we collect enough raw articles to survive category+country
+        // filtering (which can drop 50-70% of articles). Previously <10 meant that if
+        // NewsAPI returned 10+ raw results, ALL fallbacks were skipped — then the filters
+        // would cut those 10 down to 3-4 and there was no recovery mechanism.
+        if (formattedArticles.length < 30 && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) {
           console.log(`  [2] WorldNewsAPI [${country}/${category}] (have ${formattedArticles.length} so far)`);
           try {
             const raw = await fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort });
@@ -1461,7 +1465,7 @@ export default async function handler(req, res) {
         }
 
         // ── 3. NewsData.io (tertiary, broadest coverage) ──────────────────────
-        if (formattedArticles.length < 10 && NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
+        if (formattedArticles.length < 30 && NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
           console.log(`  [3] NewsData.io [${country}/${category}] (have ${formattedArticles.length} so far)`);
           try {
             const raw = await fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly });
@@ -1473,8 +1477,12 @@ export default async function handler(req, res) {
           }
         }
 
-        // ── 4. The Guardian (always tried — strong for AU/GB/US) ──────────────
-        if (formattedArticles.length < 10 && GUARDIAN_API_KEY) {
+        // ── 4. The Guardian — always tried for AU/GB/US (dedicated country sections),
+        //    and as a fallback for all others when we still need more raw articles.
+        //    Guardian is the single best source for AU/GB/US so it fires unconditionally
+        //    for those countries regardless of how many articles we already have.
+        const guardianPriorityCountry = country === 'au' || country === 'gb' || country === 'us';
+        if (GUARDIAN_API_KEY && (guardianPriorityCountry || formattedArticles.length < 30)) {
           console.log(`  [4] Guardian [${country}/${category}] (have ${formattedArticles.length} so far)`);
           try {
             const results = await fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: fromDateOnly });
