@@ -18,9 +18,15 @@ const COUNTRY_NAMES: Record<string, string> = {
   no: 'Norway', pl: 'Poland', ch: 'Switzerland', be: 'Belgium', at: 'Austria',
 }
 
+const CATEGORY_LABELS: Record<string, string> = {
+  technology: 'Technology', business: 'Business', science: 'Science', health: 'Health',
+  sports: 'Sports', gaming: 'Gaming', film: 'Film', tv: 'TV',
+  politics: 'Politics', world: 'World',
+}
+
 function getComboLabel(country: string, category: string) {
   const countryName = COUNTRY_NAMES[country] ?? country.toUpperCase()
-  const categoryName = category.charAt(0).toUpperCase() + category.slice(1)
+  const categoryName = CATEGORY_LABELS[category] ?? category.charAt(0).toUpperCase() + category.slice(1)
   return `${categoryName} · ${countryName}`
 }
 

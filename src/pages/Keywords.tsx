@@ -19,7 +19,7 @@ interface Keyword {
 
 // Broad search — use a wide spread of countries and all categories
 const SEARCH_COUNTRIES = ['us', 'gb', 'au', 'ca', 'nz', 'in', 'sg', 'za']
-const SEARCH_CATEGORIES = ['technology', 'business', 'science', 'health', 'sports', 'entertainment', 'politics', 'world']
+const SEARCH_CATEGORIES = ['technology', 'business', 'science', 'health', 'sports', 'gaming', 'film', 'tv', 'politics', 'world']
 
 export default function Keywords() {
   const { isSignedIn, isLoaded } = useUser()

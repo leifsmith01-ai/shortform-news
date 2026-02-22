@@ -4,7 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Globe, Newspaper, ChevronDown, Search, Calendar, Flame, TrendingUp, Tag, Sparkles, Bookmark, Clock } from 'lucide-react';
+import { Globe, Newspaper, ChevronDown, Search, Calendar, Flame, TrendingUp, Tag, Sparkles, Bookmark, Clock, Building2, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Collapsible,
@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { TRUSTED_SOURCES, SOURCE_GROUPS, ALL_SOURCE_DOMAINS } from '@/lib/sources';
 
 const NAV_LINKS = [
   { name: 'Trending',  icon: Flame,      page: '/trending' },
@@ -26,6 +27,7 @@ const NAV_LINKS = [
   { name: 'For You',   icon: Sparkles,   page: '/personalized' },
   { name: 'Saved',     icon: Bookmark,   page: '/saved' },
   { name: 'History',   icon: Clock,      page: '/history' },
+  { name: 'Settings',  icon: Settings,   page: '/settings' },
 ];
 
 const COUNTRIES_BY_CONTINENT = {
@@ -150,7 +152,9 @@ const CATEGORIES = [
   { id: 'science', name: 'Science', icon: '🔬' },
   { id: 'health', name: 'Health', icon: '🏥' },
   { id: 'sports', name: 'Sports', icon: '⚽' },
-  { id: 'entertainment', name: 'Entertainment', icon: '🎬' },
+  { id: 'gaming', name: 'Gaming', icon: '🎮' },
+  { id: 'film', name: 'Film', icon: '🎬' },
+  { id: 'tv', name: 'TV', icon: '📺' },
   { id: 'politics', name: 'Politics', icon: '🏛️' },
   { id: 'world', name: 'World', icon: '🌍' },
 ];
@@ -163,11 +167,14 @@ export default function FilterSidebar({
   searchQuery,
   setSearchQuery,
   dateRange,
-  setDateRange
+  setDateRange,
+  selectedSources,
+  setSelectedSources,
 }) {
   const location = useLocation();
   const [countriesOpen, setCountriesOpen] = React.useState(true);
   const [categoriesOpen, setCategoriesOpen] = React.useState(true);
+  const [sourcesOpen, setSourcesOpen] = React.useState(false);
   const [continentStates, setContinentStates] = React.useState<Record<string, boolean>>({
     'North America': true,
     'South America': false,
@@ -176,6 +183,16 @@ export default function FilterSidebar({
     'Middle East': false,
     'Africa': false,
     'Oceania': false,
+  });
+  const [sourceGroupStates, setSourceGroupStates] = React.useState<Record<string, boolean>>({
+    'General': true,
+    'Regional': false,
+    'Business & Finance': false,
+    'Technology': false,
+    'Science': false,
+    'Sports': false,
+    'Gaming': false,
+    'Film & TV': false,
   });
 
   const toggleCountry = (code) => {
@@ -187,11 +204,36 @@ export default function FilterSidebar({
   };
 
   const toggleCategory = (id) => {
-    setSelectedCategories(prev => 
-      prev.includes(id) 
+    setSelectedCategories(prev =>
+      prev.includes(id)
         ? prev.filter(c => c !== id)
         : [...prev, id]
     );
+  };
+
+  const allSourcesSelected = !selectedSources || selectedSources.length === 0 || selectedSources.length === ALL_SOURCE_DOMAINS.length;
+
+  const toggleSource = (domain: string) => {
+    if (!setSelectedSources) return;
+    setSelectedSources(prev => {
+      // If currently "all", start with full list and remove this one
+      if (!prev || prev.length === 0) {
+        return ALL_SOURCE_DOMAINS.filter(d => d !== domain);
+      }
+      if (prev.includes(domain)) {
+        const next = prev.filter(d => d !== domain);
+        // If removing the last one, reset to "all"
+        return next.length === 0 ? [] : next;
+      }
+      const next = [...prev, domain];
+      // If all are now selected, reset to empty (= all)
+      return next.length === ALL_SOURCE_DOMAINS.length ? [] : next;
+    });
+  };
+
+  const isSourceSelected = (domain: string) => {
+    if (!selectedSources || selectedSources.length === 0) return true;
+    return selectedSources.includes(domain);
   };
 
   return (
@@ -391,6 +433,91 @@ export default function FilterSidebar({
             </motion.div>
           </CollapsibleContent>
         </Collapsible>
+
+        {/* Sources Section */}
+        {setSelectedSources && (
+          <Collapsible open={sourcesOpen} onOpenChange={setSourcesOpen}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full group mb-4 mt-6">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-slate-400" />
+                <span className="text-sm font-medium text-slate-300">Sources</span>
+                <span className="text-xs bg-slate-800 px-2 py-0.5 rounded-full text-slate-400">
+                  {allSourcesSelected ? 'All' : `${selectedSources.length}/${ALL_SOURCE_DOMAINS.length}`}
+                </span>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${sourcesOpen ? 'rotate-180' : ''}`} />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <motion.div
+                className="space-y-2"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                {/* Select All toggle */}
+                <label
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                    allSourcesSelected
+                      ? 'bg-slate-800 text-white'
+                      : 'hover:bg-slate-800/50 text-slate-400'
+                  }`}
+                >
+                  <Checkbox
+                    checked={allSourcesSelected}
+                    onCheckedChange={() => setSelectedSources([])}
+                    className="border-slate-600 data-[state=checked]:bg-slate-700 data-[state=checked]:border-slate-700"
+                  />
+                  <span className="text-sm font-medium">All Sources</span>
+                </label>
+                <div className="h-px bg-slate-800 my-2" />
+
+                {SOURCE_GROUPS.map(group => {
+                  const groupSources = TRUSTED_SOURCES.filter(s => s.group === group);
+                  const selectedInGroup = groupSources.filter(s => isSourceSelected(s.domain)).length;
+                  return (
+                    <Collapsible
+                      key={group}
+                      open={sourceGroupStates[group]}
+                      onOpenChange={(open) => setSourceGroupStates(prev => ({ ...prev, [group]: open }))}
+                    >
+                      <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-2 rounded-lg hover:bg-slate-800/50 transition-colors group">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-slate-300">{group}</span>
+                          {selectedInGroup < groupSources.length && (
+                            <span className="text-xs bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded-full">
+                              {selectedInGroup}/{groupSources.length}
+                            </span>
+                          )}
+                        </div>
+                        <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${sourceGroupStates[group] ? 'rotate-180' : ''}`} />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="ml-2 mt-1 space-y-1">
+                          {groupSources.map(source => (
+                            <label
+                              key={source.domain}
+                              className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                                isSourceSelected(source.domain)
+                                  ? 'bg-slate-800 text-white'
+                                  : 'hover:bg-slate-800/50 text-slate-400'
+                              }`}
+                            >
+                              <Checkbox
+                                checked={isSourceSelected(source.domain)}
+                                onCheckedChange={() => toggleSource(source.domain)}
+                                className="border-slate-600 data-[state=checked]:bg-slate-700 data-[state=checked]:border-slate-700"
+                              />
+                              <span className="text-sm">{source.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  );
+                })}
+              </motion.div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
       </ScrollArea>
 
       {/* Footer */}

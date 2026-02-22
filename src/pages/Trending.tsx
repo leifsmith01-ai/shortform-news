@@ -14,7 +14,9 @@ const CATEGORY_COLORS: Record<string, string> = {
   science: 'bg-purple-100 text-purple-700',
   health: 'bg-rose-100 text-rose-700',
   sports: 'bg-orange-100 text-orange-700',
-  entertainment: 'bg-pink-100 text-pink-700',
+  gaming: 'bg-violet-100 text-violet-700',
+  film: 'bg-pink-100 text-pink-700',
+  tv: 'bg-fuchsia-100 text-fuchsia-700',
   politics: 'bg-amber-100 text-amber-700',
   world: 'bg-teal-100 text-teal-700',
 };

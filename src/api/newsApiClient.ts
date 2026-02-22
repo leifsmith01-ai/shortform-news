@@ -5,17 +5,18 @@ const API_BASE = '/api'; // Vercel serverless functions are at /api/*
 
 export const newsApiClient = {
 
-  async fetchNews({ countries, categories, searchQuery, dateRange }: {
+  async fetchNews({ countries, categories, searchQuery, dateRange, sources }: {
     countries: string[];
     categories: string[];
     searchQuery?: string;
     dateRange?: string;
+    sources?: string[];
   }) {
     try {
       const response = await fetch(`${API_BASE}/news`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ countries, categories, searchQuery, dateRange })
+        body: JSON.stringify({ countries, categories, searchQuery, dateRange, sources })
       });
 
       if (!response.ok) {

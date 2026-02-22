@@ -60,12 +60,26 @@ const generateMockArticles = (countries: string[], categories: string[], count =
       'Record-breaking performance stuns sports world',
       'Major tournament announces expanded format'
     ],
-    entertainment: [
-      'Blockbuster film breaks box office records',
+    gaming: [
+      'Highly anticipated game sequel breaks sales records on launch day',
+      'Esports tournament draws millions of viewers worldwide',
+      'Indie game studio wins game of the year award',
+      'New console hardware update announced by major manufacturer',
+      'Game streaming platform announces exclusive partnerships'
+    ],
+    film: [
+      'Blockbuster film breaks box office records worldwide',
+      'Independent film wins top prize at international festival',
+      'Major studio announces ambitious cinematic universe plans',
+      'Award-winning director reveals next ambitious project',
+      'Streaming platform invests billions in original films'
+    ],
+    tv: [
+      'Hit series renewed for multiple new seasons',
       'Streaming service announces slate of original content',
-      'Music festival announces star-studded lineup',
-      'Award ceremony celebrates year in entertainment',
-      'Popular series renewed for multiple seasons'
+      'Television ratings reach record highs for drama series',
+      'Popular reality show format expands to new markets',
+      'Limited series adaptation receives critical acclaim'
     ],
     politics: [
       'Legislative body passes landmark reform bill',
