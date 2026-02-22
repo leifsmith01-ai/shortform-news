@@ -458,6 +458,7 @@ function getSourceTier(article) {
 
 // ── Stop words for smarter title matching ────────────────────────────────
 const STOP_WORDS = new Set([
+  // Standard English stop words
   'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
   'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been',
   'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
@@ -467,6 +468,16 @@ const STOP_WORDS = new Set([
   'about', 'over', 'after', 'before', 'between', 'under', 'above', 'into',
   'through', 'during', 'each', 'some', 'such', 'only', 'also', 'more',
   'most', 'other', 'new', 'says', 'said', 'according', 'report', 'news',
+  // News-headline verbs — these appear in many titles but carry no topical
+  // meaning, so they inflate similarity between unrelated stories.
+  // e.g. "Biden announces X" vs "Netanyahu announces Y" would false-match
+  // on "announces" if it weren't filtered out.
+  'announces', 'announced', 'reveals', 'revealed', 'confirms', 'confirmed',
+  'updates', 'updated', 'launches', 'launched', 'reports', 'reported',
+  'shows', 'warns', 'warned', 'plans', 'faces', 'calls', 'called',
+  'urges', 'urged', 'seeks', 'signs', 'signed', 'set', 'sets',
+  'makes', 'made', 'takes', 'taken', 'gets', 'got', 'comes', 'going',
+  'first', 'latest', 'ahead', 'back', 'still', 'amid', 'top',
 ]);
 
 function normaliseTitle(title) {
@@ -570,7 +581,7 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
     for (let j = i + 1; j < items.length; j++) {
       if (assigned.has(j)) continue;
       const sim = titleSimilarity(items[i].keywords, items[j].keywords, idfMap);
-      if (sim > 0.35) { // lower threshold with IDF weighting is more accurate
+      if (sim > 0.50) { // require majority weighted-word overlap to merge
         cluster.push(items[j]);
         assigned.add(j);
       }
@@ -1289,7 +1300,7 @@ export default async function handler(req, res) {
       }
 
       // 2. WorldNewsAPI
-      if (results.length < 10 && WORLD_NEWS_API_KEY) {
+      if (results.length < 30 && WORLD_NEWS_API_KEY) {
         try {
           const raw = await searchWorldNewsAPIByKeyword(keyword, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort });
           results.push(...raw.map(a => formatWorldNewsAPIArticle(a, 'world', 'world')));
@@ -1300,7 +1311,7 @@ export default async function handler(req, res) {
       }
 
       // 3. NewsData.io
-      if (results.length < 10 && NEWS_DATA_API_KEY) {
+      if (results.length < 30 && NEWS_DATA_API_KEY) {
         try {
           const raw = await searchNewsDataByKeyword(keyword, NEWS_DATA_API_KEY, { from: fromDateOnly });
           const valid = raw.filter(a => a.title);
@@ -1312,7 +1323,7 @@ export default async function handler(req, res) {
       }
 
       // 4. Guardian (fallback)
-      if (results.length < 5 && GUARDIAN_API_KEY) {
+      if (results.length < 30 && GUARDIAN_API_KEY) {
         try {
           const raw = await searchGuardianByKeyword(keyword, GUARDIAN_API_KEY, { from: fromDateOnly });
           results.push(...raw.map(r => formatGuardianArticle(r, 'world', 'world')));
@@ -1505,7 +1516,10 @@ export default async function handler(req, res) {
 
         // ── Country relevance filter (multi-signal) ─────────────────────────
         // Scores each article and sorts so most relevant appear first.
-        // Only articles with a positive relevance score are kept.
+        // Relevant articles (score > 0) always come first. If there aren't
+        // enough to hit MIN_ARTICLES, score-0 articles fill the remainder
+        // so the user always sees a full page of results.
+        const MIN_ARTICLES = 10;
         if (country !== 'world' && formattedArticles.length > 0) {
           const scored = formattedArticles.map(a => {
             let score = 0;
@@ -1517,12 +1531,73 @@ export default async function handler(req, res) {
             return { article: a, score };
           });
           scored.sort((a, b) => b.score - a.score);
-          const relevant = scored.filter(s => s.score > 0).map(s => s.article);
-          // Only keep relevant articles — no score-0 padding
-          if (relevant.length > 0) {
-            formattedArticles = relevant;
+          const relevant = scored.filter(s => s.score > 0);
+          const filler  = scored.filter(s => s.score === 0);
+
+          if (relevant.length >= MIN_ARTICLES) {
+            // Plenty of relevant articles — use only those
+            formattedArticles = relevant.map(s => s.article);
+          } else if (relevant.length > 0) {
+            // Some relevant but not enough — fill remainder from best available
+            const needed = MIN_ARTICLES - relevant.length;
+            formattedArticles = [...relevant, ...filler.slice(0, needed)].map(s => s.article);
+            console.log(`  Country filter: ${relevant.length} relevant + ${Math.min(needed, filler.length)} filler for [${country}]`);
           }
+          // If zero relevant, keep all (country may not be well-supported by APIs)
           console.log(`  Country filter: ${relevant.length} relevant of ${scored.length} for [${country}]`);
+        }
+
+        // ── Time-window backfill ─────────────────────────────────────────────
+        // If filters have cut us below MIN_ARTICLES and we have a date
+        // restriction, widen the window (24h→3d, 3d→week, week→month) and
+        // make ONE extra fetch from NewsAPI to backfill with older-but-relevant
+        // articles. This guarantees we almost always hit 10+ results.
+        if (formattedArticles.length < MIN_ARTICLES && rangeHours && rangeHours < 720) {
+          const widerHours = Math.min(rangeHours * 3, 720);
+          const widerFrom = new Date(Date.now() - widerHours * 60 * 60 * 1000);
+          const widerFromISO = widerFrom.toISOString();
+          console.log(`  Backfill: widening ${rangeHours}h → ${widerHours}h (have ${formattedArticles.length}, need ${MIN_ARTICLES})`);
+
+          try {
+            const existingUrls = new Set(formattedArticles.map(a => a.url));
+            let backfill = [];
+
+            // Re-fetch from NewsAPI with wider window
+            if (country === 'world' || NEWS_API_SUPPORTED_COUNTRIES.has(country)) {
+              const raw = await fetchFromNewsAPI(country, category, NEWS_API_KEY, activeDomains, activeSourceIds, { from: widerFromISO, sortByPopularity: true });
+              const valid = raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com');
+              backfill = valid.map(a => formatNewsAPIArticle(a, country, category));
+            }
+
+            // Also try Guardian for wider window (cheap, high quality for AU/GB/US)
+            if (GUARDIAN_API_KEY && backfill.length < 20) {
+              try {
+                const widerDateOnly = widerFromISO.split('T')[0];
+                const gResults = await fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: widerDateOnly });
+                backfill.push(...gResults.map(r => formatGuardianArticle(r, country, category)));
+              } catch {}
+            }
+
+            // Apply same filters to backfill
+            backfill = backfill.filter(a => articleMatchesCategory(a, category));
+            backfill = backfill.filter(a => !existingUrls.has(a.url));
+
+            // Country-score backfill and keep only relevant
+            if (country !== 'world') {
+              backfill = backfill.filter(a => {
+                const { inTitle, inText } = articleMentionsCountry(a, country);
+                const metaCountry = a._meta?.sourceCountry;
+                return inTitle || inText || metaCountry === country;
+              });
+            }
+
+            if (backfill.length > 0) {
+              formattedArticles.push(...backfill);
+              console.log(`  Backfill: added ${backfill.length} older articles`);
+            }
+          } catch (err) {
+            console.error(`  Backfill fetch failed:`, err.message);
+          }
         }
 
         // ── AI summaries for first 5 filtered articles ──────────────────────
