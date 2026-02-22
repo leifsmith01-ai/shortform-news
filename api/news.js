@@ -174,14 +174,14 @@ const COUNTRY_RELEVANCE_KEYWORDS = {
   nz: ['new zealand'],
   sg: ['singapore'],
   hk: ['hong kong'],
-  tw: ['taiwan'],
-  za: ['south africa'],
+  tw: ['taiwan', 'taiwanese'],
+  za: ['south africa', 'south african'],
   ng: ['nigeria', 'nigerian'],
   eg: ['egypt', 'egyptian'],
   ke: ['kenya', 'kenyan'],
   tr: ['turkey', 'turkish'],
   il: ['israel', 'israeli'],
-  ae: ['uae', 'emirates'],
+  ae: ['uae', 'emirates', 'emirati'],
   sa: ['saudi', 'saudi arabia'],
   ar: ['argentina', 'argentinian'],
   cl: ['chile', 'chilean'],
@@ -189,9 +189,43 @@ const COUNTRY_RELEVANCE_KEYWORDS = {
   id: ['indonesia', 'indonesian'],
   th: ['thailand', 'thai'],
   my: ['malaysia', 'malaysian'],
-  ph: ['philippines', 'philippine'],
+  ph: ['philippines', 'philippine', 'filipino'],
   vn: ['vietnam', 'vietnamese'],
   pk: ['pakistan', 'pakistani'],
+};
+
+// Demonyms used to build tighter search queries that pair the adjective with category terms.
+// E.g. "Australian politics" instead of "Australia" AND "politics".
+const COUNTRY_DEMONYMS = {
+  us: 'American',   gb: 'British',     au: 'Australian',   ca: 'Canadian',
+  de: 'German',     fr: 'French',      jp: 'Japanese',     cn: 'Chinese',
+  in: 'Indian',     kr: 'South Korean', br: 'Brazilian',   mx: 'Mexican',
+  it: 'Italian',    es: 'Spanish',     nl: 'Dutch',        se: 'Swedish',
+  no: 'Norwegian',  pl: 'Polish',      ch: 'Swiss',        be: 'Belgian',
+  at: 'Austrian',   ie: 'Irish',       pt: 'Portuguese',   dk: 'Danish',
+  fi: 'Finnish',    gr: 'Greek',       nz: 'New Zealand',  sg: 'Singaporean',
+  hk: 'Hong Kong',  tw: 'Taiwanese',   za: 'South African', ng: 'Nigerian',
+  eg: 'Egyptian',   ke: 'Kenyan',      tr: 'Turkish',      il: 'Israeli',
+  ae: 'Emirati',    sa: 'Saudi',       ar: 'Argentine',    cl: 'Chilean',
+  co: 'Colombian',  id: 'Indonesian',  th: 'Thai',         my: 'Malaysian',
+  ph: 'Philippine',  vn: 'Vietnamese', pk: 'Pakistani',    ua: 'Ukrainian',
+  ro: 'Romanian',   hu: 'Hungarian',   cz: 'Czech',        rs: 'Serbian',
+  hr: 'Croatian',   bg: 'Bulgarian',   sk: 'Slovak',
+};
+
+// Short category noun phrases used to build national-relevance queries.
+// Each entry produces queries like "Australian economy" or "Indian election".
+const CATEGORY_QUERY_NOUNS = {
+  politics:   ['politics', 'government', 'election', 'parliament', 'prime minister', 'legislation'],
+  world:      ['foreign policy', 'diplomacy', 'trade deal', 'international relations'],
+  business:   ['economy', 'market', 'industry', 'trade', 'central bank'],
+  technology: ['tech', 'startup', 'innovation', 'digital'],
+  science:    ['research', 'science', 'discovery'],
+  health:     ['health', 'hospital', 'healthcare', 'medical'],
+  sports:     ['sport', 'team', 'league', 'championship'],
+  gaming:     ['gaming', 'video game', 'esports'],
+  film:       ['film', 'movie', 'cinema'],
+  tv:         ['television', 'TV', 'streaming'],
 };
 
 function getCountryTerms(country) {
@@ -200,10 +234,36 @@ function getCountryTerms(country) {
   return name ? [name.toLowerCase()] : [country.toLowerCase()];
 }
 
+// Check if country is mentioned in the article title (strict) or title+description (loose)
 function articleMentionsCountry(article, country) {
   const terms = getCountryTerms(country);
-  const text = `${article.title} ${article.description || ''}`.toLowerCase();
-  return terms.some(term => text.includes(term));
+  const title = (article.title || '').toLowerCase();
+  const text = `${title} ${article.description || ''}`.toLowerCase();
+  return {
+    inTitle: terms.some(term => title.includes(term)),
+    inText:  terms.some(term => text.includes(term)),
+  };
+}
+
+// Build a nationally-focused search query for /v2/everything.
+// Instead of `"Australia" AND (politics OR government OR ...)`, this produces:
+//   ("Australian politics" OR "Australian government" OR "Australian election" OR
+//    "Australia politics" OR "Australia government" OR ...)
+// This dramatically improves relevance because articles must pair the country with the topic.
+function buildNationalQuery(country, category) {
+  const demonym = COUNTRY_DEMONYMS[country];
+  const countryName = COUNTRY_NAMES[country] || country;
+  const nouns = CATEGORY_QUERY_NOUNS[category] || [category];
+
+  const phrases = [];
+  for (const noun of nouns) {
+    // Demonym + noun: "Australian politics", "Australian government"
+    if (demonym) phrases.push(`"${demonym} ${noun}"`);
+    // Country name + noun: "Australia politics"
+    phrases.push(`"${countryName} ${noun}"`);
+  }
+
+  return `(${phrases.join(' OR ')})`;
 }
 
 // Map app categories to Guardian API sections
@@ -288,10 +348,11 @@ async function fetchFromNewsAPI(country, category, apiKey, activeDomains, active
 
   // Categories that need /v2/everything for precise targeting
   if (EVERYTHING_QUERY_MAP[category]) {
-    const baseQuery = EVERYTHING_QUERY_MAP[category];
+    // For country-specific queries, use tightly paired phrases ("Australian politics")
+    // instead of loose AND ("Australia" AND "politics") to ensure national relevance.
     const query = country !== 'world'
-      ? `"${COUNTRY_NAMES[country] || country}" AND ${baseQuery}`
-      : baseQuery;
+      ? buildNationalQuery(country, category)
+      : EVERYTHING_QUERY_MAP[category];
     const params = new URLSearchParams({
       q: query,
       domains,
@@ -357,11 +418,15 @@ async function fetchFromWorldNewsAPI(country, category, apiKey) {
     'api-key': apiKey,
   });
   if (country !== 'world') {
+    const demonym = COUNTRY_DEMONYMS[country];
     const countryName = COUNTRY_NAMES[country] || country;
     params.set('source-country', country);
-    // Use category-specific search terms for better precision
+    // Use demonym + category terms for national relevance (e.g. "Australian politics")
     const queryTerms = WORLD_NEWS_QUERY_TERMS[category] || category;
-    params.set('text', `${countryName} ${queryTerms}`);
+    const textQuery = demonym
+      ? `${demonym} ${queryTerms} OR ${countryName} ${queryTerms}`
+      : `${countryName} ${queryTerms}`;
+    params.set('text', textQuery);
   }
   // topic filter improves precision
   if (topic) params.set('categories', topic);
@@ -417,7 +482,13 @@ async function fetchFromGuardian(country, category, apiKey) {
       params = new URLSearchParams(queryParams);
     } else {
       const countryName = COUNTRY_NAMES[country] || country;
-      const searchQuery = category === 'world' ? countryName : `${countryName} ${category}`;
+      const demonym = COUNTRY_DEMONYMS[country];
+      // Use demonym+category for tighter results (e.g. "Australian politics")
+      const searchQuery = category === 'world'
+        ? countryName
+        : demonym
+          ? `"${demonym} ${category}" OR "${countryName} ${category}"`
+          : `${countryName} ${category}`;
       params = new URLSearchParams({
         q: searchQuery,
         section: categorySection,
@@ -978,12 +1049,26 @@ export default async function handler(req, res) {
           await Promise.all(summaryPromises);
         }
 
-        // ── Relevance filter: only keep articles that mention the country ──────
-        // This removes off-topic articles (e.g. global tech news surfaced by an AU source).
-        // Falls back to all articles if fewer than 3 would remain after filtering.
+        // ── Relevance filter: rank and filter articles by national relevance ────
+        // Tier 1: country mentioned in title (strongest signal — article is ABOUT this country)
+        // Tier 2: country mentioned in title+description only (may just reference the country)
+        // Tier 3: no country mention at all (likely off-topic)
+        // We keep tier 1 first, then tier 2, dropping tier 3 entirely when we have enough.
         if (country !== 'world' && formattedArticles.length > 0) {
-          const relevant = formattedArticles.filter(a => articleMentionsCountry(a, country));
-          if (relevant.length >= 3) formattedArticles = relevant;
+          const tier1 = []; // title mention
+          const tier2 = []; // description-only mention
+          const tier3 = []; // no mention
+          for (const a of formattedArticles) {
+            const { inTitle, inText } = articleMentionsCountry(a, country);
+            if (inTitle) tier1.push(a);
+            else if (inText) tier2.push(a);
+            else tier3.push(a);
+          }
+          const ranked = [...tier1, ...tier2];
+          // Use ranked results if we have at least 2, otherwise fall back to all
+          if (ranked.length >= 2) {
+            formattedArticles = ranked;
+          }
         }
 
         CACHE[cacheKey] = { timestamp: Date.now(), articles: formattedArticles };
