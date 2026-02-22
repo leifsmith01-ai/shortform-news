@@ -1508,8 +1508,26 @@ export default async function handler(req, res) {
         // Drop articles that don't match the requested category at all.
         // This catches off-topic articles that APIs return (e.g. human interest
         // stories from a country section when we asked for politics).
+        //
+        // For country-specific requests the API query already embedded category
+        // targeting (either via buildNationalQuery or the top-headlines
+        // country+category endpoint), so we apply a relaxed OR rule: keep an
+        // article if it passes the category keyword check OR if the country is
+        // strongly mentioned in the title. This avoids double-filtering that
+        // was dropping valid country+category articles whose headlines use
+        // vocabulary outside our keyword list (e.g. "Beijing tightens grip on
+        // tech sector" is a China/business story but lacks our exact keywords).
         const beforeCatFilter = formattedArticles.length;
-        formattedArticles = formattedArticles.filter(a => articleMatchesCategory(a, category));
+        formattedArticles = formattedArticles.filter(a => {
+          if (articleMatchesCategory(a, category)) return true;
+          // Relaxed path: for country-specific fetches the API already applied
+          // category filtering, so a strong country title-mention is enough.
+          if (country !== 'world') {
+            const { inTitle } = articleMentionsCountry(a, country);
+            return inTitle;
+          }
+          return false;
+        });
         if (formattedArticles.length < beforeCatFilter) {
           console.log(`  Category filter: kept ${formattedArticles.length}/${beforeCatFilter} for [${category}]`);
         }
@@ -1578,8 +1596,15 @@ export default async function handler(req, res) {
               } catch {}
             }
 
-            // Apply same filters to backfill
-            backfill = backfill.filter(a => articleMatchesCategory(a, category));
+            // Apply same relaxed filter to backfill (mirrors primary filter above)
+            backfill = backfill.filter(a => {
+              if (articleMatchesCategory(a, category)) return true;
+              if (country !== 'world') {
+                const { inTitle } = articleMentionsCountry(a, country);
+                return inTitle;
+              }
+              return false;
+            });
             backfill = backfill.filter(a => !existingUrls.has(a.url));
 
             // Country-score backfill and keep only relevant
