@@ -87,7 +87,7 @@ export default function Home() {
     getStoredList('selectedSources', [])
   );
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateRange, setDateRange] = useState('week');
+  const [dateRange, setDateRange] = useState('24h');
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
