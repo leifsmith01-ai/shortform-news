@@ -149,13 +149,13 @@ export default function Keywords() {
       )}
 
       {isLoaded && (
-        <div className="flex-1 flex overflow-hidden">
-          {/* Left sidebar — search input + keyword tags */}
-          <aside className="w-72 flex-shrink-0 bg-white border-r border-stone-200 flex flex-col">
+        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+          {/* Left sidebar — search input + keyword tags (top strip on mobile, sidebar on desktop) */}
+          <aside className="w-full lg:w-72 flex-shrink-0 bg-white border-b lg:border-b-0 lg:border-r border-stone-200 flex flex-col">
 
             {/* Add keyword input */}
-            <div className="p-4 border-b border-stone-100">
-              <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-3">
+            <div className="p-3 lg:p-4 border-b border-stone-100">
+              <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-2 lg:mb-3 hidden lg:block">
                 Add Keyword or Search
               </p>
               <div className="flex gap-2">
@@ -183,7 +183,7 @@ export default function Keywords() {
               </div>
 
               {isSignedIn ? (
-                <p className="text-xs text-stone-400 mt-2">Press Enter to add</p>
+                <p className="text-xs text-stone-400 mt-2 hidden lg:block">Press Enter to add</p>
               ) : (
                 <Link
                   to="/sign-in"
@@ -195,71 +195,73 @@ export default function Keywords() {
               )}
             </div>
 
-            {/* Keyword tags */}
-            <ScrollArea className="flex-1">
-              <div className="p-4">
-                {!isSignedIn ? (
-                  <div className="flex flex-col items-center justify-center py-10 text-center">
-                    <div className="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center mb-3">
-                      <Lock className="w-5 h-5 text-stone-400" />
+            {/* Keyword tags — horizontal scroll on mobile, wrapped list on desktop */}
+            <div className="lg:flex-1 lg:overflow-hidden">
+              <ScrollArea className="h-full">
+                <div className="p-3 lg:p-4">
+                  {!isSignedIn ? (
+                    <div className="flex flex-col items-center justify-center py-4 lg:py-10 text-center">
+                      <div className="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center mb-3 hidden lg:flex">
+                        <Lock className="w-5 h-5 text-stone-400" />
+                      </div>
+                      <p className="text-sm text-stone-500 font-medium mb-1">Sign in to get started</p>
+                      <p className="text-xs text-stone-400 mb-4 hidden lg:block">Save keywords and track custom news feeds.</p>
+                      <Link to="/sign-in">
+                        <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white gap-2 h-8 text-xs">
+                          <LogIn className="w-3.5 h-3.5" />
+                          Sign In
+                        </Button>
+                      </Link>
                     </div>
-                    <p className="text-sm text-stone-500 font-medium mb-1">Sign in to get started</p>
-                    <p className="text-xs text-stone-400 mb-4">Save keywords and track custom news feeds.</p>
-                    <Link to="/sign-in">
-                      <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white gap-2 h-8 text-xs">
-                        <LogIn className="w-3.5 h-3.5" />
-                        Sign In
-                      </Button>
-                    </Link>
-                  </div>
-                ) : isLoadingKeywords ? (
-                  <div className="flex flex-wrap gap-2">
-                    {[...Array(5)].map((_, i) => (
-                      <div key={i} className="h-8 w-20 bg-stone-100 rounded-full animate-pulse" />
-                    ))}
-                  </div>
-                ) : keywords.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 text-center">
-                    <Tag className="w-6 h-6 text-stone-300 mx-auto mb-2" />
-                    <p className="text-xs text-stone-400">No keywords yet.</p>
-                    <p className="text-xs text-stone-300 mt-1">Add one above to create your first feed.</p>
-                  </div>
-                ) : (
-                  <AnimatePresence>
-                    <div className="flex flex-wrap gap-2">
-                      {keywords.map(kw => (
-                        <motion.span
-                          key={kw.id}
-                          layout
-                          initial={{ opacity: 0, scale: 0.85 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.85 }}
-                          onClick={() => setSelectedKeyword(kw)}
-                          className={`inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-full text-sm font-medium cursor-pointer select-none transition-colors ${
-                            selectedKeyword?.id === kw.id
-                              ? 'bg-slate-900 text-white'
-                              : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
-                          }`}
-                        >
-                          {kw.keyword}
-                          <button
-                            onClick={e => { e.stopPropagation(); handleDelete(kw) }}
-                            className={`rounded-full p-0.5 transition-colors flex-shrink-0 ${
-                              selectedKeyword?.id === kw.id
-                                ? 'hover:bg-white/20 text-slate-300 hover:text-white'
-                                : 'hover:bg-stone-300 text-stone-400 hover:text-stone-600'
-                            }`}
-                            aria-label={`Remove ${kw.keyword}`}
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </motion.span>
+                  ) : isLoadingKeywords ? (
+                    <div className="flex flex-nowrap lg:flex-wrap gap-2 overflow-x-auto lg:overflow-x-visible">
+                      {[...Array(5)].map((_, i) => (
+                        <div key={i} className="h-8 w-20 bg-stone-100 rounded-full animate-pulse flex-shrink-0" />
                       ))}
                     </div>
-                  </AnimatePresence>
-                )}
-              </div>
-            </ScrollArea>
+                  ) : keywords.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-4 lg:py-10 text-center">
+                      <Tag className="w-6 h-6 text-stone-300 mx-auto mb-2" />
+                      <p className="text-xs text-stone-400">No keywords yet.</p>
+                      <p className="text-xs text-stone-300 mt-1 hidden lg:block">Add one above to create your first feed.</p>
+                    </div>
+                  ) : (
+                    <AnimatePresence>
+                      <div className="flex flex-nowrap lg:flex-wrap gap-2 overflow-x-auto lg:overflow-x-visible pb-1 lg:pb-0">
+                        {keywords.map(kw => (
+                          <motion.span
+                            key={kw.id}
+                            layout
+                            initial={{ opacity: 0, scale: 0.85 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.85 }}
+                            onClick={() => setSelectedKeyword(kw)}
+                            className={`inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-full text-sm font-medium cursor-pointer select-none transition-colors flex-shrink-0 lg:flex-shrink ${
+                              selectedKeyword?.id === kw.id
+                                ? 'bg-slate-900 text-white'
+                                : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                            }`}
+                          >
+                            {kw.keyword}
+                            <button
+                              onClick={e => { e.stopPropagation(); handleDelete(kw) }}
+                              className={`rounded-full p-0.5 transition-colors flex-shrink-0 ${
+                                selectedKeyword?.id === kw.id
+                                  ? 'hover:bg-white/20 text-slate-300 hover:text-white'
+                                  : 'hover:bg-stone-300 text-stone-400 hover:text-stone-600'
+                              }`}
+                              aria-label={`Remove ${kw.keyword}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </motion.span>
+                        ))}
+                      </div>
+                    </AnimatePresence>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
           </aside>
 
           {/* Main content — article feed for selected keyword */}
