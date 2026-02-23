@@ -1000,7 +1000,7 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
     for (let j = i + 1; j < items.length; j++) {
       if (assigned.has(j)) continue;
       const sim = titleSimilarity(items[i].keywords, items[j].keywords, idfMap);
-      if (sim > 0.50) { // require majority weighted-word overlap to merge
+      if (sim > 0.65) { // require strong weighted-word overlap to merge
         cluster.push(items[j]);
         assigned.add(j);
       }
@@ -1340,7 +1340,7 @@ async function fetchFromGNews(country, category, apiKey, opts = {}) {
   const gnewsCategory = GNEWS_CATEGORY_MAP[category] || 'general';
   const params = new URLSearchParams({
     lang:    'en',
-    max:     '10',
+    max:     '20',
     token:   apiKey,
     sortby:  opts.sortByPopularity ? 'relevance' : 'publishedAt',
   });
@@ -1710,7 +1710,7 @@ async function searchGuardianByKeyword(keyword, apiKey, opts = {}) {
 
 async function searchGNewsByKeyword(keyword, apiKey, opts = {}) {
   const params = new URLSearchParams({
-    q: keyword, lang: 'en', max: '10', token: apiKey,
+    q: keyword, lang: 'en', max: '20', token: apiKey,
     sortby: opts.sortByPopularity ? 'relevance' : 'publishedAt',
   });
   if (opts.from) params.set('from', opts.from);
@@ -2444,7 +2444,22 @@ export default async function handler(req, res) {
 
     // Rank ALL articles together by authority + coverage + freshness + depth + category
     const singleCategory = categoryList.length === 1 ? categoryList[0] : null;
-    const rankedArticles = rankAndDeduplicateArticles(allArticles, { usePopularity: usePopularitySort, category: singleCategory });
+    let rankedArticles = rankAndDeduplicateArticles(allArticles, { usePopularity: usePopularitySort, category: singleCategory });
+
+    // Post-dedup fill-back: if deduplication reduced the count below 10, add back
+    // the highest-quality dedup-losers (articles from merged clusters that weren't
+    // chosen as the cluster representative) until we reach 10.
+    const DISPLAY_MIN = 10;
+    if (rankedArticles.length < DISPLAY_MIN && allArticles.length > rankedArticles.length) {
+      const rankedUrls = new Set(rankedArticles.map(a => a.url).filter(Boolean));
+      const extras = allArticles
+        .filter(a => a.url && !rankedUrls.has(a.url))
+        .slice(0, DISPLAY_MIN - rankedArticles.length);
+      if (extras.length > 0) {
+        console.log(`  Post-dedup fill: adding ${extras.length} dedup-losers to reach ${DISPLAY_MIN}`);
+        rankedArticles = [...rankedArticles, ...extras];
+      }
+    }
 
     // Strip internal fields before sending to the client
     const cleanArticles = rankedArticles.map(({ _meta, _coverage, _countryScore, _matchesCategory, ...rest }) => rest);
@@ -2461,7 +2476,7 @@ export default async function handler(req, res) {
         if (!a.publishedAt) return true; // no date metadata — keep
         return new Date(a.publishedAt).getTime() >= fromTime;
       });
-      if (inWindow.length >= 5) {
+      if (inWindow.length >= 10) {
         finalArticles = inWindow;
       }
     }
@@ -2621,7 +2636,7 @@ async function fetchCountryCategoryPair(country, category, ctx) {
   // Uses articleCountryScore() which considers title mentions, body mentions,
   // term frequency (multiple distinct keywords), and source-country metadata
   // (with special handling for international wire services).
-  const MIN_ARTICLES = 10;
+  const MIN_ARTICLES = 15;
   if (country !== 'world' && formattedArticles.length > 0) {
     const scored = formattedArticles.map(a => {
       // Pass category to enable the combined country+category title bonus
