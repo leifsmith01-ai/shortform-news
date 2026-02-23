@@ -761,6 +761,30 @@ const RSS_SOURCES = [
     countries: LATAM_COUNTRIES,
   },
   {
+    name: 'The Brazilian Report',
+    domain: 'brazilianreport.com',
+    // English-language outlet focused entirely on Brazil.
+    // Standard WordPress RSS feed — no paywall for the feed itself.
+    url: process.env.BRAZILIAN_REPORT_RSS_URL || 'https://brazilianreport.com/feed/',
+    countries: new Set(['br']),
+  },
+  {
+    name: 'Buenos Aires Times',
+    domain: 'batimes.com.ar',
+    // Argentina's only English-language newspaper. Covers Argentine politics,
+    // economy, and society. Standard WordPress RSS feed.
+    url: process.env.BATIMES_RSS_URL || 'https://www.batimes.com.ar/feed',
+    countries: new Set(['ar']),
+  },
+  {
+    name: 'Mexico News Daily',
+    domain: 'mexiconewsdaily.com',
+    // English-language news and analysis for Mexico.
+    // Standard WordPress RSS feed.
+    url: process.env.MEXICO_NEWS_DAILY_RSS_URL || 'https://mexiconewsdaily.com/feed/',
+    countries: new Set(['mx']),
+  },
+  {
     name: 'Daily Maverick',
     domain: 'dailymaverick.co.za',
     // South Africa's leading independent investigative outlet. Covers the full
@@ -795,12 +819,14 @@ const GNEWS_CATEGORY_MAP = {
 
 // Helper: generate cache key (slot = "am" or "pm" to refresh twice a day)
 // Includes a source hash so different source selections don't collide.
-function getCacheKey(country, category, dateRange, sourceFingerprint) {
+// Includes language so English-only and all-languages results are cached separately.
+function getCacheKey(country, category, dateRange, sourceFingerprint, showNonEnglish) {
   const now = new Date();
   const date = now.toISOString().split('T')[0];
   const slot = now.getUTCHours() < 12 ? 'am' : 'pm';
   const sf = sourceFingerprint || 'all';
-  return `${date}-${slot}-${country}-${category}-${dateRange || '24h'}-${sf}`;
+  const lang = showNonEnglish ? 'all' : 'en';
+  return `${date}-${slot}-${country}-${category}-${dateRange || '24h'}-${sf}-${lang}`;
 }
 
 // Short hash of selected sources to use in cache keys
@@ -2603,7 +2629,7 @@ async function fetchCountryCategoryPair(country, category, ctx) {
     rangeHours, dateRange, sourceFingerprint, showNonEnglish,
   } = ctx;
 
-  const cacheKey = getCacheKey(country, category, dateRange, sourceFingerprint);
+  const cacheKey = getCacheKey(country, category, dateRange, sourceFingerprint, showNonEnglish);
 
   if (isCacheValid(CACHE[cacheKey])) {
     console.log(`Cache HIT: ${cacheKey}`);
