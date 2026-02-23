@@ -284,91 +284,212 @@ const COUNTRY_DEMONYMS = {
 
 // Short category noun phrases used to build national-relevance queries.
 // Each entry produces queries like "Australian economy" or "Indian election".
+// These are paired with country demonyms, so keep them as common nouns/phrases.
 const CATEGORY_QUERY_NOUNS = {
-  politics:   ['politics', 'government', 'election', 'parliament', 'prime minister', 'legislation'],
-  world:      ['foreign policy', 'diplomacy', 'trade deal', 'international relations'],
-  business:   ['economy', 'market', 'industry', 'trade', 'central bank'],
-  technology: ['tech', 'startup', 'innovation', 'digital'],
-  science:    ['research', 'science', 'discovery'],
-  health:     ['health', 'hospital', 'healthcare', 'medical'],
-  sports:     ['sport', 'team', 'league', 'championship'],
-  gaming:     ['gaming', 'video game', 'esports'],
-  film:       ['film', 'movie', 'cinema'],
-  tv:         ['television', 'TV', 'streaming'],
+  politics:   ['politics', 'government', 'election', 'parliament', 'prime minister', 'legislation', 'policy'],
+  world:      ['foreign policy', 'diplomacy', 'trade deal', 'international relations', 'summit'],
+  business:   ['economy', 'market', 'industry', 'trade', 'central bank', 'stocks', 'finance'],
+  technology: ['tech', 'startup', 'innovation', 'digital', 'AI', 'software', 'cybersecurity'],
+  science:    ['research', 'science', 'discovery', 'climate', 'space', 'laboratory', 'environment'],
+  health:     ['health', 'hospital', 'healthcare', 'medical', 'disease', 'public health'],
+  sports:     ['sport', 'team', 'league', 'championship', 'football', 'cricket', 'athlete'],
+  gaming:     ['gaming', 'video game', 'esports', 'game industry'],
+  film:       ['film', 'movie', 'cinema', 'box office', 'film industry'],
+  tv:         ['television', 'TV', 'streaming', 'TV series', 'broadcast'],
 };
 
 // Category relevance keywords — used in post-fetch filtering to verify articles
-// actually match the requested topic. Broader than query nouns to allow reasonable matches.
+// actually match the requested topic.
+//
+// Two tiers per category:
+//   strong: Domain-specific terms that almost certainly indicate this category.
+//           A single strong match is enough to confirm relevance.
+//   weak:   Terms that appear in this category but also in others.
+//           Require 2+ weak matches (or 1 weak + title presence) to confirm.
+//
+// NOTE: Prefix stems (e.g. 'politi') intentionally match 'political', 'politician',
+// 'politics' etc. Terms that previously caused false positives across categories
+// (e.g. 'game' in sports matching gaming, 'app' in tech matching 'apple/appeal')
+// have been replaced with more specific alternatives.
 const CATEGORY_RELEVANCE_KEYWORDS = {
-  politics: [
-    'politi', 'government', 'elect', 'parliament', 'legislat', 'minister',
-    'president', 'senator', 'congress', 'vote', 'voter', 'ballot', 'party',
-    'opposition', 'coalition', 'campaign', 'democrat', 'republican', 'labor',
-    'liberal', 'conservative', 'cabinet', 'bill', 'law', 'regulation',
-    'policy', 'reform', 'referendum', 'constitutional', 'bipartisan',
-    'geopoliti', 'sanction', 'diplomatic', 'nato', 'tariff',
-  ],
-  world: [
-    'international', 'diplomacy', 'diplomat', 'foreign', 'global', 'trade',
-    'summit', 'united nations', ' un ', 'nato', 'treaty', 'sanction',
-    'geopoliti', 'embassy', 'refugee', 'humanitarian', 'conflict',
-    'bilateral', 'multilateral', 'alliance',
-  ],
-  business: [
-    'business', 'econom', 'market', 'stock', 'financ', 'bank', 'trade',
-    'invest', 'profit', 'revenue', 'gdp', 'inflation', 'interest rate',
-    'startup', 'merger', 'acquisition', 'ipo', 'ceo', 'industry',
-    'commodit', 'oil price', 'crypto', 'bitcoin',
-  ],
-  technology: [
-    'tech', 'software', 'hardware', 'ai ', 'artificial intelligen',
-    'startup', 'app', 'digital', 'cyber', 'robot', 'comput', 'chip',
-    'semiconductor', 'cloud', 'data', 'algorithm', 'machine learning',
-    'blockchain', 'quantum', 'internet', 'silicon valley',
-  ],
-  science: [
-    'scien', 'research', 'study', 'discover', 'experiment', 'nasa',
-    'space', 'climate', 'species', 'fossil', 'dna', 'genome', 'physics',
-    'chemist', 'biolog', 'astrono', 'geolog', 'environ', 'carbon',
-  ],
-  health: [
-    'health', 'medical', 'hospital', 'doctor', 'patient', 'disease',
-    'virus', 'vaccine', 'treatment', 'drug', 'pharma', 'surgery',
-    'mental health', 'cancer', 'diabet', 'obesity', 'pandemic',
-    'clinic', 'diagnosis', 'symptom', 'therapy', 'who ',
-  ],
-  sports: [
-    'sport', 'game', 'match', 'team', 'player', 'coach', 'league',
-    'championship', 'tournament', 'goal', 'score', 'win', 'defeat',
-    'season', 'final', 'olympic', 'fifa', 'nba', 'nfl', 'cricket',
-    'football', 'soccer', 'tennis', 'rugby', 'athlet',
-  ],
-  gaming: [
-    'gaming', 'video game', 'esport', 'console', 'playstation', 'xbox',
-    'nintendo', 'steam', 'gamer', 'fps', 'rpg', 'multiplayer',
-    'twitch', 'game developer', 'gameplay',
-  ],
-  film: [
-    'film', 'movie', 'cinema', 'box office', 'director', 'actor',
-    'actress', 'oscar', 'screenplay', 'hollywood', 'blockbuster',
-    'premiere', 'sequel', 'franchise', 'animation', 'documentary',
-  ],
-  tv: [
-    'television', 'tv show', 'tv series', 'streaming', 'showrunner',
-    'netflix', 'hbo', 'disney+', 'series finale', 'episode',
-    'renewal', 'cancell', 'sitcom', 'drama series',
-  ],
+  politics: {
+    strong: [
+      'politi', 'parliament', 'legislat', 'senator', 'congress',
+      'ballot', 'referendum', 'bipartisan', 'geopoliti', 'impeach',
+      'inaugurat', 'gubernator', 'governorship', 'caucus', 'filibuster',
+      'executive order', 'head of state', 'prime minister', 'veto',
+    ],
+    weak: [
+      'government', 'elect', 'minister', 'president', 'vote', 'voter',
+      'opposition', 'coalition', 'campaign', 'democrat', 'republican',
+      'labor party', 'liberal', 'conservative', 'cabinet', 'regulation',
+      'policy', 'reform', 'constitutional', 'sanction', 'diplomatic',
+      'nato', 'tariff', 'populis', 'authoritar', 'regime', 'judiciary',
+      'governance', 'sovereignty', 'junta', 'coup',
+    ],
+  },
+  world: {
+    strong: [
+      'diplomacy', 'diplomat', 'united nations', 'nato', 'treaty',
+      'bilateral', 'multilateral', 'peacekeep', 'cease-fire', 'ceasefire',
+      'annexation', 'territorial dispute', 'border dispute',
+    ],
+    weak: [
+      'international', 'foreign', 'global', 'summit', 'sanction',
+      'geopoliti', 'embassy', 'refugee', 'humanitarian', 'conflict',
+      'alliance', 'sovereignty', 'occupation', 'migration', 'diaspora',
+      'trade deal', 'foreign aid', 'foreign policy',
+    ],
+  },
+  business: {
+    strong: [
+      'econom', 'stock market', 'financ', 'gdp', 'inflation', 'interest rate',
+      'merger', 'acquisition', 'ipo', 'earnings', 'dividend', 'bankruptcy',
+      'recession', 'wall street', 'dow jones', 'nasdaq', 's&p 500',
+      'supply chain', 'quarterly', 'fiscal', 'monetary',
+    ],
+    weak: [
+      'business', 'market', 'stock', 'bank', 'invest', 'profit', 'revenue',
+      'startup', 'ceo', 'industry', 'commodit', 'oil price', 'crypto',
+      'bitcoin', 'retail', 'consumer', 'workforce', 'export', 'import',
+      'shareholder', 'valuation', 'hedge fund', 'venture capital',
+      'central bank', 'trade',
+    ],
+  },
+  technology: {
+    strong: [
+      'artificial intelligen', 'machine learning', 'deep learning',
+      'semiconductor', 'silicon valley', 'open source', 'software',
+      'cybersecur', 'neural network', 'large language model',
+      'autonomous vehicl', 'self-driving', 'programming', 'developer',
+      'generative ai', 'chatgpt', 'openai', 'github',
+    ],
+    weak: [
+      'tech', 'hardware', 'cyber', 'robot', 'comput', 'chip',
+      'cloud comput', 'algorithm', 'blockchain', 'quantum comput',
+      'internet', 'encryption', 'startup', 'digital', 'smartphone',
+      'gadget', 'browser', 'operating system', 'linux', 'api',
+      'augmented reality', 'virtual reality', ' vr ', ' ar ',
+    ],
+  },
+  science: {
+    strong: [
+      'scien', 'nasa', 'genome', 'archaeolog', 'paleontolog', 'particle',
+      'telescope', 'laboratory', 'peer-review', 'peer review', 'hypothesis',
+      'biolog', 'astrono', 'geolog', 'physicist', 'chemist',
+      'extinction', 'biodiversity', 'ecosystem', 'photosynthes',
+    ],
+    weak: [
+      'research', 'discover', 'experiment', 'space', 'climate',
+      'species', 'fossil', 'dna', 'physics', 'environ', 'carbon',
+      'evolution', 'renewable', 'solar', 'fusion', 'neurosci',
+      'volcanic', 'seismic', 'marine biolog', 'gene', 'organism',
+    ],
+  },
+  health: {
+    strong: [
+      'medical', 'hospital', 'patient', 'disease', 'vaccine', 'pharma',
+      'surgery', 'mental health', 'diagnosis', 'symptom', 'pandemic',
+      'epidemic', 'outbreak', 'clinical trial', 'oncolog', 'cardio',
+      'alzheimer', 'dementia', 'public health', 'healthcare',
+    ],
+    weak: [
+      'health', 'doctor', 'virus', 'treatment', 'cancer', 'diabet',
+      'obesity', 'clinic', 'therapy', 'nutrition', 'wellness',
+      'fitness', 'nursing', 'stroke', 'chronic', 'infectious',
+      'immuniz', 'prescription', 'antibiotic', 'organ transplant',
+    ],
+  },
+  sports: {
+    strong: [
+      'championship', 'tournament', 'olympic', 'fifa', 'nba', 'nfl',
+      'premier league', 'world cup', 'athlet', 'playoff', 'grand slam',
+      'super bowl', 'champions league', 'world series', 'medal',
+      'stadium', 'transfer window', 'world record',
+    ],
+    weak: [
+      'sport', 'player', 'coach', 'league', 'goal', 'defeat',
+      'cricket', 'football', 'soccer', 'tennis', 'rugby', 'boxing',
+      'hockey', 'baseball', 'basketball', 'qualifier', 'roster',
+      'draft pick', 'injury report', 'halftime', 'referee',
+    ],
+  },
+  gaming: {
+    strong: [
+      'video game', 'esport', 'playstation', 'xbox', 'nintendo',
+      'game developer', 'gameplay', 'game pass', 'battle royale',
+      'mmorpg', 'game engine', 'unreal engine', 'early access',
+      'indie game', 'game studio', 'dlc',
+    ],
+    weak: [
+      'gaming', 'console', 'gamer', 'multiplayer', 'twitch',
+      'rpg', 'game update', 'game patch', 'frame rate', 'modding',
+      'speedrun', 'game release', 'co-op', 'open world',
+    ],
+  },
+  film: {
+    strong: [
+      'box office', 'screenplay', 'hollywood', 'blockbuster',
+      'oscar', 'academy award', 'golden globe', 'bafta',
+      'film festival', 'cannes', 'sundance', 'tribeca',
+      'cinematograph', 'film director',
+    ],
+    weak: [
+      'film', 'movie', 'cinema', 'director', 'actor', 'actress',
+      'premiere', 'sequel', 'franchise', 'animation', 'documentary',
+      'trailer', 'film critic', 'casting',
+    ],
+  },
+  tv: {
+    strong: [
+      'tv show', 'tv series', 'showrunner', 'series finale',
+      'primetime', 'cable network', 'reality tv', 'talk show',
+      'miniseries', 'anthology series', 'sitcom', 'drama series',
+      'late night', 'television show',
+    ],
+    weak: [
+      'television', 'netflix', 'hbo', 'disney+', 'episode',
+      'renewal', 'cancell', 'streaming service', 'season premiere',
+      'season finale', 'reboot', 'spinoff', 'broadcast',
+      'emmys', 'emmy',
+    ],
+  },
 };
 
+// Count how many keywords from a list appear in the given text
+function countKeywordHits(text, keywords) {
+  let hits = 0;
+  for (const kw of keywords) {
+    if (text.includes(kw)) hits++;
+  }
+  return hits;
+}
+
 // Check if an article's title+description match the requested category.
-// Returns true if at least one category keyword appears.
+// Uses the two-tier keyword system:
+//   - 1 strong hit → match
+//   - 2+ weak hits → match
+//   - 1 weak hit in the title → match (title mention is a strong signal)
 function articleMatchesCategory(article, category) {
   // 'world' is too broad to filter usefully — we rely on query-level filtering
   if (category === 'world') return true;
-  const keywords = CATEGORY_RELEVANCE_KEYWORDS[category];
-  if (!keywords) return true; // unknown category, don't filter
-  const text = `${article.title || ''} ${article.description || ''}`.toLowerCase();
-  return keywords.some(kw => text.includes(kw));
+  const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
+  if (!catKeywords) return true; // unknown category, don't filter
+
+  const title = (article.title || '').toLowerCase();
+  const text = `${title} ${article.description || ''}`.toLowerCase();
+
+  // Any strong keyword is an immediate match
+  if (catKeywords.strong.some(kw => text.includes(kw))) return true;
+
+  // Count weak keyword hits
+  const weakHits = countKeywordHits(text, catKeywords.weak);
+  if (weakHits >= 2) return true;
+
+  // A single weak keyword in the title is enough (title = high signal)
+  if (weakHits === 1 && catKeywords.weak.some(kw => title.includes(kw))) return true;
+
+  return false;
 }
 
 function getCountryTerms(country) {
@@ -747,18 +868,44 @@ function contentDepthScore(article) {
   return descScore + contentScore;
 }
 
-// Category relevance strength (0-1): how many category keywords appear
+// Category relevance strength (0-1): how strongly an article matches a category.
+// Uses the two-tier keyword system with title weighting:
+//   - Strong keywords count 2x (domain-specific, high confidence)
+//   - Weak keywords count 1x (shared across categories)
+//   - Title matches get a bonus (keywords in the headline = high signal)
 function categoryRelevanceScore(article, category) {
   if (category === 'world') return 0.5; // neutral
-  const keywords = CATEGORY_RELEVANCE_KEYWORDS[category];
-  if (!keywords) return 0.5;
-  const text = `${article.title || ''} ${article.description || ''}`.toLowerCase();
-  let hits = 0;
-  for (const kw of keywords) {
-    if (text.includes(kw)) hits++;
+  const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
+  if (!catKeywords) return 0.5;
+
+  const title = (article.title || '').toLowerCase();
+  const text = `${title} ${article.description || ''}`.toLowerCase();
+
+  // Weighted hit counting
+  let score = 0;
+
+  // Strong keywords: 2 points each, +1 bonus if in title
+  for (const kw of catKeywords.strong) {
+    if (text.includes(kw)) {
+      score += 2;
+      if (title.includes(kw)) score += 1;
+    }
   }
-  // Normalise: 1 hit = 0.3, 2 = 0.5, 3+ = 0.7-1.0
-  return Math.min(hits / 4, 1);
+
+  // Weak keywords: 1 point each, +0.5 bonus if in title
+  for (const kw of catKeywords.weak) {
+    if (text.includes(kw)) {
+      score += 1;
+      if (title.includes(kw)) score += 0.5;
+    }
+  }
+
+  // Normalise to 0-1 range. Calibrated so:
+  //   1 strong hit           = 2/8  = 0.25
+  //   1 strong hit in title  = 3/8  = 0.375
+  //   2 strong + 2 weak      = 6/8  = 0.75
+  //   3+ strong + title      = 1.0  (capped)
+  return Math.min(score / 8, 1);
 }
 
 // ── Main ranking function ────────────────────────────────────────────────
@@ -940,13 +1087,19 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
   return diversified.map(s => s.article);
 }
 
-// Search-query templates for categories that use /v2/everything (more targeted than top-headlines)
+// Search-query templates for categories that use /v2/everything (more targeted than top-headlines).
+// All 10 categories now have custom queries for better precision than generic top-headlines.
 const EVERYTHING_QUERY_MAP = {
-  politics: '(politics OR government OR election OR parliament OR president OR minister OR policy OR legislation)',
-  world:    '(international OR diplomacy OR foreign OR global OR trade OR summit OR UN)',
-  gaming:   '(gaming OR "video game" OR esports OR console OR PlayStation OR Xbox OR Nintendo)',
-  film:     '(film OR movie OR cinema OR "box office" OR director OR screenplay)',
-  tv:       '(television OR "TV series" OR streaming OR "TV show" OR showrunner OR Netflix OR HBO)',
+  politics:   '(politics OR government OR election OR parliament OR president OR minister OR policy OR legislation)',
+  world:      '(international OR diplomacy OR foreign OR global OR "trade deal" OR summit OR "United Nations")',
+  business:   '(economy OR "stock market" OR finance OR business OR GDP OR inflation OR earnings OR merger OR IPO)',
+  technology: '(technology OR software OR AI OR "artificial intelligence" OR cybersecurity OR semiconductor OR startup OR "machine learning")',
+  science:    '(science OR research OR NASA OR climate OR discovery OR "space exploration" OR biology OR physics OR environment)',
+  health:     '(health OR medical OR hospital OR disease OR vaccine OR pandemic OR "public health" OR "clinical trial" OR healthcare)',
+  sports:     '(sports OR championship OR tournament OR Olympics OR FIFA OR "Premier League" OR athlete OR "World Cup")',
+  gaming:     '(gaming OR "video game" OR esports OR console OR PlayStation OR Xbox OR Nintendo)',
+  film:       '(film OR movie OR cinema OR "box office" OR director OR Oscar OR screenplay OR "film festival")',
+  tv:         '(television OR "TV series" OR streaming OR "TV show" OR showrunner OR Netflix OR HBO OR Emmy)',
 };
 
 // Helper: fetch from NewsAPI (primary - ~55 countries)
@@ -985,49 +1138,40 @@ async function fetchFromNewsAPI(country, category, apiKey, activeDomains, active
     return data.articles || [];
   }
 
-  // World (no country filter): use category-specific strategies below.
-  // Categories in EVERYTHING_QUERY_MAP use /v2/everything with keyword queries.
-  if (EVERYTHING_QUERY_MAP[category]) {
-    const params = new URLSearchParams({
-      q: EVERYTHING_QUERY_MAP[category],
-      domains,
-      language: 'en',
-      sortBy: sortByPopularity ? 'popularity' : 'publishedAt',
-      pageSize: '30',
-      apiKey,
-    });
-    if (from) params.set('from', from);
-    const url = `https://newsapi.org/v2/everything?${params.toString()}`;
-    const response = await fetchWithTimeout(url);
-    if (!response.ok) throw new Error(`NewsAPI ${category} error: ${response.status}`);
-    const data = await response.json();
-    if (data.status !== 'ok') throw new Error(`NewsAPI ${category} error: ${data.message}`);
-    return data.articles || [];
-  }
-
-  // Standard categories for world: top-headlines with trusted sources filter.
-  // (NewsAPI prohibits combining `sources` with `country` or `category`, so we
-  // omit `category` here and rely on post-fetch filtering for topic relevance.)
-  const url = `https://newsapi.org/v2/top-headlines?sources=${sourceIds}&pageSize=30&apiKey=${apiKey}`;
+  // World (no country filter): all categories now have EVERYTHING_QUERY_MAP entries,
+  // so we always use /v2/everything with keyword queries for better precision
+  // than top-headlines (which can't combine `sources` with `category`).
+  const queryTemplate = EVERYTHING_QUERY_MAP[category] || category;
+  const params = new URLSearchParams({
+    q: queryTemplate,
+    domains,
+    language: 'en',
+    sortBy: sortByPopularity ? 'popularity' : 'publishedAt',
+    pageSize: '30',
+    apiKey,
+  });
+  if (from) params.set('from', from);
+  const url = `https://newsapi.org/v2/everything?${params.toString()}`;
   const response = await fetchWithTimeout(url);
-  if (!response.ok) throw new Error(`NewsAPI error: ${response.status}`);
+  if (!response.ok) throw new Error(`NewsAPI ${category} error: ${response.status}`);
   const data = await response.json();
-  if (data.status !== 'ok') throw new Error(`NewsAPI error: ${data.message}`);
+  if (data.status !== 'ok') throw new Error(`NewsAPI ${category} error: ${data.message}`);
   return data.articles || [];
 }
 
-// Category-specific search terms for WorldNewsAPI — improves relevance over bare category names
+// Category-specific search terms for WorldNewsAPI — improves relevance over bare category names.
+// Broader than EVERYTHING_QUERY_MAP (no OR/quotes syntax) since WorldNewsAPI uses simpler text matching.
 const WORLD_NEWS_QUERY_TERMS = {
-  technology: 'technology software AI computing',
-  business:   'business economy market finance',
-  science:    'science research discovery study',
-  health:     'health medical hospital disease treatment',
-  sports:     'sports match championship tournament',
-  gaming:     'gaming video game esports console',
-  film:       'film movie cinema box office',
-  tv:         'television TV series streaming show',
-  politics:   'politics government election parliament',
-  world:      'international diplomacy foreign global',
+  technology: 'technology software AI cybersecurity startup semiconductor',
+  business:   'business economy stock market finance GDP earnings',
+  science:    'science research discovery NASA climate environment',
+  health:     'health medical hospital disease vaccine healthcare',
+  sports:     'sports championship tournament athlete league football',
+  gaming:     'gaming video game esports PlayStation Xbox Nintendo',
+  film:       'film movie cinema box office director Oscar',
+  tv:         'television TV series streaming Netflix HBO Emmy',
+  politics:   'politics government election parliament legislation policy',
+  world:      'international diplomacy foreign summit United Nations',
 };
 
 // Helper: fetch from WorldNewsAPI (secondary - broad country coverage)
