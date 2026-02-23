@@ -234,6 +234,14 @@ export default function NewsCard({ article, index, rank }) {
           <Badge variant="outline" className={`text-xs font-medium ${CATEGORY_COLORS[article.category] || 'bg-stone-100 text-stone-600'}`}>
             {article.category}
           </Badge>
+          {article.language && article.language !== 'en' && (
+            <span
+              className="text-[10px] font-semibold px-1.5 py-0.5 rounded border bg-amber-50 border-amber-200 text-amber-700 uppercase tracking-wide"
+              title={`Article in ${article.language.toUpperCase()}`}
+            >
+              {article.language.toUpperCase()}
+            </span>
+          )}
           <div className="flex items-center gap-1 text-xs text-stone-400 ml-auto">
             <Clock className="w-3 h-3" />
             <span>{article.time_ago || 'Today'}</span>

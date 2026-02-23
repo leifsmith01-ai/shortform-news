@@ -4,7 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Globe, Newspaper, ChevronDown, Search, Calendar, Flame, TrendingUp, Tag, Sparkles, Bookmark, Clock, Building2, Settings } from 'lucide-react';
+import { Globe, Newspaper, ChevronDown, Search, Calendar, Flame, TrendingUp, Tag, Sparkles, Bookmark, Clock, Building2, Settings, Languages } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Collapsible,
@@ -171,6 +171,8 @@ export default function FilterSidebar({
   setDateRange,
   selectedSources,
   setSelectedSources,
+  showNonEnglish,
+  setShowNonEnglish,
 }) {
   const location = useLocation();
   const [countriesOpen, setCountriesOpen] = React.useState(true);
@@ -317,6 +319,38 @@ export default function FilterSidebar({
             </SelectContent>
           </Select>
         </div>
+
+        {/* Language Section */}
+        {setShowNonEnglish && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Languages className="w-4 h-4 text-slate-400" />
+              <span className="text-sm font-medium text-slate-300">Language</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowNonEnglish(!showNonEnglish)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border transition-all duration-200 text-sm ${
+                showNonEnglish
+                  ? 'bg-slate-700 border-slate-500 text-white'
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <span>{showNonEnglish ? '🌐' : '🇬🇧'}</span>
+                <span>{showNonEnglish ? 'All languages' : 'English only'}</span>
+              </span>
+              <span className={`w-9 h-5 rounded-full relative transition-colors duration-200 flex-shrink-0 ${showNonEnglish ? 'bg-slate-400' : 'bg-slate-600'}`}>
+                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${showNonEnglish ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              </span>
+            </button>
+            {showNonEnglish && (
+              <p className="text-[11px] text-slate-500 mt-1.5 px-1">
+                Articles in the country's local language will appear with a language badge.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Countries Section */}
         <Collapsible open={countriesOpen} onOpenChange={setCountriesOpen}>
