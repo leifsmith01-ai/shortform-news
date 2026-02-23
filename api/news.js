@@ -265,21 +265,44 @@ const COUNTRY_RELEVANCE_KEYWORDS = {
 
 // Demonyms used to build tighter search queries that pair the adjective with category terms.
 // E.g. "Australian politics" instead of "Australia" AND "politics".
+// Countries without a demonym here fall back to bare country name in loose queries —
+// adding an entry here improves query precision for that country.
 const COUNTRY_DEMONYMS = {
-  us: 'American',   gb: 'British',     au: 'Australian',   ca: 'Canadian',
-  de: 'German',     fr: 'French',      jp: 'Japanese',     cn: 'Chinese',
-  in: 'Indian',     kr: 'South Korean', br: 'Brazilian',   mx: 'Mexican',
-  it: 'Italian',    es: 'Spanish',     nl: 'Dutch',        se: 'Swedish',
-  no: 'Norwegian',  pl: 'Polish',      ch: 'Swiss',        be: 'Belgian',
-  at: 'Austrian',   ie: 'Irish',       pt: 'Portuguese',   dk: 'Danish',
-  fi: 'Finnish',    gr: 'Greek',       nz: 'New Zealand',  sg: 'Singaporean',
-  hk: 'Hong Kong',  tw: 'Taiwanese',   za: 'South African', ng: 'Nigerian',
-  eg: 'Egyptian',   ke: 'Kenyan',      tr: 'Turkish',      il: 'Israeli',
-  ps: 'Palestinian', ae: 'Emirati',    sa: 'Saudi',        ar: 'Argentine',    cl: 'Chilean',
-  co: 'Colombian',  id: 'Indonesian',  th: 'Thai',         my: 'Malaysian',
-  ph: 'Philippine',  vn: 'Vietnamese', pk: 'Pakistani',    ua: 'Ukrainian',
-  ro: 'Romanian',   hu: 'Hungarian',   cz: 'Czech',        rs: 'Serbian',
-  hr: 'Croatian',   bg: 'Bulgarian',   sk: 'Slovak',
+  // ── North America ──
+  us: 'American',   ca: 'Canadian',    mx: 'Mexican',      cu: 'Cuban',
+  jm: 'Jamaican',   cr: 'Costa Rican', pa: 'Panamanian',   do: 'Dominican',
+  gt: 'Guatemalan', hn: 'Honduran',
+  // ── South America ──
+  br: 'Brazilian',  ar: 'Argentine',   cl: 'Chilean',      co: 'Colombian',
+  pe: 'Peruvian',   ve: 'Venezuelan',  ec: 'Ecuadorian',   uy: 'Uruguayan',
+  py: 'Paraguayan', bo: 'Bolivian',
+  // ── Europe ──
+  gb: 'British',    de: 'German',      fr: 'French',       it: 'Italian',
+  es: 'Spanish',    nl: 'Dutch',       se: 'Swedish',      no: 'Norwegian',
+  pl: 'Polish',     ch: 'Swiss',       be: 'Belgian',      at: 'Austrian',
+  ie: 'Irish',      pt: 'Portuguese',  dk: 'Danish',       fi: 'Finnish',
+  gr: 'Greek',      cz: 'Czech',       ro: 'Romanian',     hu: 'Hungarian',
+  ua: 'Ukrainian',  rs: 'Serbian',     hr: 'Croatian',     bg: 'Bulgarian',
+  sk: 'Slovak',     lt: 'Lithuanian',  lv: 'Latvian',      ee: 'Estonian',
+  is: 'Icelandic',  lu: 'Luxembourgish', si: 'Slovenian',  ru: 'Russian',
+  // ── Asia ──
+  cn: 'Chinese',    jp: 'Japanese',    in: 'Indian',       kr: 'South Korean',
+  sg: 'Singaporean', hk: 'Hong Kong', tw: 'Taiwanese',    id: 'Indonesian',
+  th: 'Thai',       my: 'Malaysian',   ph: 'Philippine',   vn: 'Vietnamese',
+  pk: 'Pakistani',  bd: 'Bangladeshi', lk: 'Sri Lankan',   mm: 'Myanmar',
+  kh: 'Cambodian',  np: 'Nepalese',
+  // ── Oceania ──
+  au: 'Australian', nz: 'New Zealand', fj: 'Fijian',       pg: 'Papua New Guinean',
+  // ── Middle East ──
+  il: 'Israeli',    ps: 'Palestinian', ae: 'Emirati',      sa: 'Saudi',
+  tr: 'Turkish',    qa: 'Qatari',      kw: 'Kuwaiti',      bh: 'Bahraini',
+  om: 'Omani',      jo: 'Jordanian',   lb: 'Lebanese',     iq: 'Iraqi',
+  ir: 'Iranian',
+  // ── Africa ──
+  za: 'South African', ng: 'Nigerian', eg: 'Egyptian',     ke: 'Kenyan',
+  ma: 'Moroccan',   gh: 'Ghanaian',    et: 'Ethiopian',    tz: 'Tanzanian',
+  ug: 'Ugandan',    sn: 'Senegalese',  ci: 'Ivorian',      cm: 'Cameroonian',
+  dz: 'Algerian',   tn: 'Tunisian',    rw: 'Rwandan',
 };
 
 // Short category noun phrases used to build national-relevance queries.
@@ -521,13 +544,16 @@ function articleMentionsCountry(article, country) {
   return { inTitle, inText, termHits };
 }
 
-// Compute a nuanced country relevance score (0-8) for an article.
+// Compute a nuanced country relevance score (0-10) for an article.
 // Uses multiple signals:
-//   - Title mention:  strong signal (+4)
-//   - Body mention:   weaker signal (+2)
-//   - Term frequency: bonus for multiple distinct term matches (+1 per extra, max +2)
-//   - Meta country:   domain/source country match (+2, but NOT for international wire services)
-function articleCountryScore(article, country) {
+//   - Title mention:         strong signal (+4)
+//   - Body mention:          weaker signal (+2)
+//   - Term frequency:        bonus for multiple distinct term matches (+1-2)
+//   - Meta country:          domain/source country match (+2, NOT for international wires)
+//   - Combined title bonus:  article title explicitly about BOTH country AND category (+2)
+//                            e.g. "Japan AI startup" for jp+technology
+// Optional `category` parameter enables the combined-title bonus.
+function articleCountryScore(article, country, category = null) {
   const { inTitle, inText, termHits } = articleMentionsCountry(article, country);
   let score = 0;
 
@@ -550,7 +576,22 @@ function articleCountryScore(article, country) {
     }
   }
 
-  return Math.min(score, 8); // cap at 8 to match Signal 6 range
+  // Combined country+category title bonus: rewards articles explicitly about BOTH
+  // signals in the headline (e.g. "Japanese AI startup" for jp+technology).
+  // Only applies when the country is mentioned in the title and a category keyword
+  // also appears in the title — a strong signal that the article is squarely on-topic.
+  if (inTitle && category && category !== 'world') {
+    const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
+    if (catKeywords) {
+      const title = (article.title || '').toLowerCase();
+      const hasCatInTitle =
+        catKeywords.strong.some(kw => title.includes(kw)) ||
+        catKeywords.weak.some(kw => title.includes(kw));
+      if (hasCatInTitle) score += 2;
+    }
+  }
+
+  return Math.min(score, 10); // cap at 10 (increased from 8 to accommodate combined bonus)
 }
 
 // Build a nationally-focused search query for /v2/everything.
@@ -571,7 +612,10 @@ function buildNationalQuery(country, category) {
 
   // Tight phrases get priority (NewsAPI ranks by query match), but also include
   // a looser term so articles mentioning the country in a political context aren't missed.
-  const topicKeywords = nouns.slice(0, 3).join(' OR ');
+  // Use up to 5 nouns (increased from 3) so more category terms are covered in the
+  // loose fallback — e.g. politics includes "prime minister" and "legislation" beyond
+  // the first three entries.
+  const topicKeywords = nouns.slice(0, 5).join(' OR ');
   const looseTerm = demonym
     ? `(${demonym} OR ${countryName}) AND (${topicKeywords})`
     : `${countryName} AND (${topicKeywords})`;
@@ -1004,11 +1048,12 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
     const maxCatRelevance = Math.max(...cluster.map(c => c.catRelevance));
     const catScore = maxCatRelevance * 8;
 
-    // ── Signal 6: Country Relevance (0-8) ──
-    // Derived from articleCountryScore() which returns 0-8:
-    //   8 = title mention + multiple term hits + national source (strongest)
+    // ── Signal 6: Country Relevance (0-10) ──
+    // Derived from articleCountryScore() which returns 0-10:
+    //  10 = title mention + category keyword in title + multiple term hits + national source
+    //   8 = title mention + multiple term hits + national source (strongest, no combined bonus)
     //   6 = title mention + frequency bonus or national source
-    //   4 = title mention only
+    //   4 = title mention only (or neutral midpoint for world queries)
     //   2 = body/description mention only
     //   0 = not mentioned (passed via filler path)
     //  -1 = not set (world query — use neutral midpoint to avoid penalising)
@@ -1258,12 +1303,16 @@ async function fetchFromGuardian(country, category, apiKey, opts = {}) {
     } else {
       const countryName = COUNTRY_NAMES[country] || country;
       const demonym = COUNTRY_DEMONYMS[country];
-      // Use demonym+category for tighter results (e.g. "Australian politics")
+      // Use CATEGORY_QUERY_NOUNS for richer queries (e.g. "German tech OR German startup
+      // OR German AI") instead of the raw category name ("German technology") which is
+      // too narrow and misses articles that don't use that exact term.
+      const catNouns = CATEGORY_QUERY_NOUNS[category];
+      const queryTerms = catNouns ? catNouns.slice(0, 5).join(' OR ') : category;
       const searchQuery = category === 'world'
         ? countryName
         : demonym
-          ? `"${demonym} ${category}" OR "${countryName} ${category}"`
-          : `${countryName} ${category}`;
+          ? `(${demonym} OR "${countryName}") AND (${queryTerms})`
+          : `"${countryName}" AND (${queryTerms})`;
       params = new URLSearchParams({
         q: searchQuery,
         section: categorySection,
@@ -2246,7 +2295,9 @@ export default async function handler(req, res) {
         results = results.map(a => {
           let bestScore = 0;
           for (const country of countryList) {
-            const score = articleCountryScore(a, country);
+            // Pass best-matching category so the combined title bonus can apply
+            const bestCat = categoryList.length === 1 ? categoryList[0] : (a.category || null);
+            const score = articleCountryScore(a, country, bestCat);
             bestScore = Math.max(bestScore, score);
           }
           a._countryScore = bestScore;
@@ -2556,7 +2607,8 @@ async function fetchCountryCategoryPair(country, category, ctx) {
   const MIN_ARTICLES = 10;
   if (country !== 'world' && formattedArticles.length > 0) {
     const scored = formattedArticles.map(a => {
-      const score = articleCountryScore(a, country);
+      // Pass category to enable the combined country+category title bonus
+      const score = articleCountryScore(a, country, category);
       a._countryScore = score;
       return { article: a, score };
     });
@@ -2623,7 +2675,7 @@ async function fetchCountryCategoryPair(country, category, ctx) {
       backfill = backfill.filter(a => !existingUrls.has(a.url));
 
       if (country !== 'world') {
-        backfill = backfill.filter(a => articleCountryScore(a, country) > 0);
+        backfill = backfill.filter(a => articleCountryScore(a, country, category) > 0);
       }
 
       if (backfill.length > 0) {
@@ -2635,8 +2687,12 @@ async function fetchCountryCategoryPair(country, category, ctx) {
     }
   }
 
-  // Strip _meta before caching so cached responses are clean
-  const cleanForCache = formattedArticles.map(({ _meta, _countryScore, ...rest }) => rest);
+  // Strip _meta (internal inference data) before caching but KEEP _countryScore.
+  // The ranking engine reads `a._countryScore ?? -1` to apply Signal 6; stripping it
+  // would cause all cached articles to receive a neutral score (4) regardless of how
+  // strongly they actually mention the requested country — making cache hits rank
+  // differently from fresh fetches.
+  const cleanForCache = formattedArticles.map(({ _meta, ...rest }) => rest);
   CACHE[cacheKey] = { timestamp: Date.now(), articles: cleanForCache };
   return cleanForCache;
 }
