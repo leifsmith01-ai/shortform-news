@@ -104,6 +104,34 @@ const ALL_TRUSTED_SOURCES = [
   { domain: 'straitstimes.com',               sourceId: null,                 name: 'Straits Times',            group: 'regional' },
   { domain: 'caixinglobal.com',               sourceId: null,                 name: 'Caixin Global',            group: 'regional' },
   { domain: 'asia.nikkei.com',               sourceId: null,                 name: 'Nikkei Asia',              group: 'regional' },
+  // ── Regional (supplemental — underserved countries) ──────────────────────
+  // Latin America
+  { domain: 'brazilianreport.com',            sourceId: null,                 name: 'The Brazilian Report',     group: 'regional' },
+  { domain: 'mercopress.com',                 sourceId: null,                 name: 'MercoPress',               group: 'regional' },
+  { domain: 'batimes.com.ar',                 sourceId: null,                 name: 'Buenos Aires Times',       group: 'regional' },
+  { domain: 'mexiconewsdaily.com',            sourceId: null,                 name: 'Mexico News Daily',        group: 'regional' },
+  // Africa
+  { domain: 'dailymaverick.co.za',            sourceId: null,                 name: 'Daily Maverick',           group: 'regional' },
+  { domain: 'businessday.ng',                 sourceId: null,                 name: 'BusinessDay Nigeria',      group: 'regional' },
+  { domain: 'nation.africa',                  sourceId: null,                 name: 'Nation Africa',            group: 'regional' },
+  { domain: 'africanews.com',                 sourceId: null,                 name: 'Africanews',               group: 'regional' },
+  // Middle East (supplements Al Jazeera)
+  { domain: 'arabnews.com',                   sourceId: null,                 name: 'Arab News',                group: 'regional' },
+  { domain: 'thenationalnews.com',            sourceId: null,                 name: 'The National',             group: 'regional' },
+  { domain: 'timesofisrael.com',              sourceId: null,                 name: 'Times of Israel',          group: 'regional' },
+  { domain: 'middleeasteye.net',              sourceId: null,                 name: 'Middle East Eye',          group: 'regional' },
+  // Korea
+  { domain: 'koreaherald.com',                sourceId: null,                 name: 'Korea Herald',             group: 'regional' },
+  // Southeast Asia (supplements Straits Times)
+  { domain: 'channelnewsasia.com',            sourceId: null,                 name: 'Channel NewsAsia',         group: 'regional' },
+  { domain: 'bangkokpost.com',                sourceId: null,                 name: 'Bangkok Post',             group: 'regional' },
+  { domain: 'jakartaglobe.id',                sourceId: null,                 name: 'Jakarta Globe',            group: 'regional' },
+  { domain: 'inquirer.net',                   sourceId: null,                 name: 'Philippine Daily Inquirer',group: 'regional' },
+  { domain: 'rappler.com',                    sourceId: null,                 name: 'Rappler',                  group: 'regional' },
+  // Eastern Europe
+  { domain: 'kyivindependent.com',            sourceId: null,                 name: 'Kyiv Independent',         group: 'regional' },
+  { domain: 'notesfrompoland.com',            sourceId: null,                 name: 'Notes from Poland',        group: 'regional' },
+  { domain: 'meduza.io',                      sourceId: null,                 name: 'Meduza',                   group: 'regional' },
   // ── Business & Finance ────────────────────────────────────────────────────
   { domain: 'politico.com',  sourceId: 'politico',               name: 'Politico',           group: 'business' },
   { domain: 'economist.com', sourceId: null,                     name: 'The Economist',      group: 'business' },
@@ -156,7 +184,7 @@ const COUNTRY_RELEVANCE_KEYWORDS = {
   // ── North America ──────────────────────────────────────────────────────
   us: ['united states', 'america', 'american', 'u.s.', ' us ', 'washington d.c.', 'new york', 'los angeles', 'chicago', 'houston', 'san francisco', 'silicon valley'],
   ca: ['canada', 'canadian', 'ottawa', 'toronto', 'vancouver', 'montreal', 'calgary'],
-  mx: ['mexico', 'mexican', 'mexico city', 'guadalajara', 'monterrey'],
+  mx: ['mexico', 'mexican', 'mexico city', 'guadalajara', 'monterrey', 'sheinbaum', 'claudia sheinbaum', 'amlo', 'obrador', 'morena', 'tijuana', 'cancun', 'puebla'],
   cu: ['cuba', 'cuban', 'havana'],
   jm: ['jamaica', 'jamaican', 'kingston'],
   cr: ['costa rica', 'costa rican', 'san jose'],
@@ -165,102 +193,102 @@ const COUNTRY_RELEVANCE_KEYWORDS = {
   gt: ['guatemala', 'guatemalan', 'guatemala city'],
   hn: ['honduras', 'honduran', 'tegucigalpa'],
   // ── South America ──────────────────────────────────────────────────────
-  br: ['brazil', 'brazilian', 'brasilia', 'são paulo', 'sao paulo', 'rio de janeiro'],
-  ar: ['argentina', 'argentinian', 'argentine', 'buenos aires'],
-  cl: ['chile', 'chilean', 'santiago'],
-  co: ['colombia', 'colombian', 'bogota', 'bogotá', 'medellin', 'medellín'],
-  pe: ['peru', 'peruvian', 'lima'],
-  ve: ['venezuela', 'venezuelan', 'caracas'],
-  ec: ['ecuador', 'ecuadorian', 'quito', 'guayaquil'],
-  uy: ['uruguay', 'uruguayan', 'montevideo'],
-  py: ['paraguay', 'paraguayan', 'asuncion', 'asunción'],
-  bo: ['bolivia', 'bolivian', 'la paz', 'sucre'],
+  br: ['brazil', 'brazilian', 'brasilia', 'são paulo', 'sao paulo', 'rio de janeiro', 'lula', 'lula da silva', 'planalto', 'bolsonaro', 'belo horizonte', 'fortaleza', 'manaus'],
+  ar: ['argentina', 'argentinian', 'argentine', 'buenos aires', 'milei', 'javier milei', 'kirchner', 'casa rosada', 'peronist', 'cordoba', 'rosario', 'mendoza'],
+  cl: ['chile', 'chilean', 'santiago', 'boric', 'gabriel boric', 'valparaiso', 'concepcion'],
+  co: ['colombia', 'colombian', 'bogota', 'bogotá', 'medellin', 'medellín', 'petro', 'gustavo petro', 'cartagena', 'cali', 'barranquilla'],
+  pe: ['peru', 'peruvian', 'lima', 'boluarte', 'dina boluarte', 'castillo', 'arequipa'],
+  ve: ['venezuela', 'venezuelan', 'caracas', 'maduro', 'nicolas maduro', 'chavismo', 'miraflores'],
+  ec: ['ecuador', 'ecuadorian', 'quito', 'guayaquil', 'noboa', 'daniel noboa'],
+  uy: ['uruguay', 'uruguayan', 'montevideo', 'orsi', 'yamandú orsi'],
+  py: ['paraguay', 'paraguayan', 'asuncion', 'asunción', 'peña', 'santiago peña'],
+  bo: ['bolivia', 'bolivian', 'la paz', 'sucre', 'arce', 'luis arce', 'morales', 'evo morales'],
   // ── Europe ─────────────────────────────────────────────────────────────
-  gb: ['united kingdom', 'britain', 'british', ' uk ', 'england', 'scotland', 'wales', 'london', 'manchester', 'birmingham', 'edinburgh', 'westminster', 'downing street'],
-  de: ['germany', 'german', 'berlin', 'munich', 'frankfurt', 'hamburg', 'bundestag'],
-  fr: ['france', 'french', 'paris', 'marseille', 'lyon', 'élysée', 'elysee'],
-  it: ['italy', 'italian', 'rome', 'milan', 'naples', 'turin'],
-  es: ['spain', 'spanish', 'madrid', 'barcelona', 'seville'],
-  nl: ['netherlands', 'dutch', 'amsterdam', 'rotterdam', 'the hague', 'den haag'],
-  se: ['sweden', 'swedish', 'stockholm', 'gothenburg'],
-  no: ['norway', 'norwegian', 'oslo', 'bergen'],
-  pl: ['poland', 'polish', 'warsaw', 'krakow', 'kraków', 'gdansk'],
+  gb: ['united kingdom', 'britain', 'british', ' uk ', 'england', 'scotland', 'wales', 'london', 'manchester', 'birmingham', 'edinburgh', 'westminster', 'downing street', 'starmer', 'keir starmer'],
+  de: ['germany', 'german', 'berlin', 'munich', 'frankfurt', 'hamburg', 'bundestag', 'scholz', 'olaf scholz', 'merz', 'friedrich merz', 'spd', 'cdu'],
+  fr: ['france', 'french', 'paris', 'marseille', 'lyon', 'élysée', 'elysee', 'macron', 'emmanuel macron', 'le pen', 'marine le pen', 'bayrou', 'toulouse', 'nice', 'bordeaux'],
+  it: ['italy', 'italian', 'rome', 'milan', 'naples', 'turin', 'meloni', 'giorgia meloni', 'quirinale', 'genoa', 'bologna'],
+  es: ['spain', 'spanish', 'madrid', 'barcelona', 'seville', 'sanchez', 'pedro sanchez', 'catalan', 'catalonia', 'valencia', 'bilbao', 'moncloa'],
+  nl: ['netherlands', 'dutch', 'amsterdam', 'rotterdam', 'the hague', 'den haag', 'wilders', 'geert wilders', 'utrecht'],
+  se: ['sweden', 'swedish', 'stockholm', 'gothenburg', 'kristersson', 'ulf kristersson', 'malmo'],
+  no: ['norway', 'norwegian', 'oslo', 'bergen', 'store', 'jonas gahr', 'storting'],
+  pl: ['poland', 'polish', 'warsaw', 'krakow', 'kraków', 'gdansk', 'tusk', 'donald tusk', 'duda', 'andrzej duda', 'pis', 'sejm'],
   ch: ['switzerland', 'swiss', 'bern', 'zurich', 'zürich', 'geneva', 'davos'],
-  be: ['belgium', 'belgian', 'brussels', 'antwerp'],
-  at: ['austria', 'austrian', 'vienna', 'salzburg'],
-  ie: ['ireland', 'irish', 'dublin', 'cork'],
-  pt: ['portugal', 'portuguese', 'lisbon', 'porto'],
-  dk: ['denmark', 'danish', 'copenhagen'],
-  fi: ['finland', 'finnish', 'helsinki'],
-  gr: ['greece', 'greek', 'athens', 'thessaloniki'],
-  cz: ['czech republic', 'czech', 'czechia', 'prague'],
-  ro: ['romania', 'romanian', 'bucharest'],
-  hu: ['hungary', 'hungarian', 'budapest'],
-  ua: ['ukraine', 'ukrainian', 'kyiv', 'kiev', 'odesa', 'odessa', 'kharkiv', 'lviv', 'zelenskyy', 'zelensky'],
-  rs: ['serbia', 'serbian', 'belgrade'],
-  hr: ['croatia', 'croatian', 'zagreb'],
-  bg: ['bulgaria', 'bulgarian', 'sofia'],
-  sk: ['slovakia', 'slovak', 'bratislava'],
-  lt: ['lithuania', 'lithuanian', 'vilnius'],
-  lv: ['latvia', 'latvian', 'riga'],
-  ee: ['estonia', 'estonian', 'tallinn'],
-  is: ['iceland', 'icelandic', 'reykjavik', 'reykjavík'],
-  lu: ['luxembourg', 'luxembourgish'],
-  si: ['slovenia', 'slovenian', 'ljubljana'],
+  be: ['belgium', 'belgian', 'brussels', 'antwerp', 'ghent', 'de wever'],
+  at: ['austria', 'austrian', 'vienna', 'salzburg', 'kickl', 'herbert kickl', 'fpö'],
+  ie: ['ireland', 'irish', 'dublin', 'cork', 'martin', 'micheál martin', 'galway'],
+  pt: ['portugal', 'portuguese', 'lisbon', 'porto', 'montenegro', 'luís montenegro'],
+  dk: ['denmark', 'danish', 'copenhagen', 'frederiksen', 'mette frederiksen'],
+  fi: ['finland', 'finnish', 'helsinki', 'orpo', 'petteri orpo'],
+  gr: ['greece', 'greek', 'athens', 'thessaloniki', 'mitsotakis', 'kyriakos mitsotakis'],
+  cz: ['czech republic', 'czech', 'czechia', 'prague', 'fiala', 'petr fiala', 'brno'],
+  ro: ['romania', 'romanian', 'bucharest', 'iohannis', 'ciuca', 'cluj', 'timisoara'],
+  hu: ['hungary', 'hungarian', 'budapest', 'orban', 'viktor orban', 'fidesz'],
+  ua: ['ukraine', 'ukrainian', 'kyiv', 'kiev', 'odesa', 'odessa', 'kharkiv', 'lviv', 'zelenskyy', 'zelensky', 'kherson', 'zaporizhzhia', 'donetsk', 'mariupol', 'zaluzhny'],
+  rs: ['serbia', 'serbian', 'belgrade', 'vucic', 'aleksandar vucic', 'novi sad'],
+  hr: ['croatia', 'croatian', 'zagreb', 'plenković', 'andrej plenkovic', 'split'],
+  bg: ['bulgaria', 'bulgarian', 'sofia', 'borissov', 'denkov', 'plovdiv'],
+  sk: ['slovakia', 'slovak', 'bratislava', 'fico', 'robert fico', 'pellegrini'],
+  lt: ['lithuania', 'lithuanian', 'vilnius', 'nauseda', 'gitanas nauseda', 'kaunas'],
+  lv: ['latvia', 'latvian', 'riga', 'silina', 'evika silina'],
+  ee: ['estonia', 'estonian', 'tallinn', 'kallas', 'kaja kallas'],
+  is: ['iceland', 'icelandic', 'reykjavik', 'reykjavík', 'jakobsdottir'],
+  lu: ['luxembourg', 'luxembourgish', 'frieden', 'luc frieden'],
+  si: ['slovenia', 'slovenian', 'ljubljana', 'golob', 'robert golob'],
   // ── Asia ───────────────────────────────────────────────────────────────
-  cn: ['china', 'chinese', 'beijing', 'shanghai', 'shenzhen', 'guangzhou', 'hong kong'],
-  jp: ['japan', 'japanese', 'tokyo', 'osaka', 'kyoto', 'yokohama'],
-  in: ['india', 'indian', 'new delhi', 'mumbai', 'bangalore', 'bengaluru', 'chennai', 'kolkata', 'hyderabad'],
-  kr: ['south korea', 'korean', 'korea', 'seoul', 'busan'],
-  sg: ['singapore', 'singaporean'],
-  hk: ['hong kong'],
-  tw: ['taiwan', 'taiwanese', 'taipei'],
-  id: ['indonesia', 'indonesian', 'jakarta', 'bali'],
-  th: ['thailand', 'thai', 'bangkok'],
-  my: ['malaysia', 'malaysian', 'kuala lumpur'],
-  ph: ['philippines', 'philippine', 'filipino', 'manila', 'duterte', 'marcos'],
-  vn: ['vietnam', 'vietnamese', 'hanoi', 'ho chi minh'],
-  pk: ['pakistan', 'pakistani', 'islamabad', 'karachi', 'lahore'],
-  bd: ['bangladesh', 'bangladeshi', 'dhaka'],
-  lk: ['sri lanka', 'sri lankan', 'colombo'],
-  mm: ['myanmar', 'burmese', 'burma', 'yangon', 'naypyidaw'],
-  kh: ['cambodia', 'cambodian', 'phnom penh'],
-  np: ['nepal', 'nepalese', 'nepali', 'kathmandu'],
+  cn: ['china', 'chinese', 'beijing', 'shanghai', 'shenzhen', 'guangzhou', 'hong kong', 'xi jinping', 'xi', 'ccp', 'politburo', 'npc', 'li qiang', 'chengdu', 'wuhan'],
+  jp: ['japan', 'japanese', 'tokyo', 'osaka', 'kyoto', 'yokohama', 'ishiba', 'shigeru ishiba', 'ldp', 'diet', 'abe', 'kishida', 'nagoya'],
+  in: ['india', 'indian', 'new delhi', 'mumbai', 'bangalore', 'bengaluru', 'chennai', 'kolkata', 'hyderabad', 'modi', 'narendra modi', 'bjp', 'gandhi', 'rahul gandhi', 'lok sabha', 'rajya sabha', 'ahmedabad', 'pune'],
+  kr: ['south korea', 'korean', 'korea', 'seoul', 'busan', 'yoon', 'yoon suk-yeol', 'lee jae-myung', 'han duck-soo', 'national assembly', 'incheon', 'gwangju'],
+  sg: ['singapore', 'singaporean', 'lawrence wong', 'lee hsien loong', 'pap', "people's action party"],
+  hk: ['hong kong', 'john lee', 'legco', 'carrie lam', 'basic law'],
+  tw: ['taiwan', 'taiwanese', 'taipei', 'lai ching-te', 'william lai', 'tsai', 'tsai ing-wen', 'kuomintang', 'kmt', 'legislative yuan'],
+  id: ['indonesia', 'indonesian', 'jakarta', 'bali', 'prabowo', 'prabowo subianto', 'jokowi', 'widodo', 'surabaya', 'bandung', 'medan'],
+  th: ['thailand', 'thai', 'bangkok', 'paetongtarn', 'thaksin', 'shinawatra', 'chiang mai', 'pattaya', 'phuket'],
+  my: ['malaysia', 'malaysian', 'kuala lumpur', 'anwar', 'anwar ibrahim', 'putrajaya', 'penang', 'johor', 'najib'],
+  ph: ['philippines', 'philippine', 'filipino', 'manila', 'duterte', 'marcos', 'ferdinand marcos', 'bongbong', 'quezon city', 'davao', 'cebu'],
+  vn: ['vietnam', 'vietnamese', 'hanoi', 'ho chi minh', 'to lam', 'communist party of vietnam', 'haiphong', 'da nang'],
+  pk: ['pakistan', 'pakistani', 'islamabad', 'karachi', 'lahore', 'imran khan', 'sharif', 'shehbaz sharif', 'nawaz', 'pti', 'pmln', 'rawalpindi', 'peshawar'],
+  bd: ['bangladesh', 'bangladeshi', 'dhaka', 'yunus', 'muhammad yunus', 'hasina', 'chittagong', 'sylhet'],
+  lk: ['sri lanka', 'sri lankan', 'colombo', 'dissanayake', 'anura kumara', 'rajapaksa', 'kandy'],
+  mm: ['myanmar', 'burmese', 'burma', 'yangon', 'naypyidaw', 'suu kyi', 'aung san suu kyi', 'tatmadaw', 'min aung hlaing', 'nld'],
+  kh: ['cambodia', 'cambodian', 'phnom penh', 'hun manet', 'hun sen', 'siem reap'],
+  np: ['nepal', 'nepalese', 'nepali', 'kathmandu', 'oli', 'kp sharma oli', 'pokhara'],
   nz: ['new zealand', 'auckland', 'wellington'],
   au: ['australia', 'australian', 'sydney', 'melbourne', 'canberra', 'brisbane', 'perth'],
   fj: ['fiji', 'fijian', 'suva'],
   pg: ['papua new guinea', 'port moresby'],
   // ── Middle East ────────────────────────────────────────────────────────
-  il: ['israel', 'israeli', 'jerusalem', 'tel aviv', 'netanyahu', 'knesset'],
-  ps: ['palestine', 'palestinian', 'gaza', 'west bank', 'ramallah', 'hamas'],
-  ae: ['uae', 'emirates', 'emirati', 'dubai', 'abu dhabi'],
-  sa: ['saudi', 'saudi arabia', 'riyadh', 'jeddah', 'mecca'],
-  tr: ['turkey', 'turkish', 'türkiye', 'ankara', 'istanbul', 'erdogan'],
-  qa: ['qatar', 'qatari', 'doha'],
-  kw: ['kuwait', 'kuwaiti'],
+  il: ['israel', 'israeli', 'jerusalem', 'tel aviv', 'netanyahu', 'knesset', 'idf', 'ben-gvir', 'gallant', 'likud', 'gantz', 'haifa'],
+  ps: ['palestine', 'palestinian', 'gaza', 'west bank', 'ramallah', 'hamas', 'fatah', 'rafah', 'sinwar', 'haniyeh', 'un rwa', 'unrwa'],
+  ae: ['uae', 'emirates', 'emirati', 'dubai', 'abu dhabi', 'mbz', 'mohammed bin zayed', 'adnoc', 'sheikh', 'sharjah'],
+  sa: ['saudi', 'saudi arabia', 'riyadh', 'jeddah', 'mecca', 'mbs', 'mohammed bin salman', 'bin salman', 'aramco', 'neom', 'vision 2030', 'medina'],
+  tr: ['turkey', 'turkish', 'türkiye', 'ankara', 'istanbul', 'erdogan', 'erdoğan', 'akp', 'opposition cHP', 'izmir', 'antalya'],
+  qa: ['qatar', 'qatari', 'doha', 'al thani', 'tamim'],
+  kw: ['kuwait', 'kuwaiti', 'kuwait city'],
   bh: ['bahrain', 'bahraini', 'manama'],
-  om: ['oman', 'omani', 'muscat'],
-  jo: ['jordan', 'jordanian', 'amman'],
-  lb: ['lebanon', 'lebanese', 'beirut', 'hezbollah'],
-  iq: ['iraq', 'iraqi', 'baghdad', 'basra'],
-  ir: ['iran', 'iranian', 'tehran'],
+  om: ['oman', 'omani', 'muscat', 'al said'],
+  jo: ['jordan', 'jordanian', 'amman', 'king abdullah', 'hashemite'],
+  lb: ['lebanon', 'lebanese', 'beirut', 'hezbollah', 'nasrallah', 'aoun', 'salam'],
+  iq: ['iraq', 'iraqi', 'baghdad', 'basra', 'mosul', 'erbil', 'kurdistan', 'al-sudani'],
+  ir: ['iran', 'iranian', 'tehran', 'khamenei', 'supreme leader', 'irgc', 'pezeshkian', 'nuclear deal', 'isfahan', 'mashhad'],
   // ── Africa ─────────────────────────────────────────────────────────────
-  za: ['south africa', 'south african', 'johannesburg', 'cape town', 'pretoria', 'durban'],
-  ng: ['nigeria', 'nigerian', 'lagos', 'abuja'],
-  eg: ['egypt', 'egyptian', 'cairo', 'alexandria'],
-  ke: ['kenya', 'kenyan', 'nairobi', 'mombasa'],
-  ma: ['morocco', 'moroccan', 'rabat', 'casablanca', 'marrakech'],
-  gh: ['ghana', 'ghanaian', 'accra'],
-  et: ['ethiopia', 'ethiopian', 'addis ababa'],
-  tz: ['tanzania', 'tanzanian', 'dar es salaam', 'dodoma'],
-  ug: ['uganda', 'ugandan', 'kampala'],
-  sn: ['senegal', 'senegalese', 'dakar'],
-  ci: ['ivory coast', "cote d'ivoire", 'ivorian', 'abidjan'],
-  cm: ['cameroon', 'cameroonian', 'yaoundé', 'yaounde', 'douala'],
-  dz: ['algeria', 'algerian', 'algiers'],
-  tn: ['tunisia', 'tunisian', 'tunis'],
-  rw: ['rwanda', 'rwandan', 'kigali'],
-  ru: ['russia', 'russian', 'moscow', 'kremlin', 'putin', 'st. petersburg', 'saint petersburg'],
+  za: ['south africa', 'south african', 'johannesburg', 'cape town', 'pretoria', 'durban', 'ramaphosa', 'cyril ramaphosa', 'anc', 'da', 'eff', 'zuma', 'port elizabeth'],
+  ng: ['nigeria', 'nigerian', 'lagos', 'abuja', 'tinubu', 'bola tinubu', 'buhari', 'kano', 'ibadan', 'national assembly', 'kaduna'],
+  eg: ['egypt', 'egyptian', 'cairo', 'alexandria', 'sisi', 'el-sisi', 'abdel fattah', 'suez canal', 'suez', 'giza'],
+  ke: ['kenya', 'kenyan', 'nairobi', 'mombasa', 'ruto', 'william ruto', 'kenyatta', 'odinga', 'kisumu'],
+  ma: ['morocco', 'moroccan', 'rabat', 'casablanca', 'marrakech', 'mohammed vi', 'tangier', 'fez'],
+  gh: ['ghana', 'ghanaian', 'accra', 'mahama', 'john mahama', 'akufo-addo', 'kumasi'],
+  et: ['ethiopia', 'ethiopian', 'addis ababa', 'abiy', 'abiy ahmed', 'tigray', 'oromo', 'dire dawa'],
+  tz: ['tanzania', 'tanzanian', 'dar es salaam', 'dodoma', 'hassan', 'samia hassan', 'zanzibar'],
+  ug: ['uganda', 'ugandan', 'kampala', 'museveni', 'yoweri museveni', 'entebbe'],
+  sn: ['senegal', 'senegalese', 'dakar', 'faye', 'bassirou diomaye faye', 'sonko', 'thiès'],
+  ci: ['ivory coast', "cote d'ivoire", 'ivorian', 'abidjan', 'ouattara', 'alassane ouattara', 'yamoussoukro'],
+  cm: ['cameroon', 'cameroonian', 'yaoundé', 'yaounde', 'douala', 'biya', 'paul biya'],
+  dz: ['algeria', 'algerian', 'algiers', 'tebboune', 'abdelmadjid tebboune', 'oran'],
+  tn: ['tunisia', 'tunisian', 'tunis', 'saied', 'kais saied', 'sfax'],
+  rw: ['rwanda', 'rwandan', 'kigali', 'kagame', 'paul kagame'],
+  ru: ['russia', 'russian', 'moscow', 'kremlin', 'putin', 'st. petersburg', 'saint petersburg', 'lavrov', 'medvedev', 'duma', 'navalny', 'novosibirsk'],
 };
 
 // Demonyms used to build tighter search queries that pair the adjective with category terms.
@@ -683,6 +711,13 @@ const ASIA_COUNTRIES = new Set([
   'pk', 'bd', 'lk', 'mm', 'kh', 'np',
 ]);
 
+// Latin American countries covered by MercoPress RSS feed.
+// Covers all of South America + Mexico + Central America.
+const LATAM_COUNTRIES = new Set([
+  'br', 'ar', 'cl', 'co', 'pe', 've', 'ec', 'uy', 'py', 'bo', 'mx',
+  'cr', 'pa', 'gt', 'hn', 'cu', 'do',
+]);
+
 // RSS feed registry — each entry is fetched for applicable countries and merged
 // into the article pool alongside API sources. Errors are caught and skipped.
 //
@@ -713,6 +748,26 @@ const RSS_SOURCES = [
     // and swap in a more targeted URL if available.
     url: process.env.NIKKEI_RSS_URL || 'https://asia.nikkei.com/rss/feed/nar',
     countries: ASIA_COUNTRIES,
+  },
+  {
+    name: 'MercoPress',
+    domain: 'mercopress.com',
+    // English-language news agency covering all of South America and the wider
+    // Latin America/Caribbean region. Free RSS feed, no paywall.
+    // TODO: confirm accessible from your host. Alternative feed paths:
+    //   https://en.mercopress.com/rss.xml
+    //   https://en.mercopress.com/news/rss
+    url: process.env.MERCOPRESS_RSS_URL || 'https://en.mercopress.com/rss.xml',
+    countries: LATAM_COUNTRIES,
+  },
+  {
+    name: 'Daily Maverick',
+    domain: 'dailymaverick.co.za',
+    // South Africa's leading independent investigative outlet. Covers the full
+    // African continent with strong political/business reporting in English.
+    // TODO: confirm accessible from your host.
+    url: process.env.DAILYMAVERICK_RSS_URL || 'https://www.dailymaverick.co.za/dmrss/',
+    countries: new Set(['za', 'ng', 'ke', 'gh', 'et', 'tz', 'ug', 'sn', 'ci', 'cm', 'dz', 'tn', 'rw', 'eg', 'ma']),
   },
 ];
 
@@ -814,6 +869,15 @@ const SOURCE_AUTHORITY_TIER = {
   'espn.com': 2, 'scmp.com': 2, 'theconversation.com': 2,
   'timesofindia.indiatimes.com': 2, 'thehindu.com': 2,
   'caixinglobal.com': 2, 'asia.nikkei.com': 2,
+  // Tier 2 — strong regional/national outlets (supplemental countries)
+  'dailymaverick.co.za': 2, 'koreaherald.com': 2, 'channelnewsasia.com': 2,
+  'kyivindependent.com': 2, 'timesofisrael.com': 2, 'arabnews.com': 2,
+  'thenationalnews.com': 2, 'bangkokpost.com': 2, 'mercopress.com': 2,
+  // Tier 1 — quality regionals (default tier, listed explicitly for clarity)
+  'brazilianreport.com': 1, 'batimes.com.ar': 1, 'mexiconewsdaily.com': 1,
+  'businessday.ng': 1, 'nation.africa': 1, 'africanews.com': 1,
+  'middleeasteye.net': 1, 'jakartaglobe.id': 1, 'inquirer.net': 1,
+  'rappler.com': 1, 'notesfrompoland.com': 1, 'meduza.io': 1,
 };
 
 // Normalise a source name or URL to a domain key for tier lookup
@@ -2542,8 +2606,16 @@ async function fetchCountryCategoryPair(country, category, ctx) {
     }
   }
 
+  // Track which secondary sources were consulted so the post-filter retry
+  // (Option A) can call only the ones that were skipped by the raw-count gate.
+  const calledSources = new Set(['newsapi']);
+
   // ── 2. WorldNewsAPI (secondary, very broad) ───────────────────────────
-  if (formattedArticles.length < 30 && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) {
+  // Gate lowered from 30 → 15: a raw count of 15 NewsAPI articles may still
+  // collapse to far fewer after category+country filtering, so we always
+  // probe WorldNewsAPI unless we already have a healthy raw buffer.
+  if (formattedArticles.length < 15 && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) {
+    calledSources.add('worldnews');
     console.log(`  [2] WorldNewsAPI [${country}/${category}] (have ${formattedArticles.length} so far)`);
     try {
       const raw = await fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort });
@@ -2555,7 +2627,8 @@ async function fetchCountryCategoryPair(country, category, ctx) {
   }
 
   // ── 3. NewsData.io (tertiary, broadest coverage) ──────────────────────
-  if (formattedArticles.length < 30 && NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
+  if (formattedArticles.length < 15 && NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
+    calledSources.add('newsdata');
     console.log(`  [3] NewsData.io [${country}/${category}] (have ${formattedArticles.length} so far)`);
     try {
       const raw = await fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly });
@@ -2570,7 +2643,8 @@ async function fetchCountryCategoryPair(country, category, ctx) {
   // ── 4. The Guardian — always tried for AU/GB/US (dedicated country sections),
   //    and as a fallback for all others when we still need more raw articles.
   const guardianPriorityCountry = country === 'au' || country === 'gb' || country === 'us';
-  if (GUARDIAN_API_KEY && (guardianPriorityCountry || formattedArticles.length < 30)) {
+  if (GUARDIAN_API_KEY && (guardianPriorityCountry || formattedArticles.length < 15)) {
+    calledSources.add('guardian');
     console.log(`  [4] Guardian [${country}/${category}] (have ${formattedArticles.length} so far)`);
     try {
       const results = await fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: fromDateOnly });
@@ -2581,7 +2655,7 @@ async function fetchCountryCategoryPair(country, category, ctx) {
     }
   }
 
-  // ── 5. RSS feeds (Caixin Global, Nikkei Asia, …) ─────────────────────
+  // ── 5. RSS feeds (Caixin Global, Nikkei Asia, MercoPress, Daily Maverick …) ─────────────────────
   {
     const applicableFeeds = RSS_SOURCES.filter(f => {
       if (!f.url || !f.countries.has(country)) return false;
@@ -2606,7 +2680,8 @@ async function fetchCountryCategoryPair(country, category, ctx) {
   }
 
   // ── 6. GNews (extra fallback - broad country+category support) ────────
-  if (formattedArticles.length < 30 && GNEWS_API_KEY) {
+  if (formattedArticles.length < 15 && GNEWS_API_KEY) {
+    calledSources.add('gnews');
     console.log(`  [6] GNews [${country}/${category}] (have ${formattedArticles.length} so far)`);
     try {
       const raw = await fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort });
@@ -2656,6 +2731,74 @@ async function fetchCountryCategoryPair(country, category, ctx) {
       console.log(`  Country filter: ${relevant.length} relevant + ${Math.min(needed, filler.length)} filler for [${country}]`);
     }
     console.log(`  Country filter: ${relevant.length} relevant of ${scored.length} for [${country}]`);
+  }
+
+  // ── Post-filter source retry (Option A) ────────────────────────────────
+  // The waterfall above stops calling secondary sources once raw article count
+  // reaches 15. But for underserved countries (e.g. Brazil, Nigeria, Turkey)
+  // those 15 raw articles can collapse to 2–5 after category+country filtering.
+  // If that happens, call any sources that were skipped by the raw-count gate,
+  // giving the pipeline a second chance to gather more relevant material.
+  if (formattedArticles.length < MIN_ARTICLES) {
+    console.log(`  Post-filter retry: only ${formattedArticles.length} relevant — calling skipped sources`);
+    const existingUrls = new Set(formattedArticles.map(a => a.url));
+    const retryPromises = [];
+
+    if (!calledSources.has('worldnews') && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) {
+      retryPromises.push(
+        fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort })
+          .then(raw => raw.map(a => formatWorldNewsAPIArticle(a, country, category)))
+          .catch(() => [])
+      );
+    }
+    if (!calledSources.has('newsdata') && NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
+      retryPromises.push(
+        fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly })
+          .then(raw => raw.filter(a => a.title && a.title !== '[Removed]').map(a => formatNewsDataArticle(a, country, category)))
+          .catch(() => [])
+      );
+    }
+    if (!calledSources.has('guardian') && GUARDIAN_API_KEY) {
+      retryPromises.push(
+        fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: fromDateOnly })
+          .then(r => r.map(r => formatGuardianArticle(r, country, category)))
+          .catch(() => [])
+      );
+    }
+    if (!calledSources.has('gnews') && GNEWS_API_KEY) {
+      retryPromises.push(
+        fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort })
+          .then(raw => raw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category)))
+          .catch(() => [])
+      );
+    }
+
+    if (retryPromises.length > 0) {
+      const retryResults = await Promise.all(retryPromises);
+      let retryArticles = retryResults.flat().filter(a => !existingUrls.has(a.url));
+
+      // Apply same category + country filters to retry batch
+      retryArticles = retryArticles.filter(a => {
+        if (articleMatchesCategory(a, category)) return true;
+        if (country !== 'world') {
+          const { inTitle } = articleMentionsCountry(a, country);
+          return inTitle;
+        }
+        return false;
+      });
+      if (country !== 'world') {
+        retryArticles = retryArticles.filter(a => {
+          const score = articleCountryScore(a, country, category);
+          a._countryScore = score;
+          return score > 0;
+        });
+      }
+
+      if (retryArticles.length > 0) {
+        formattedArticles = [...formattedArticles, ...retryArticles];
+        console.log(`  Post-filter retry: added ${retryArticles.length} articles (total now ${formattedArticles.length})`);
+      }
+    }
   }
 
   // ── Time-window backfill ─────────────────────────────────────────────
