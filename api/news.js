@@ -149,56 +149,118 @@ function buildTrustedSourceIds(userDomains) {
 const TRUSTED_DOMAINS = buildTrustedDomains(null);
 const TRUSTED_SOURCE_IDS = buildTrustedSourceIds(null);
 
-// Keywords/demonyms for relevance filtering — articles must mention at least one term
+// Keywords/demonyms for relevance filtering — articles must mention at least one term.
+// Includes country name, demonyms, abbreviations, capital cities, and major cities.
+// City names are strong relevance signals (e.g. "Tokyo" → Japan, "Berlin" → Germany).
 const COUNTRY_RELEVANCE_KEYWORDS = {
-  us: ['united states', 'america', 'american', 'u.s.', ' us '],
-  gb: ['united kingdom', 'britain', 'british', ' uk ', 'england', 'scotland', 'wales'],
-  au: ['australia', 'australian'],
-  ca: ['canada', 'canadian'],
-  de: ['germany', 'german'],
-  fr: ['france', 'french'],
-  jp: ['japan', 'japanese'],
-  cn: ['china', 'chinese'],
-  in: ['india', 'indian'],
-  kr: ['korea', 'korean', 'south korea'],
-  br: ['brazil', 'brazilian'],
-  mx: ['mexico', 'mexican'],
-  it: ['italy', 'italian'],
-  es: ['spain', 'spanish'],
-  nl: ['netherlands', 'dutch'],
-  se: ['sweden', 'swedish'],
-  no: ['norway', 'norwegian'],
-  pl: ['poland', 'polish'],
-  ch: ['switzerland', 'swiss'],
-  be: ['belgium', 'belgian'],
-  at: ['austria', 'austrian'],
-  ie: ['ireland', 'irish'],
-  pt: ['portugal', 'portuguese'],
-  dk: ['denmark', 'danish'],
-  fi: ['finland', 'finnish'],
-  gr: ['greece', 'greek'],
-  nz: ['new zealand'],
-  sg: ['singapore'],
+  // ── North America ──────────────────────────────────────────────────────
+  us: ['united states', 'america', 'american', 'u.s.', ' us ', 'washington d.c.', 'new york', 'los angeles', 'chicago', 'houston', 'san francisco', 'silicon valley'],
+  ca: ['canada', 'canadian', 'ottawa', 'toronto', 'vancouver', 'montreal', 'calgary'],
+  mx: ['mexico', 'mexican', 'mexico city', 'guadalajara', 'monterrey'],
+  cu: ['cuba', 'cuban', 'havana'],
+  jm: ['jamaica', 'jamaican', 'kingston'],
+  cr: ['costa rica', 'costa rican', 'san jose'],
+  pa: ['panama', 'panamanian', 'panama city'],
+  do: ['dominican republic', 'dominican', 'santo domingo'],
+  gt: ['guatemala', 'guatemalan', 'guatemala city'],
+  hn: ['honduras', 'honduran', 'tegucigalpa'],
+  // ── South America ──────────────────────────────────────────────────────
+  br: ['brazil', 'brazilian', 'brasilia', 'são paulo', 'sao paulo', 'rio de janeiro'],
+  ar: ['argentina', 'argentinian', 'argentine', 'buenos aires'],
+  cl: ['chile', 'chilean', 'santiago'],
+  co: ['colombia', 'colombian', 'bogota', 'bogotá', 'medellin', 'medellín'],
+  pe: ['peru', 'peruvian', 'lima'],
+  ve: ['venezuela', 'venezuelan', 'caracas'],
+  ec: ['ecuador', 'ecuadorian', 'quito', 'guayaquil'],
+  uy: ['uruguay', 'uruguayan', 'montevideo'],
+  py: ['paraguay', 'paraguayan', 'asuncion', 'asunción'],
+  bo: ['bolivia', 'bolivian', 'la paz', 'sucre'],
+  // ── Europe ─────────────────────────────────────────────────────────────
+  gb: ['united kingdom', 'britain', 'british', ' uk ', 'england', 'scotland', 'wales', 'london', 'manchester', 'birmingham', 'edinburgh', 'westminster', 'downing street'],
+  de: ['germany', 'german', 'berlin', 'munich', 'frankfurt', 'hamburg', 'bundestag'],
+  fr: ['france', 'french', 'paris', 'marseille', 'lyon', 'élysée', 'elysee'],
+  it: ['italy', 'italian', 'rome', 'milan', 'naples', 'turin'],
+  es: ['spain', 'spanish', 'madrid', 'barcelona', 'seville'],
+  nl: ['netherlands', 'dutch', 'amsterdam', 'rotterdam', 'the hague', 'den haag'],
+  se: ['sweden', 'swedish', 'stockholm', 'gothenburg'],
+  no: ['norway', 'norwegian', 'oslo', 'bergen'],
+  pl: ['poland', 'polish', 'warsaw', 'krakow', 'kraków', 'gdansk'],
+  ch: ['switzerland', 'swiss', 'bern', 'zurich', 'zürich', 'geneva', 'davos'],
+  be: ['belgium', 'belgian', 'brussels', 'antwerp'],
+  at: ['austria', 'austrian', 'vienna', 'salzburg'],
+  ie: ['ireland', 'irish', 'dublin', 'cork'],
+  pt: ['portugal', 'portuguese', 'lisbon', 'porto'],
+  dk: ['denmark', 'danish', 'copenhagen'],
+  fi: ['finland', 'finnish', 'helsinki'],
+  gr: ['greece', 'greek', 'athens', 'thessaloniki'],
+  cz: ['czech republic', 'czech', 'czechia', 'prague'],
+  ro: ['romania', 'romanian', 'bucharest'],
+  hu: ['hungary', 'hungarian', 'budapest'],
+  ua: ['ukraine', 'ukrainian', 'kyiv', 'kiev', 'odesa', 'odessa', 'kharkiv', 'lviv', 'zelenskyy', 'zelensky'],
+  rs: ['serbia', 'serbian', 'belgrade'],
+  hr: ['croatia', 'croatian', 'zagreb'],
+  bg: ['bulgaria', 'bulgarian', 'sofia'],
+  sk: ['slovakia', 'slovak', 'bratislava'],
+  lt: ['lithuania', 'lithuanian', 'vilnius'],
+  lv: ['latvia', 'latvian', 'riga'],
+  ee: ['estonia', 'estonian', 'tallinn'],
+  is: ['iceland', 'icelandic', 'reykjavik', 'reykjavík'],
+  lu: ['luxembourg', 'luxembourgish'],
+  si: ['slovenia', 'slovenian', 'ljubljana'],
+  // ── Asia ───────────────────────────────────────────────────────────────
+  cn: ['china', 'chinese', 'beijing', 'shanghai', 'shenzhen', 'guangzhou', 'hong kong'],
+  jp: ['japan', 'japanese', 'tokyo', 'osaka', 'kyoto', 'yokohama'],
+  in: ['india', 'indian', 'new delhi', 'mumbai', 'bangalore', 'bengaluru', 'chennai', 'kolkata', 'hyderabad'],
+  kr: ['south korea', 'korean', 'korea', 'seoul', 'busan'],
+  sg: ['singapore', 'singaporean'],
   hk: ['hong kong'],
-  tw: ['taiwan', 'taiwanese'],
-  za: ['south africa', 'south african'],
-  ng: ['nigeria', 'nigerian'],
-  eg: ['egypt', 'egyptian'],
-  ke: ['kenya', 'kenyan'],
-  tr: ['turkey', 'turkish'],
-  il: ['israel', 'israeli'],
-  ps: ['palestine', 'palestinian', 'gaza', 'west bank', 'ramallah'],
-  ae: ['uae', 'emirates', 'emirati'],
-  sa: ['saudi', 'saudi arabia'],
-  ar: ['argentina', 'argentinian'],
-  cl: ['chile', 'chilean'],
-  co: ['colombia', 'colombian'],
-  id: ['indonesia', 'indonesian'],
-  th: ['thailand', 'thai'],
-  my: ['malaysia', 'malaysian'],
-  ph: ['philippines', 'philippine', 'filipino'],
-  vn: ['vietnam', 'vietnamese'],
-  pk: ['pakistan', 'pakistani'],
+  tw: ['taiwan', 'taiwanese', 'taipei'],
+  id: ['indonesia', 'indonesian', 'jakarta', 'bali'],
+  th: ['thailand', 'thai', 'bangkok'],
+  my: ['malaysia', 'malaysian', 'kuala lumpur'],
+  ph: ['philippines', 'philippine', 'filipino', 'manila', 'duterte', 'marcos'],
+  vn: ['vietnam', 'vietnamese', 'hanoi', 'ho chi minh'],
+  pk: ['pakistan', 'pakistani', 'islamabad', 'karachi', 'lahore'],
+  bd: ['bangladesh', 'bangladeshi', 'dhaka'],
+  lk: ['sri lanka', 'sri lankan', 'colombo'],
+  mm: ['myanmar', 'burmese', 'burma', 'yangon', 'naypyidaw'],
+  kh: ['cambodia', 'cambodian', 'phnom penh'],
+  np: ['nepal', 'nepalese', 'nepali', 'kathmandu'],
+  nz: ['new zealand', 'auckland', 'wellington'],
+  au: ['australia', 'australian', 'sydney', 'melbourne', 'canberra', 'brisbane', 'perth'],
+  fj: ['fiji', 'fijian', 'suva'],
+  pg: ['papua new guinea', 'port moresby'],
+  // ── Middle East ────────────────────────────────────────────────────────
+  il: ['israel', 'israeli', 'jerusalem', 'tel aviv', 'netanyahu', 'knesset'],
+  ps: ['palestine', 'palestinian', 'gaza', 'west bank', 'ramallah', 'hamas'],
+  ae: ['uae', 'emirates', 'emirati', 'dubai', 'abu dhabi'],
+  sa: ['saudi', 'saudi arabia', 'riyadh', 'jeddah', 'mecca'],
+  tr: ['turkey', 'turkish', 'türkiye', 'ankara', 'istanbul', 'erdogan'],
+  qa: ['qatar', 'qatari', 'doha'],
+  kw: ['kuwait', 'kuwaiti'],
+  bh: ['bahrain', 'bahraini', 'manama'],
+  om: ['oman', 'omani', 'muscat'],
+  jo: ['jordan', 'jordanian', 'amman'],
+  lb: ['lebanon', 'lebanese', 'beirut', 'hezbollah'],
+  iq: ['iraq', 'iraqi', 'baghdad', 'basra'],
+  ir: ['iran', 'iranian', 'tehran'],
+  // ── Africa ─────────────────────────────────────────────────────────────
+  za: ['south africa', 'south african', 'johannesburg', 'cape town', 'pretoria', 'durban'],
+  ng: ['nigeria', 'nigerian', 'lagos', 'abuja'],
+  eg: ['egypt', 'egyptian', 'cairo', 'alexandria'],
+  ke: ['kenya', 'kenyan', 'nairobi', 'mombasa'],
+  ma: ['morocco', 'moroccan', 'rabat', 'casablanca', 'marrakech'],
+  gh: ['ghana', 'ghanaian', 'accra'],
+  et: ['ethiopia', 'ethiopian', 'addis ababa'],
+  tz: ['tanzania', 'tanzanian', 'dar es salaam', 'dodoma'],
+  ug: ['uganda', 'ugandan', 'kampala'],
+  sn: ['senegal', 'senegalese', 'dakar'],
+  ci: ['ivory coast', "cote d'ivoire", 'ivorian', 'abidjan'],
+  cm: ['cameroon', 'cameroonian', 'yaoundé', 'yaounde', 'douala'],
+  dz: ['algeria', 'algerian', 'algiers'],
+  tn: ['tunisia', 'tunisian', 'tunis'],
+  rw: ['rwanda', 'rwandan', 'kigali'],
+  ru: ['russia', 'russian', 'moscow', 'kremlin', 'putin', 'st. petersburg', 'saint petersburg'],
 };
 
 // Demonyms used to build tighter search queries that pair the adjective with category terms.
@@ -315,15 +377,59 @@ function getCountryTerms(country) {
   return name ? [name.toLowerCase()] : [country.toLowerCase()];
 }
 
-// Check if country is mentioned in the article title (strict) or title+description (loose)
+// Check if country is mentioned in the article title (strict) or title+description (loose).
+// Returns match details including frequency count for richer scoring.
 function articleMentionsCountry(article, country) {
   const terms = getCountryTerms(country);
   const title = (article.title || '').toLowerCase();
-  const text = `${title} ${article.description || ''}`.toLowerCase();
-  return {
-    inTitle: terms.some(term => title.includes(term)),
-    inText:  terms.some(term => text.includes(term)),
-  };
+  const desc = (article.description || '').toLowerCase();
+  const content = (article.content || '').toLowerCase();
+  const text = `${title} ${desc}`;
+  const fullText = `${text} ${content}`;
+
+  const inTitle = terms.some(term => title.includes(term));
+  const inText  = terms.some(term => text.includes(term));
+
+  // Count how many distinct terms match across title + description + content.
+  // More distinct matches = stronger relevance (e.g. "Australia" + "Sydney" + "Australian").
+  let termHits = 0;
+  for (const term of terms) {
+    if (fullText.includes(term)) termHits++;
+  }
+
+  return { inTitle, inText, termHits };
+}
+
+// Compute a nuanced country relevance score (0-8) for an article.
+// Uses multiple signals:
+//   - Title mention:  strong signal (+4)
+//   - Body mention:   weaker signal (+2)
+//   - Term frequency: bonus for multiple distinct term matches (+1 per extra, max +2)
+//   - Meta country:   domain/source country match (+2, but NOT for international wire services)
+function articleCountryScore(article, country) {
+  const { inTitle, inText, termHits } = articleMentionsCountry(article, country);
+  let score = 0;
+
+  // Text-based signals
+  if (inTitle) score += 4;
+  else if (inText) score += 2;
+
+  // Frequency bonus: multiple distinct terms matching is a strong signal
+  // (e.g. "Tokyo" + "Japan" + "Japanese" = 3 hits → +2 bonus)
+  if (termHits >= 3) score += 2;
+  else if (termHits >= 2) score += 1;
+
+  // Meta-country signal: the source's home country matches
+  const metaCountry = article._meta?.sourceCountry;
+  if (metaCountry === country) {
+    // International sources (Reuters, AP, BBC) cover all countries — their HQ country
+    // should not inflate the score. Only give the bonus to national outlets.
+    if (!isInternationalSource(article)) {
+      score += 2;
+    }
+  }
+
+  return Math.min(score, 8); // cap at 8 to match Signal 6 range
 }
 
 // Build a nationally-focused search query for /v2/everything.
@@ -752,14 +858,15 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
     const catScore = maxCatRelevance * 8;
 
     // ── Signal 6: Country Relevance (0-8) ──
-    // Derived from the score computed in the country filter:
-    //   6 = in title + meta match (most relevant)
-    //   4 = in title only
-    //   2 = in body/description only
+    // Derived from articleCountryScore() which returns 0-8:
+    //   8 = title mention + multiple term hits + national source (strongest)
+    //   6 = title mention + frequency bonus or national source
+    //   4 = title mention only
+    //   2 = body/description mention only
     //   0 = not mentioned (passed via filler path)
     //  -1 = not set (world query — use neutral midpoint to avoid penalising)
-    const bestCountryRel = best.countryRel;
-    const countryRelScore = bestCountryRel === -1 ? 4 : (bestCountryRel / 6) * 8;
+    const bestCountryRel = Math.max(...cluster.map(c => c.countryRel));
+    const countryRelScore = bestCountryRel === -1 ? 4 : bestCountryRel;
 
     // ── Signal 7: Keyword Relevance (0-10) ──
     // Only active during keyword searches. Strongly boosts articles where
@@ -1588,8 +1695,19 @@ const TLD_TO_COUNTRY = {
   cz: 'cz', rs: 'rs', hr: 'hr', bg: 'bg', sk: 'sk', ps: 'ps',
 };
 
+// International wire services and global outlets — these cover ALL countries
+// and should NOT give a meta-country boost to their HQ country. Articles from
+// reuters.com about India should not get +2 for UK just because Reuters is UK-based.
+const INTERNATIONAL_SOURCES = new Set([
+  'reuters.com', 'apnews.com', 'bbc.co.uk', 'bbc.com',
+  'aljazeera.com', 'france24.com', 'dw.com',
+  'theconversation.com',
+]);
+
 // Map well-known source domains to their home countries.
 // More reliable than TLD for domains like aljazeera.com (Qatar-based, English service).
+// NOTE: International sources are still mapped here (needed for non-country queries),
+// but the country scoring logic treats them differently — see articleCountryScore().
 const DOMAIN_TO_COUNTRY = {
   'reuters.com': 'gb',   'bbc.co.uk': 'gb',     'bbc.com': 'gb',
   'theguardian.com': 'gb', 'ft.com': 'gb',       'economist.com': 'gb',
@@ -1631,13 +1749,22 @@ function inferCountryFromUrl(url) {
     const parts = hostname.split('.');
     const tld = parts[parts.length - 1];
     if (TLD_TO_COUNTRY[tld]) return TLD_TO_COUNTRY[tld];
-    // Handle .co.uk, .com.au etc.
+    // Handle compound TLDs: .co.uk, .com.au, .co.nz, .co.jp, .com.br etc.
+    // The country code is the last part; the second-to-last is the generic (.co, .com)
     if (parts.length >= 3) {
-      const secondLevel = parts[parts.length - 1];
-      if (TLD_TO_COUNTRY[secondLevel]) return TLD_TO_COUNTRY[secondLevel];
+      const secondToLast = parts[parts.length - 2];
+      if ((secondToLast === 'co' || secondToLast === 'com' || secondToLast === 'org' || secondToLast === 'net') && TLD_TO_COUNTRY[tld]) {
+        return TLD_TO_COUNTRY[tld];
+      }
     }
   } catch {}
   return null;
+}
+
+// Check if a source domain is an international/wire service
+function isInternationalSource(article) {
+  const domain = getSourceDomain(article);
+  return INTERNATIONAL_SOURCES.has(domain);
 }
 
 // Formatters — normalise each API's shape to our app format.
@@ -1969,17 +2096,16 @@ export default async function handler(req, res) {
       // ── Country relevance scoring ─────────────────────────────────────
       // When user has country filters active, score each article for
       // country relevance so Signal 6 can rank them appropriately.
+      // Uses articleCountryScore() which considers title mentions, body mentions,
+      // term frequency, and source-country metadata (wire service aware).
       if (hasCountryFilter) {
         results = results.map(a => {
-          let score = 0;
+          let bestScore = 0;
           for (const country of countryList) {
-            const { inTitle, inText } = articleMentionsCountry(a, country);
-            if (inTitle) { score = Math.max(score, 4); }
-            else if (inText) { score = Math.max(score, 2); }
-            const metaCountry = a._meta?.sourceCountry;
-            if (metaCountry === country) score = Math.min(score + 2, 6);
+            const score = articleCountryScore(a, country);
+            bestScore = Math.max(bestScore, score);
           }
-          a._countryScore = score;
+          a._countryScore = bestScore;
           return a;
         });
       }
@@ -1990,7 +2116,7 @@ export default async function handler(req, res) {
         category: categoryList.length === 1 ? categoryList[0] : null,
         searchTerms,
       });
-      const clean = ranked.map(({ _meta, _coverage, ...rest }) => rest);
+      const clean = ranked.map(({ _meta, _coverage, _countryScore, _matchesCategory, ...rest }) => rest);
 
       // AI summaries for top 5 ranked articles
       if (HAS_LLM && clean.length > 0) {
@@ -2126,7 +2252,7 @@ export default async function handler(req, res) {
     const rankedArticles = rankAndDeduplicateArticles(allArticles, { usePopularity: usePopularitySort, category: singleCategory });
 
     // Strip internal fields before sending to the client
-    const cleanArticles = rankedArticles.map(({ _meta, _coverage, ...rest }) => rest);
+    const cleanArticles = rankedArticles.map(({ _meta, _coverage, _countryScore, _matchesCategory, ...rest }) => rest);
 
     // AI summaries for the TOP 5 final ranked articles only.
     // Previously summaries were generated per-pair BEFORE ranking, wasting LLM calls
@@ -2280,15 +2406,13 @@ async function fetchCountryCategoryPair(country, category, ctx) {
   }
 
   // ── Country relevance filter (multi-signal) ─────────────────────────
+  // Uses articleCountryScore() which considers title mentions, body mentions,
+  // term frequency (multiple distinct keywords), and source-country metadata
+  // (with special handling for international wire services).
   const MIN_ARTICLES = 10;
   if (country !== 'world' && formattedArticles.length > 0) {
     const scored = formattedArticles.map(a => {
-      let score = 0;
-      const { inTitle, inText } = articleMentionsCountry(a, country);
-      if (inTitle) score += 4;
-      else if (inText) score += 2;
-      const metaCountry = a._meta?.sourceCountry;
-      if (metaCountry === country) score += 2;
+      const score = articleCountryScore(a, country);
       a._countryScore = score;
       return { article: a, score };
     });
@@ -2355,11 +2479,7 @@ async function fetchCountryCategoryPair(country, category, ctx) {
       backfill = backfill.filter(a => !existingUrls.has(a.url));
 
       if (country !== 'world') {
-        backfill = backfill.filter(a => {
-          const { inTitle, inText } = articleMentionsCountry(a, country);
-          const metaCountry = a._meta?.sourceCountry;
-          return inTitle || inText || metaCountry === country;
-        });
+        backfill = backfill.filter(a => articleCountryScore(a, country) > 0);
       }
 
       if (backfill.length > 0) {
@@ -2372,7 +2492,7 @@ async function fetchCountryCategoryPair(country, category, ctx) {
   }
 
   // Strip _meta before caching so cached responses are clean
-  const cleanForCache = formattedArticles.map(({ _meta, ...rest }) => rest);
+  const cleanForCache = formattedArticles.map(({ _meta, _countryScore, ...rest }) => rest);
   CACHE[cacheKey] = { timestamp: Date.now(), articles: cleanForCache };
   return cleanForCache;
 }
