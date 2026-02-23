@@ -86,6 +86,9 @@ export default function Home() {
   const [selectedSources, setSelectedSources] = useState<string[]>(() =>
     getStoredList('selectedSources', [])
   );
+  const [showNonEnglish, setShowNonEnglish] = useState<boolean>(() =>
+    localStorage.getItem('showNonEnglish') === 'true'
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState('24h');
   const [articles, setArticles] = useState([]);
@@ -107,6 +110,10 @@ export default function Home() {
   useEffect(() => {
     localStorage.setItem('selectedSources', JSON.stringify(selectedSources));
   }, [selectedSources]);
+
+  useEffect(() => {
+    localStorage.setItem('showNonEnglish', String(showNonEnglish));
+  }, [showNonEnglish]);
 
   // Ref for aborting in-flight requests when filters change
   const abortControllerRef = React.useRef<AbortController | null>(null);
@@ -134,6 +141,7 @@ export default function Home() {
         searchQuery,
         dateRange,
         sources: selectedSources.length > 0 ? selectedSources : undefined,
+        language: showNonEnglish ? 'all' : 'en',
       });
 
       // If this request was aborted while in flight, discard the result
@@ -209,6 +217,8 @@ export default function Home() {
           setDateRange={setDateRange}
           selectedSources={selectedSources}
           setSelectedSources={setSelectedSources}
+          showNonEnglish={showNonEnglish}
+          setShowNonEnglish={setShowNonEnglish}
         />
       </aside>
 
@@ -235,6 +245,8 @@ export default function Home() {
                     setSearchQuery={setSearchQuery}
                     dateRange={dateRange}
                     setDateRange={setDateRange}
+                    showNonEnglish={showNonEnglish}
+                    setShowNonEnglish={setShowNonEnglish}
                   />
                 </SheetContent>
               </Sheet>
