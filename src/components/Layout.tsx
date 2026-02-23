@@ -63,7 +63,7 @@ export default function Layout({ children, currentPageName }: { children: React.
             {navItems.map((item) => {
               const Icon = item.icon;
               return (
-                <div key={item.page} className="relative">
+                <div key={item.page} className="relative group/navitem">
                   <Link
                     to={item.page}
                     className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
@@ -71,10 +71,13 @@ export default function Layout({ children, currentPageName }: { children: React.
                         ? 'bg-white text-slate-900'
                         : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                     }`}
-                    title={item.name}
                   >
                     <Icon className="w-5 h-5" />
                   </Link>
+                  {/* Hover tooltip — appears to the right of the icon */}
+                  <span className="pointer-events-none absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1 text-xs font-medium text-white bg-slate-700 rounded-lg opacity-0 group-hover/navitem:opacity-100 transition-opacity duration-150 whitespace-nowrap z-50 shadow-lg">
+                    {item.name}
+                  </span>
                   {item.isPremium && (
                     <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-amber-400 border-2 border-slate-900 pointer-events-none" />
                   )}

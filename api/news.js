@@ -2449,11 +2449,28 @@ export default async function handler(req, res) {
     // Strip internal fields before sending to the client
     const cleanArticles = rankedArticles.map(({ _meta, _coverage, _countryScore, _matchesCategory, ...rest }) => rest);
 
+    // ── Enforce requested date window ────────────────────────────────────────
+    // The per-pair backfill widens the time window (e.g. 24h → 72h) to ensure
+    // enough articles are returned. After ranking across all pairs we re-apply
+    // the original date constraint so that stale articles don't appear in the
+    // "Last 24 Hours" feed. Only skip enforcement if it would leave too few results.
+    let finalArticles = cleanArticles;
+    if (fromDate) {
+      const fromTime = fromDate.getTime();
+      const inWindow = cleanArticles.filter(a => {
+        if (!a.publishedAt) return true; // no date metadata — keep
+        return new Date(a.publishedAt).getTime() >= fromTime;
+      });
+      if (inWindow.length >= 5) {
+        finalArticles = inWindow;
+      }
+    }
+
     // AI summaries for the TOP 5 final ranked articles only.
     // Previously summaries were generated per-pair BEFORE ranking, wasting LLM calls
     // on articles that would later be filtered, deduplicated, or ranked below the fold.
-    if (HAS_LLM && cleanArticles.length > 0) {
-      await Promise.all(cleanArticles.slice(0, 5).map(async (article) => {
+    if (HAS_LLM && finalArticles.length > 0) {
+      await Promise.all(finalArticles.slice(0, 5).map(async (article) => {
         try {
           const summary = await generateSummary(article, LLM_KEYS);
           if (summary) article.summary_points = summary;
@@ -2467,8 +2484,8 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       status: 'ok',
-      articles: cleanArticles,
-      totalResults: cleanArticles.length,
+      articles: finalArticles,
+      totalResults: finalArticles.length,
       cached: false
     });
 
