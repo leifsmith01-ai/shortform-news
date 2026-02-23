@@ -182,7 +182,7 @@ export default function Home() {
         setLoading(false);
       }
     }
-  }, [selectedCountries, selectedCategories, selectedSources, searchQuery, dateRange]);
+  }, [selectedCountries, selectedCategories, selectedSources, searchQuery, dateRange, showNonEnglish]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -245,6 +245,8 @@ export default function Home() {
                     setSearchQuery={setSearchQuery}
                     dateRange={dateRange}
                     setDateRange={setDateRange}
+                    selectedSources={selectedSources}
+                    setSelectedSources={setSelectedSources}
                     showNonEnglish={showNonEnglish}
                     setShowNonEnglish={setShowNonEnglish}
                   />

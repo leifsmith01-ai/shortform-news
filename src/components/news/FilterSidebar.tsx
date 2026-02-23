@@ -340,8 +340,8 @@ export default function FilterSidebar({
                 <span>{showNonEnglish ? '🌐' : '🇬🇧'}</span>
                 <span>{showNonEnglish ? 'All languages' : 'English only'}</span>
               </span>
-              <span className={`w-9 h-5 rounded-full relative transition-colors duration-200 flex-shrink-0 ${showNonEnglish ? 'bg-slate-400' : 'bg-slate-600'}`}>
-                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${showNonEnglish ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              <span className={`w-9 h-5 rounded-full relative transition-colors duration-200 flex-shrink-0 ${showNonEnglish ? 'bg-indigo-500' : 'bg-slate-600'}`}>
+                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${showNonEnglish ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
               </span>
             </button>
             {showNonEnglish && (
