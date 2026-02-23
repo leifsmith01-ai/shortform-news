@@ -17,10 +17,6 @@ interface Keyword {
   created_at: string
 }
 
-// Broad search — use a wide spread of countries and all categories
-const SEARCH_COUNTRIES = ['us', 'gb', 'au', 'ca', 'nz', 'in', 'sg', 'za']
-const SEARCH_CATEGORIES = ['technology', 'business', 'science', 'health', 'sports', 'gaming', 'film', 'tv', 'politics', 'world']
-
 export default function Keywords() {
   const { isSignedIn, isLoaded } = useUser()
   const [keywords, setKeywords] = useState<Keyword[]>([])
@@ -30,6 +26,8 @@ export default function Keywords() {
   const [isLoadingKeywords, setIsLoadingKeywords] = useState(false)
   const [articles, setArticles] = useState<any[]>([])
   const [isLoadingArticles, setIsLoadingArticles] = useState(false)
+  // Ref for aborting in-flight keyword fetches
+  const abortRef = React.useRef<AbortController | null>(null)
 
   // Load saved keywords on mount (sign-in required)
   useEffect(() => {
@@ -44,23 +42,33 @@ export default function Keywords() {
       .finally(() => setIsLoadingKeywords(false))
   }, [isLoaded, isSignedIn])
 
-  // Fetch articles whenever selected keyword changes
+  // Fetch articles whenever selected keyword changes.
+  // The backend keyword search is now country/category-aware but for the
+  // Keywords page we do a broad global search — the backend handles LLM
+  // expansion, keyword relevance scoring, and result caching automatically.
   const fetchArticlesForKeyword = useCallback(async (kw: Keyword) => {
+    // Cancel any previous in-flight fetch
+    if (abortRef.current) abortRef.current.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
     setIsLoadingArticles(true)
     setArticles([])
     try {
       const result = await api.fetchNews({
-        countries: SEARCH_COUNTRIES,
-        categories: SEARCH_CATEGORIES,
+        countries: ['world'],
+        categories: ['world'],
         searchQuery: kw.keyword,
         dateRange: 'week',
       })
+      if (controller.signal.aborted) return
       setArticles(result?.articles ?? [])
-    } catch {
+    } catch (err) {
+      if (controller.signal.aborted) return
       toast.error(`Failed to fetch articles for "${kw.keyword}"`)
       setArticles([])
     } finally {
-      setIsLoadingArticles(false)
+      if (!controller.signal.aborted) setIsLoadingArticles(false)
     }
   }, [])
 

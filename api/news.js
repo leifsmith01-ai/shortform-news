@@ -489,11 +489,15 @@ function getSourceFingerprint(userSources) {
   return (hash >>> 0).toString(36);
 }
 
+const KEYWORD_CACHE_TTL_HOURS = 1; // Keyword results refresh more frequently
+
 // Helper: check if cache is still valid
-function isCacheValid(cacheEntry) {
+function isCacheValid(cacheEntry, key) {
   if (!cacheEntry) return false;
   const ageInHours = (Date.now() - cacheEntry.timestamp) / (1000 * 60 * 60);
-  return ageInHours < CACHE_TTL_HOURS;
+  // Keyword caches expire after 1 hour (more time-sensitive than category caches)
+  const ttl = (key && key.startsWith('kw-')) ? KEYWORD_CACHE_TTL_HOURS : CACHE_TTL_HOURS;
+  return ageInHours < ttl;
 }
 
 // Evict oldest entries when cache exceeds max size
@@ -652,7 +656,9 @@ function categoryRelevanceScore(article, category) {
 }
 
 // ── Main ranking function ────────────────────────────────────────────────
-function rankAndDeduplicateArticles(articles, { usePopularity = false, category = null } = {}) {
+// `searchTerms` (optional): when present, enables Signal 7 (keyword relevance)
+// which boosts articles that strongly match the user's search query.
+function rankAndDeduplicateArticles(articles, { usePopularity = false, category = null, searchTerms = null } = {}) {
   if (articles.length === 0) return [];
 
   // 1. Build IDF map — words that appear in many titles are less distinctive
@@ -680,6 +686,8 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
     catRelevance: categoryRelevanceScore(a, category || a.category),
     // _countryScore is set by the country relevance filter (-1 = not set, i.e. world query)
     countryRel: a._countryScore ?? -1,
+    // Signal 7: keyword relevance — only active during keyword searches
+    kwRelevance: searchTerms ? keywordRelevanceScore(a, searchTerms) : -1,
     domain: getSourceDomain(a),
   }));
 
@@ -753,9 +761,16 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
     const bestCountryRel = best.countryRel;
     const countryRelScore = bestCountryRel === -1 ? 4 : (bestCountryRel / 6) * 8;
 
+    // ── Signal 7: Keyword Relevance (0-10) ──
+    // Only active during keyword searches. Strongly boosts articles where
+    // the search term appears in the title vs buried in the body.
+    //  -1 = not a keyword search (neutral midpoint used)
+    const bestKwRel = Math.max(...cluster.map(c => c.kwRelevance));
+    const kwRelevanceScore = bestKwRel === -1 ? 0 : bestKwRel * 10;
+
     return {
       article: { ...best.article, _coverage: coverageCount > 1 ? { count: coverageCount, sources: uniqueSources } : undefined },
-      signals: { authority, coverage, freshness, depth, catScore, countryRelScore },
+      signals: { authority, coverage, freshness, depth, catScore, countryRelScore, kwRelevanceScore },
       coverageCount,
       domain: best.domain,
     };
@@ -771,20 +786,23 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
   //   Category Match    |  2.0            |  1.5
   //   Content Depth     |  1.0            |  1.0
   //   Country Relevance |  2.0            |  2.0   ← constant: user's country choice always matters
+  //   Keyword Relevance |  2.5            |  2.5   ← only active during keyword searches
   //
+  const hasKeywordSearch = searchTerms && searchTerms.length > 0;
   const W = usePopularity
-    ? { freshness: 1.0, authority: 2.5, coverage: 3.0, cat: 1.5, depth: 1.0, countryRel: 2.0 }
-    : { freshness: 3.0, authority: 1.5, coverage: 1.5, cat: 2.0, depth: 1.0, countryRel: 2.0 };
+    ? { freshness: 1.0, authority: 2.5, coverage: 3.0, cat: 1.5, depth: 1.0, countryRel: 2.0, kwRel: hasKeywordSearch ? 2.5 : 0 }
+    : { freshness: 3.0, authority: 1.5, coverage: 1.5, cat: 2.0, depth: 1.0, countryRel: 2.0, kwRel: hasKeywordSearch ? 2.5 : 0 };
 
   for (const s of scored) {
-    const { authority, coverage, freshness, depth, catScore, countryRelScore } = s.signals;
+    const { authority, coverage, freshness, depth, catScore, countryRelScore, kwRelevanceScore } = s.signals;
     s.totalScore =
-      authority       * W.authority +
-      coverage        * W.coverage +
-      freshness       * W.freshness +
-      depth           * W.depth +
-      catScore        * W.cat +
-      countryRelScore * W.countryRel;
+      authority        * W.authority +
+      coverage         * W.coverage +
+      freshness        * W.freshness +
+      depth            * W.depth +
+      catScore         * W.cat +
+      countryRelScore  * W.countryRel +
+      kwRelevanceScore * W.kwRel;
   }
 
   // 6. Sort by total score, then apply source diversity re-ranking
@@ -1211,6 +1229,134 @@ function buildSearchQuery(rawKeyword) {
   return kw;
 }
 
+// ── LLM-powered dynamic query expansion ────────────────────────────────────
+// For keywords not in the static KEYWORD_EXPANSION_MAP, use an LLM to generate
+// related search terms. This dramatically improves recall for long-tail queries
+// (e.g. "tariffs" → "tariffs OR trade war OR import duties OR customs").
+// Results are cached in-memory so the same keyword only triggers one LLM call.
+const EXPANSION_CACHE = {};
+const EXPANSION_PROMPT = (keyword) =>
+  `You are a search query expansion tool. Given the news search keyword "${keyword}", output 3-5 closely related search terms or synonyms that a journalist might use when writing about this topic. Output ONLY a comma-separated list of terms, nothing else. Do NOT include the original keyword. Example: for "electric cars" you might output: electric vehicles, EV, Tesla, battery vehicles, zero-emission cars`;
+
+function parseExpansionResponse(text, originalKeyword) {
+  if (!text) return null;
+  const terms = text
+    .split(/[,\n]/)
+    .map(t => t.trim().replace(/^["']+|["']+$/g, ''))
+    .filter(t => t.length > 1 && t.length < 60 && t.toLowerCase() !== originalKeyword.toLowerCase());
+  if (terms.length === 0) return null;
+  // Quote multi-word terms for precise API matching
+  return terms.slice(0, 5).map(t => t.includes(' ') ? `"${t}"` : t);
+}
+
+async function expandQueryWithLLM(keyword, llmKeys) {
+  const cacheKey = keyword.trim().toLowerCase();
+  if (EXPANSION_CACHE[cacheKey]) return EXPANSION_CACHE[cacheKey];
+
+  const prompt = EXPANSION_PROMPT(keyword);
+  // Try Gemini first (fastest/cheapest), then Groq
+  const providers = [
+    llmKeys.gemini && (async () => {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${llmKeys.gemini}`;
+      const res = await fetchWithTimeout(url, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.3, maxOutputTokens: 100 }
+        })
+      }, 4000); // tight 4s timeout — expansion shouldn't delay the search
+      const data = await res.json();
+      if (res.status === 429 || data.error?.code === 429) return null;
+      if (!res.ok) return null;
+      return data.candidates?.[0]?.content?.parts?.[0]?.text;
+    }),
+    llmKeys.groq && (async () => {
+      const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${llmKeys.groq}` },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.3, max_tokens: 100
+        })
+      }, 4000);
+      const data = await res.json();
+      if (res.status === 429) return null;
+      if (!res.ok) return null;
+      return data.choices?.[0]?.message?.content;
+    }),
+  ].filter(Boolean);
+
+  for (const attempt of providers) {
+    try {
+      const text = await attempt();
+      const terms = parseExpansionResponse(text, keyword);
+      if (terms) {
+        EXPANSION_CACHE[cacheKey] = terms;
+        return terms;
+      }
+    } catch (err) {
+      console.warn(`[expansion] LLM expansion failed: ${err.message}`);
+    }
+  }
+  return null; // fallback: no expansion
+}
+
+// Build the final search query, using LLM expansion if available.
+// Called with await since LLM expansion is async.
+async function buildExpandedSearchQuery(rawKeyword, llmKeys) {
+  const normalized = rawKeyword.trim().toLowerCase();
+
+  // 1. Check static expansion map first (instant, no LLM call needed)
+  const staticExpansion = KEYWORD_EXPANSION_MAP[normalized];
+  if (staticExpansion && staticExpansion.length > 0) {
+    return { query: staticExpansion.join(' OR '), source: 'static' };
+  }
+
+  // 2. Try LLM-powered expansion for unknown terms
+  if (llmKeys && Object.values(llmKeys).some(Boolean)) {
+    const dynamicTerms = await expandQueryWithLLM(rawKeyword, llmKeys);
+    if (dynamicTerms) {
+      const kw = rawKeyword.trim();
+      const quotedOriginal = kw.includes(' ') ? `"${kw}"` : kw;
+      const expanded = [quotedOriginal, ...dynamicTerms].join(' OR ');
+      return { query: expanded, source: 'llm' };
+    }
+  }
+
+  // 3. Fallback: auto-quote multi-word phrases
+  const kw = rawKeyword.trim();
+  if (kw.includes(' ') && !kw.startsWith('"')) {
+    return { query: `"${kw}"`, source: 'quoted' };
+  }
+  return { query: kw, source: 'raw' };
+}
+
+// ── Keyword relevance scoring ──────────────────────────────────────────────
+// Scores how strongly an article matches the user's search keyword (0-1).
+// Title matches are weighted highest, description mid, content lowest.
+// This becomes Signal 7 in the ranking engine for keyword searches.
+function keywordRelevanceScore(article, searchTerms) {
+  if (!searchTerms || searchTerms.length === 0) return 0;
+  const title = (article.title || '').toLowerCase();
+  const desc = (article.description || '').toLowerCase();
+  const content = (article.content || '').toLowerCase();
+
+  let score = 0;
+  for (const term of searchTerms) {
+    const t = term.toLowerCase().replace(/^["']+|["']+$/g, '');
+    if (t.length < 2) continue;
+    // Title match: highest value (visible, most deliberate placement)
+    if (title.includes(t)) score += 3;
+    // Description match
+    else if (desc.includes(t)) score += 1.5;
+    // Content/body match
+    else if (content.includes(t)) score += 0.5;
+  }
+  // Normalise to 0-1 range: 1 term in title = 0.6, 2+ = higher
+  return Math.min(score / 5, 1);
+}
+
 // ── Keyword search helpers ─────────────────────────────────────────────────
 // These search APIs directly by keyword rather than by country/category top-headlines.
 
@@ -1260,6 +1406,20 @@ async function searchGuardianByKeyword(keyword, apiKey, opts = {}) {
   const data = await response.json();
   if (data.response?.status !== 'ok') throw new Error(`Guardian keyword error: ${data.response?.message}`);
   return data.response?.results || [];
+}
+
+async function searchGNewsByKeyword(keyword, apiKey, opts = {}) {
+  const params = new URLSearchParams({
+    q: keyword, lang: 'en', max: '10', token: apiKey,
+    sortby: opts.sortByPopularity ? 'relevance' : 'publishedAt',
+  });
+  if (opts.from) params.set('from', opts.from);
+  if (opts.country && opts.country !== 'world') params.set('country', opts.country);
+  const response = await fetchWithTimeout(`https://gnews.io/api/v4/search?${params}`);
+  if (!response.ok) throw new Error(`GNews keyword error: ${response.status}`);
+  const data = await response.json();
+  if (data.errors) throw new Error(`GNews keyword error: ${JSON.stringify(data.errors)}`);
+  return data.articles || [];
 }
 
 // ── AI Summarisation — multi-provider fallback chain ─────────────────────────
@@ -1656,55 +1816,148 @@ export default async function handler(req, res) {
   if (!NEWS_API_KEY) return res.status(500).json({ error: 'NewsAPI key not configured' });
 
   // ── Keyword search: search APIs directly when a searchQuery is provided ────
-  // This replaces the top-headlines + post-filter approach with a real search
-  // so results are actually about the keyword, not just top news that mentions it.
-  // All API sources are queried in parallel for speed.
+  // Now country/category-aware: if the user has filters active, results are
+  // tagged with the correct country/category and the ranking engine applies
+  // country relevance scoring. Also uses LLM-powered query expansion,
+  // keyword relevance scoring (Signal 7), result caching, and GNews.
   if (searchQuery) {
     const keyword = searchQuery.trim();
-    const expandedQuery = buildSearchQuery(keyword);
-    const isExpanded = expandedQuery !== keyword;
-    console.log(`Keyword search: "${keyword}"${isExpanded ? ` → expanded: ${expandedQuery}` : ''}`);
+    const sourceFingerprint = getSourceFingerprint(userSources);
+
+    // Check cache first (keyed on keyword + dateRange + sources)
+    const kwCacheKey = `kw-${keyword.toLowerCase()}-${dateRange || 'all'}-${sourceFingerprint}`;
+    if (isCacheValid(CACHE[kwCacheKey], kwCacheKey)) {
+      console.log(`Keyword cache HIT: "${keyword}"`);
+      return res.status(200).json({ status: 'ok', articles: CACHE[kwCacheKey].articles, totalResults: CACHE[kwCacheKey].articles.length, cached: true });
+    }
+
+    // Build expanded query — tries static map first, then LLM, then raw
+    const { query: expandedQuery, source: expansionSource } = await buildExpandedSearchQuery(keyword, LLM_KEYS);
+    console.log(`Keyword search: "${keyword}" → ${expansionSource}: ${expandedQuery}`);
+
+    // Extract search terms for keyword relevance scoring (Signal 7)
+    const searchTerms = expandedQuery
+      .split(/ OR /i)
+      .map(t => t.trim().replace(/^["'(]+|["')]+$/g, ''))
+      .filter(t => t.length > 1);
+
+    // Determine country/category context from the request
+    const countryList = Array.isArray(countries) && countries.length > 0 ? countries : ['world'];
+    const categoryList = Array.isArray(categories) && categories.length > 0 ? categories : ['world'];
+    const hasCountryFilter = countryList.length > 0 && countryList[0] !== 'world';
+
     try {
-      // Fire all keyword searches in parallel — each is independent
-      const searchPromises = [
+      // Fire all keyword searches in parallel across all sources
+      const searchPromises = [];
+
+      // 1. NewsAPI — keyword search with trusted domains
+      searchPromises.push(
         searchNewsAPIByKeyword(expandedQuery, NEWS_API_KEY, activeDomains, { from: fromISO, sortByPopularity: usePopularitySort })
           .then(raw => {
             const valid = raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com');
             console.log(`  [1] NewsAPI keyword: ${valid.length} articles`);
-            return valid.map(a => formatNewsAPIArticle(a, 'world', 'world'));
+            return valid.map(a => formatNewsAPIArticle(a, countryList[0], categoryList[0]));
           })
-          .catch(err => { console.error('  NewsAPI keyword search failed:', err.message); return []; }),
-      ];
+          .catch(err => { console.error('  NewsAPI keyword search failed:', err.message); return []; })
+      );
+
+      // 2. WorldNewsAPI
       if (WORLD_NEWS_API_KEY) {
         searchPromises.push(
           searchWorldNewsAPIByKeyword(expandedQuery, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort })
-            .then(raw => { console.log(`  [2] WorldNewsAPI keyword: ${raw.length} articles`); return raw.map(a => formatWorldNewsAPIArticle(a, 'world', 'world')); })
+            .then(raw => { console.log(`  [2] WorldNewsAPI keyword: ${raw.length} articles`); return raw.map(a => formatWorldNewsAPIArticle(a, countryList[0], categoryList[0])); })
             .catch(err => { console.error('  WorldNewsAPI keyword search failed:', err.message); return []; })
         );
       }
+
+      // 3. NewsData.io
       if (NEWS_DATA_API_KEY) {
         searchPromises.push(
           searchNewsDataByKeyword(expandedQuery, NEWS_DATA_API_KEY, { from: fromDateOnly })
-            .then(raw => { const valid = raw.filter(a => a.title); console.log(`  [3] NewsData keyword: ${valid.length} articles`); return valid.map(a => formatNewsDataArticle(a, 'world', 'world')); })
+            .then(raw => { const valid = raw.filter(a => a.title); console.log(`  [3] NewsData keyword: ${valid.length} articles`); return valid.map(a => formatNewsDataArticle(a, countryList[0], categoryList[0])); })
             .catch(err => { console.error('  NewsData keyword search failed:', err.message); return []; })
         );
       }
+
+      // 4. Guardian
       if (GUARDIAN_API_KEY) {
         searchPromises.push(
           searchGuardianByKeyword(expandedQuery, GUARDIAN_API_KEY, { from: fromDateOnly })
-            .then(raw => { console.log(`  [4] Guardian keyword: ${raw.length} articles`); return raw.map(r => formatGuardianArticle(r, 'world', 'world')); })
+            .then(raw => { console.log(`  [4] Guardian keyword: ${raw.length} articles`); return raw.map(r => formatGuardianArticle(r, countryList[0], categoryList[0])); })
             .catch(err => { console.error('  Guardian keyword search failed:', err.message); return []; })
         );
       }
 
-      const searchResults = await Promise.all(searchPromises);
-      const results = searchResults.flat();
+      // 5. GNews — now included in keyword search (supports country filtering natively)
+      if (GNEWS_API_KEY) {
+        searchPromises.push(
+          searchGNewsByKeyword(expandedQuery, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, country: countryList[0] })
+            .then(raw => { const valid = raw.filter(a => a.title); console.log(`  [5] GNews keyword: ${valid.length} articles`); return valid.map(a => formatGNewsArticle(a, countryList[0], categoryList[0])); })
+            .catch(err => { console.error('  GNews keyword search failed:', err.message); return []; })
+        );
+      }
 
-      // Rank FIRST, then generate summaries only for the top articles
-      const ranked = rankAndDeduplicateArticles(results, { usePopularity: usePopularitySort });
+      // 6. RSS feeds — check if any apply to the selected countries
+      const rssPromises = [];
+      for (const country of countryList) {
+        const applicableFeeds = RSS_SOURCES.filter(f => f.url && f.countries.has(country));
+        for (const feed of applicableFeeds) {
+          rssPromises.push(
+            fetchRSSFeed(feed.url)
+              .then(items => {
+                // Filter RSS items that mention the keyword in title/description
+                const kwLower = keyword.toLowerCase();
+                const matched = items.filter(item => {
+                  const text = `${item.title || ''} ${item.description || ''}`.toLowerCase();
+                  return text.includes(kwLower);
+                });
+                return matched.map(item => formatRSSArticle(item, feed, country, categoryList[0]));
+              })
+              .catch(() => [])
+          );
+        }
+      }
+      if (rssPromises.length > 0) {
+        searchPromises.push(
+          Promise.all(rssPromises).then(results => {
+            const flat = results.flat();
+            if (flat.length > 0) console.log(`  [6] RSS keyword: ${flat.length} articles`);
+            return flat;
+          })
+        );
+      }
+
+      const searchResults = await Promise.all(searchPromises);
+      let results = searchResults.flat();
+
+      // Apply country relevance scoring if user has country filters active
+      if (hasCountryFilter) {
+        results = results.map(a => {
+          let score = 0;
+          for (const country of countryList) {
+            const { inTitle, inText } = articleMentionsCountry(a, country);
+            if (inTitle) { score = Math.max(score, 4); }
+            else if (inText) { score = Math.max(score, 2); }
+            const metaCountry = a._meta?.sourceCountry;
+            if (metaCountry === country) score = Math.min(score + 2, 6);
+          }
+          a._countryScore = score;
+          return a;
+        });
+        // Sort: country-relevant results first, but keep ALL results
+        // (the ranker's Signal 6 will handle fine-grained ordering)
+        results.sort((a, b) => (b._countryScore || 0) - (a._countryScore || 0));
+      }
+
+      // Rank with keyword relevance scoring (Signal 7) and country awareness
+      const ranked = rankAndDeduplicateArticles(results, {
+        usePopularity: usePopularitySort,
+        category: categoryList.length === 1 ? categoryList[0] : null,
+        searchTerms,
+      });
       const clean = ranked.map(({ _meta, _coverage, ...rest }) => rest);
 
-      // AI summaries for top 5 ranked articles (not pre-rank, avoiding wasted LLM calls)
+      // AI summaries for top 5 ranked articles
       if (HAS_LLM && clean.length > 0) {
         await Promise.all(clean.slice(0, 5).map(async (article) => {
           try {
@@ -1715,6 +1968,10 @@ export default async function handler(req, res) {
           }
         }));
       }
+
+      // Cache keyword results (1-hour TTL since keyword results are more time-sensitive)
+      CACHE[kwCacheKey] = { timestamp: Date.now(), articles: clean };
+      evictCacheIfNeeded();
 
       return res.status(200).json({ status: 'ok', articles: clean, totalResults: clean.length, cached: false });
     } catch (error) {
