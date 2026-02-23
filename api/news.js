@@ -1824,8 +1824,14 @@ export default async function handler(req, res) {
     const keyword = searchQuery.trim();
     const sourceFingerprint = getSourceFingerprint(userSources);
 
-    // Check cache first (keyed on keyword + dateRange + sources)
-    const kwCacheKey = `kw-${keyword.toLowerCase()}-${dateRange || 'all'}-${sourceFingerprint}`;
+    // Determine country/category context from the request
+    const countryList = Array.isArray(countries) && countries.length > 0 ? countries : ['world'];
+    const categoryList = Array.isArray(categories) && categories.length > 0 ? categories : ['world'];
+    const hasCountryFilter = countryList.some(c => c !== 'world');
+    const hasCategoryFilter = categoryList.some(c => c !== 'world');
+
+    // Check cache (keyed on keyword + filters + dateRange + sources)
+    const kwCacheKey = `kw-${keyword.toLowerCase()}-${countryList.sort().join(',')}-${categoryList.sort().join(',')}-${dateRange || 'all'}-${sourceFingerprint}`;
     if (isCacheValid(CACHE[kwCacheKey], kwCacheKey)) {
       console.log(`Keyword cache HIT: "${keyword}"`);
       return res.status(200).json({ status: 'ok', articles: CACHE[kwCacheKey].articles, totalResults: CACHE[kwCacheKey].articles.length, cached: true });
@@ -1840,11 +1846,6 @@ export default async function handler(req, res) {
       .split(/ OR /i)
       .map(t => t.trim().replace(/^["'(]+|["')]+$/g, ''))
       .filter(t => t.length > 1);
-
-    // Determine country/category context from the request
-    const countryList = Array.isArray(countries) && countries.length > 0 ? countries : ['world'];
-    const categoryList = Array.isArray(categories) && categories.length > 0 ? categories : ['world'];
-    const hasCountryFilter = countryList.length > 0 && countryList[0] !== 'world';
 
     try {
       // Fire all keyword searches in parallel across all sources
@@ -1930,7 +1931,44 @@ export default async function handler(req, res) {
       const searchResults = await Promise.all(searchPromises);
       let results = searchResults.flat();
 
-      // Apply country relevance scoring if user has country filters active
+      // ── Category relevance filter ────────────────────────────────────
+      // When the user has specific categories selected (not just "world"),
+      // boost articles matching those categories and demote off-topic ones.
+      // We use a soft filter: articles matching ANY selected category are
+      // kept at full weight; others are kept but scored lower by Signal 5.
+      if (hasCategoryFilter) {
+        const beforeCatFilter = results.length;
+        // Score each article against ALL selected categories (not just the first)
+        results = results.map(a => {
+          const matchesAny = categoryList.some(cat => articleMatchesCategory(a, cat));
+          // Tag the article's best-matching category so Signal 5 can score it
+          if (matchesAny) {
+            // Find which selected category matches best
+            let bestCat = categoryList[0];
+            let bestScore = 0;
+            for (const cat of categoryList) {
+              const s = categoryRelevanceScore(a, cat);
+              if (s > bestScore) { bestScore = s; bestCat = cat; }
+            }
+            a.category = bestCat;
+          }
+          a._matchesCategory = matchesAny;
+          return a;
+        });
+        // Separate matched and unmatched, but keep unmatched as filler
+        // (they might still be relevant via keyword — the ranking engine
+        // will naturally push them down via low Signal 5 scores)
+        const matched = results.filter(a => a._matchesCategory);
+        const unmatched = results.filter(a => !a._matchesCategory);
+        results = [...matched, ...unmatched];
+        if (matched.length < beforeCatFilter) {
+          console.log(`  Category filter: ${matched.length}/${beforeCatFilter} match [${categoryList.join(',')}], keeping ${unmatched.length} as filler`);
+        }
+      }
+
+      // ── Country relevance scoring ─────────────────────────────────────
+      // When user has country filters active, score each article for
+      // country relevance so Signal 6 can rank them appropriately.
       if (hasCountryFilter) {
         results = results.map(a => {
           let score = 0;
@@ -1944,12 +1982,9 @@ export default async function handler(req, res) {
           a._countryScore = score;
           return a;
         });
-        // Sort: country-relevant results first, but keep ALL results
-        // (the ranker's Signal 6 will handle fine-grained ordering)
-        results.sort((a, b) => (b._countryScore || 0) - (a._countryScore || 0));
       }
 
-      // Rank with keyword relevance scoring (Signal 7) and country awareness
+      // Rank with keyword relevance (Signal 7), category (Signal 5), and country (Signal 6)
       const ranked = rankAndDeduplicateArticles(results, {
         usePopularity: usePopularitySort,
         category: categoryList.length === 1 ? categoryList[0] : null,
