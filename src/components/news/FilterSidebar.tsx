@@ -176,14 +176,17 @@ export default function FilterSidebar({
   const [countriesOpen, setCountriesOpen] = React.useState(true);
   const [categoriesOpen, setCategoriesOpen] = React.useState(true);
   const [sourcesOpen, setSourcesOpen] = React.useState(false);
-  const [continentStates, setContinentStates] = React.useState<Record<string, boolean>>({
-    'North America': true,
-    'South America': false,
-    'Europe': false,
-    'Asia': false,
-    'Middle East': false,
-    'Africa': false,
-    'Oceania': false,
+  const [continentStates, setContinentStates] = React.useState<Record<string, boolean>>(() => {
+    // Auto-expand any continent that contains a currently selected country
+    const init: Record<string, boolean> = {};
+    for (const [continent, countries] of Object.entries(COUNTRIES_BY_CONTINENT)) {
+      init[continent] = countries.some(c => selectedCountries.includes(c.code));
+    }
+    // Fallback: if nothing expanded, open North America (most common default)
+    if (!Object.values(init).some(Boolean)) {
+      init['North America'] = true;
+    }
+    return init;
   });
   const [sourceGroupStates, setSourceGroupStates] = React.useState<Record<string, boolean>>({
     'General': true,

@@ -257,8 +257,8 @@ export default function NewsCard({ article, index, rank }) {
           {article.source}
         </p>
 
-        {/* AI Summary Bullets — only shown when summaries were generated */}
-        {article.summary_points && article.summary_points.length > 0 && (
+        {/* AI Summary Bullets */}
+        {article.summary_points && article.summary_points.length > 0 ? (
           <div className="bg-stone-50 rounded-xl p-4 mb-4 border border-stone-100">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-5 h-5 rounded-md bg-slate-900 flex items-center justify-center">
@@ -274,6 +274,10 @@ export default function NewsCard({ article, index, rank }) {
                 </li>
               ))}
             </ul>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 px-3 py-2 mb-4 rounded-lg bg-stone-50 border border-stone-100">
+            <span className="text-xs text-stone-400 italic">Summary unavailable</span>
           </div>
         )}
 

@@ -261,21 +261,24 @@ export default function Home() {
               )}
               
               {(selectedCountries.length > 1 || selectedCategories.length > 1) && articles.length > 0 && (
-                <ToggleGroup type="single" value={groupBy || 'none'} onValueChange={setGroupBy}>
-                  <ToggleGroupItem value="none" aria-label="No grouping" className="text-xs">
-                    List
-                  </ToggleGroupItem>
-                  {selectedCountries.length > 1 && (
-                    <ToggleGroupItem value="country" aria-label="Group by country" className="text-xs">
-                      By Country
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-[10px] text-stone-400 uppercase tracking-wider hidden sm:block">Group by</span>
+                  <ToggleGroup type="single" value={groupBy || 'none'} onValueChange={setGroupBy}>
+                    <ToggleGroupItem value="none" aria-label="Flat list — all articles in one stream" title="Flat list — all articles in one stream" className="text-xs">
+                      Flat list
                     </ToggleGroupItem>
-                  )}
-                  {selectedCategories.length > 1 && (
-                    <ToggleGroupItem value="category" aria-label="Group by category" className="text-xs">
-                      By Category
-                    </ToggleGroupItem>
-                  )}
-                </ToggleGroup>
+                    {selectedCountries.length > 1 && (
+                      <ToggleGroupItem value="country" aria-label="Group articles by country" title="Group articles by country" className="text-xs">
+                        Country
+                      </ToggleGroupItem>
+                    )}
+                    {selectedCategories.length > 1 && (
+                      <ToggleGroupItem value="category" aria-label="Group articles by category" title="Group articles by category" className="text-xs">
+                        Category
+                      </ToggleGroupItem>
+                    )}
+                  </ToggleGroup>
+                </div>
               )}
               
               <Button 
