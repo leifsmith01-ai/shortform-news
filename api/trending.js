@@ -66,6 +66,36 @@ async function fetchTrustedHeadlines(apiKey) {
     .map(a => formatArticle(a, 'general'));
 }
 
+async function fetchFromGuardian(apiKey) {
+  // Guardian fallback — free 'test' key works without registration, real key via env var
+  const params = new URLSearchParams({
+    section: 'news,technology,business,science,sport,society',
+    'show-fields': 'trailText,thumbnail',
+    'page-size': '50',
+    'order-by': 'newest',
+    'api-key': apiKey || 'test',
+  });
+  const url = `https://content.guardianapis.com/search?${params.toString()}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Guardian fallback: ${res.status}`);
+  const data = await res.json();
+  if (data.response?.status !== 'ok') throw new Error(`Guardian fallback: ${data.response?.message}`);
+  return (data.response?.results || []).map(a => ({
+    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    title: a.webTitle || 'No title',
+    description: a.fields?.trailText || '',
+    content: a.fields?.trailText || '',
+    url: a.webUrl || '#',
+    image_url: a.fields?.thumbnail || null,
+    source: 'The Guardian',
+    publishedAt: a.webPublicationDate || new Date().toISOString(),
+    time_ago: timeAgo(a.webPublicationDate),
+    country: 'world',
+    category: a.sectionId || 'general',
+    summary_points: null,
+  }));
+}
+
 async function generateSummary(article, geminiKey) {
   if (!geminiKey) return null;
   let content = `${article.title}. ${article.description || ''}`.slice(0, 1500);
@@ -96,6 +126,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const NEWS_API_KEY = process.env.VITE_NEWS_API_KEY || process.env.NEWS_API_KEY;
+  const GUARDIAN_API_KEY = process.env.GUARDIAN_API_KEY || null;
   const GEMINI_API_KEY = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
   if (!NEWS_API_KEY) {
@@ -109,7 +140,17 @@ export default async function handler(req, res) {
   }
 
   try {
-    const all = await fetchTrustedHeadlines(NEWS_API_KEY);
+    let all;
+    try {
+      all = await fetchTrustedHeadlines(NEWS_API_KEY);
+    } catch (err) {
+      if (err.message.includes('429')) {
+        console.warn('NewsAPI rate limited — falling back to Guardian');
+        all = await fetchFromGuardian(GUARDIAN_API_KEY);
+      } else {
+        throw err;
+      }
+    }
 
     if (all.length === 0) {
       return res.status(200).json({ status: 'ok', articles: [], cached: false });
