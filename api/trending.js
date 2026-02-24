@@ -5,15 +5,15 @@ const CACHE = {};
 const CACHE_TTL_HOURS = 6; // Refresh trending more frequently than regular news
 
 // Trusted NewsAPI source IDs — only surface articles from reputable outlets
+// Note: NewsAPI enforces a maximum of 20 sources per request
 const TRUSTED_SOURCE_IDS = [
-  'reuters', 'bbc-news', 'associated-press', 'abc-news-au',
-  'the-guardian-uk', 'the-guardian-au', 'the-new-york-times',
-  'the-washington-post', 'al-jazeera-english', 'cnn', 'nbc-news',
-  'cbs-news', 'abc-news', 'bloomberg', 'the-wall-street-journal',
-  'politico', 'bbc-sport', 'espn', 'the-times-of-india',
-  'the-hindu', 'ars-technica', 'wired', 'techcrunch',
-  'the-verge', 'national-geographic', 'new-scientist',
-].join(',');
+  'reuters', 'bbc-news', 'associated-press',
+  'the-new-york-times', 'the-washington-post', 'the-guardian-uk',
+  'al-jazeera-english', 'cnn', 'nbc-news', 'cbs-news',
+  'abc-news', 'bloomberg', 'the-wall-street-journal', 'politico',
+  'espn', 'ars-technica', 'wired', 'techcrunch',
+  'the-verge', 'new-scientist',
+].join(','); // 20 sources — at the NewsAPI limit
 
 function getCacheKey() {
   const now = new Date();
@@ -54,16 +54,16 @@ function formatArticle(article, category) {
   };
 }
 
-async function fetchCategory(category, apiKey) {
-  // Use trusted sources for trending — ensures only reputable outlets appear
-  const url = `https://newsapi.org/v2/top-headlines?sources=${TRUSTED_SOURCE_IDS}&pageSize=8&apiKey=${apiKey}`;
+async function fetchTrustedHeadlines(apiKey) {
+  // NewsAPI does not allow combining `sources` with `category` — fetch once with all trusted sources
+  const url = `https://newsapi.org/v2/top-headlines?sources=${TRUSTED_SOURCE_IDS}&pageSize=100&apiKey=${apiKey}`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`NewsAPI ${category}: ${res.status}`);
+  if (!res.ok) throw new Error(`NewsAPI top-headlines: ${res.status}`);
   const data = await res.json();
-  if (data.status !== 'ok') throw new Error(`NewsAPI ${category}: ${data.message}`);
+  if (data.status !== 'ok') throw new Error(`NewsAPI top-headlines: ${data.message}`);
   return (data.articles || [])
     .filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com')
-    .map(a => formatArticle(a, category));
+    .map(a => formatArticle(a, 'general'));
 }
 
 async function generateSummary(article, geminiKey) {
@@ -109,19 +109,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const categories = ['technology', 'business', 'general', 'science', 'health', 'sports', 'entertainment'];
-
-    // Fetch all categories in parallel
-    const results = await Promise.allSettled(categories.map(cat => fetchCategory(cat, NEWS_API_KEY)));
-
-    const all = [];
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        all.push(...result.value);
-      } else {
-        console.error('Trending category failed:', result.reason?.message);
-      }
-    }
+    const all = await fetchTrustedHeadlines(NEWS_API_KEY);
 
     if (all.length === 0) {
       return res.status(200).json({ status: 'ok', articles: [], cached: false });
