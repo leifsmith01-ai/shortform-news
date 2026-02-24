@@ -277,9 +277,7 @@ This project is licensed under the MIT License - see [LICENSE](./LICENSE) file f
 
 ## 📧 Contact
 
-- **Website**: [shortform.news](https://shortform.news)
-- **Email**: contact@shortform.news
-- **Twitter**: [@shortformnews](https://twitter.com/shortformnews)
+
 - **GitHub**: [@shortformnews](https://github.com/shortformnews)
 
 ## 💖 Support
