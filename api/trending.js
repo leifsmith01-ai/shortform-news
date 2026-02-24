@@ -96,27 +96,150 @@ async function fetchFromGuardian(apiKey) {
   }));
 }
 
-async function generateSummary(article, geminiKey) {
-  if (!geminiKey) return null;
-  let content = `${article.title}. ${article.description || ''}`.slice(0, 1500);
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${geminiKey}`;
-  const res = await fetch(url, {
+class QuotaExceededError extends Error {
+  constructor(provider) {
+    super(`${provider} quota exceeded`);
+    this.name = 'QuotaExceededError';
+  }
+}
+
+const SUMMARY_PROMPT = (content) =>
+  `You are a factual news summarizer. Based ONLY on the provided article text, write 2-3 concise bullet points covering the key facts. Do NOT add information that is not in the text.\n\n• Key point 1\n• Key point 2\n• Key point 3 (if warranted)\n\nArticle:\n${content}`;
+
+function parseBullets(text) {
+  if (!text) return null;
+  let bullets = text.split('\n')
+    .filter(line => /^[\s]*[•*\-–—]/.test(line))
+    .map(line => line.replace(/^[\s]*[•*\-–—]+\s*/, '').trim())
+    .filter(Boolean);
+  if (bullets.length === 0) {
+    bullets = text.split('\n')
+      .filter(line => /^[\s]*\d+[\.\)]/.test(line))
+      .map(line => line.replace(/^[\s]*\d+[\.\)]\s*/, '').trim())
+      .filter(line => line.length > 10);
+  }
+  return bullets.length > 0 ? bullets.slice(0, 3) : null;
+}
+
+function prepareContent(article) {
+  const strippedContent = (article.content || '').replace(/\s*\[\+\d+ chars\].*$/s, '').trim();
+  const desc = (article.description || '').replace(/\s*\[\+\d+ chars\].*$/s, '').trim();
+  const body = strippedContent.length >= desc.length ? strippedContent : desc;
+  let content = body || article.title || '';
+  if (article.title && !content.toLowerCase().includes(article.title.slice(0, 20).toLowerCase())) {
+    content = `${article.title}. ${content}`;
+  }
+  return content.slice(0, 3000);
+}
+
+async function fetchWithTimeout(url, opts = {}, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...opts, signal: controller.signal });
+    clearTimeout(timer);
+    return response;
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+
+async function tryGemini(content, key) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${key}`;
+  const res = await fetchWithTimeout(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: `Summarize in 2-3 bullet points:\n\n${content}` }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 300 },
+      contents: [{ parts: [{ text: SUMMARY_PROMPT(content) }] }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 500 },
     }),
   });
-  if (!res.ok) return null;
   const data = await res.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) return null;
-  const bullets = text.split('\n')
-    .filter(l => /^[\s]*[•*\-–—\d]/.test(l))
-    .map(l => l.replace(/^[\s]*[•*\-–—]+\s*|\d+[\.\)]\s*/, '').trim())
-    .filter(l => l.length > 10);
-  return bullets.length > 0 ? bullets.slice(0, 3) : null;
+  if (res.status === 429 || data.error?.code === 429 || data.error?.status === 'RESOURCE_EXHAUSTED') {
+    throw new QuotaExceededError('Gemini');
+  }
+  if (!res.ok) { console.error(`Gemini error: ${data.error?.message?.slice(0, 100)}`); return null; }
+  return parseBullets(data.candidates?.[0]?.content?.parts?.[0]?.text);
+}
+
+async function tryGroq(content, key) {
+  const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({
+      model: 'llama-3.1-8b-instant',
+      messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
+      temperature: 0.2,
+      max_tokens: 500,
+    }),
+  });
+  const data = await res.json();
+  if (res.status === 429 || data.error?.code === 'rate_limit_exceeded') {
+    throw new QuotaExceededError('Groq');
+  }
+  if (!res.ok) { console.error(`Groq error: ${data.error?.message?.slice(0, 100)}`); return null; }
+  return parseBullets(data.choices?.[0]?.message?.content);
+}
+
+async function tryOpenAI(content, key) {
+  const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
+      temperature: 0.2,
+      max_tokens: 500,
+    }),
+  });
+  const data = await res.json();
+  if (res.status === 429 || data.error?.type === 'insufficient_quota' || data.error?.type === 'rate_limit_exceeded') {
+    throw new QuotaExceededError('OpenAI');
+  }
+  if (!res.ok) { console.error(`OpenAI error: ${data.error?.message?.slice(0, 100)}`); return null; }
+  return parseBullets(data.choices?.[0]?.message?.content);
+}
+
+async function tryCohere(content, key) {
+  const res = await fetchWithTimeout('https://api.cohere.com/v2/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({
+      model: 'command-r-08-2024',
+      messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
+      temperature: 0.2,
+      max_tokens: 500,
+    }),
+  });
+  const data = await res.json();
+  if (res.status === 429) { throw new QuotaExceededError('Cohere'); }
+  if (!res.ok) { console.error(`Cohere error: ${JSON.stringify(data).slice(0, 100)}`); return null; }
+  return parseBullets(data.message?.content?.[0]?.text);
+}
+
+async function generateSummary(article, llmKeys) {
+  const content = prepareContent(article);
+  const providers = [
+    llmKeys.gemini && (() => tryGemini(content, llmKeys.gemini)),
+    llmKeys.groq   && (() => tryGroq(content, llmKeys.groq)),
+    llmKeys.openai && (() => tryOpenAI(content, llmKeys.openai)),
+    llmKeys.cohere && (() => tryCohere(content, llmKeys.cohere)),
+  ].filter(Boolean);
+
+  for (const attempt of providers) {
+    try {
+      const result = await attempt();
+      if (result) return result;
+    } catch (err) {
+      if (err.name === 'QuotaExceededError') {
+        console.warn(`[trending summary] ${err.message} — trying next provider`);
+        continue;
+      }
+      console.error('[trending summary] unexpected error:', err.message);
+    }
+  }
+  return null;
 }
 
 export default async function handler(req, res) {
@@ -127,7 +250,13 @@ export default async function handler(req, res) {
 
   const NEWS_API_KEY = process.env.VITE_NEWS_API_KEY || process.env.NEWS_API_KEY;
   const GUARDIAN_API_KEY = process.env.GUARDIAN_API_KEY || null;
-  const GEMINI_API_KEY = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+  const LLM_KEYS = {
+    gemini: process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || null,
+    groq:   process.env.GROQ_API_KEY   || null,
+    openai: process.env.OPENAI_API_KEY || null,
+    cohere: process.env.COHERE_API_KEY || null,
+  };
+  const HAS_LLM = Object.values(LLM_KEYS).some(Boolean);
 
   if (!NEWS_API_KEY) {
     return res.status(500).json({ error: 'NewsAPI key not configured' });
@@ -168,11 +297,11 @@ export default async function handler(req, res) {
       .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
       .slice(0, 10);
 
-    // AI summaries for top 5
-    if (GEMINI_API_KEY) {
+    // AI summaries for top 5 — multi-provider fallback (Gemini → Groq → OpenAI → Cohere)
+    if (HAS_LLM) {
       await Promise.all(top10.slice(0, 5).map(async article => {
         try {
-          const summary = await generateSummary(article, GEMINI_API_KEY);
+          const summary = await generateSummary(article, LLM_KEYS);
           if (summary) article.summary_points = summary;
         } catch (e) {
           console.error('Summary error:', e.message);

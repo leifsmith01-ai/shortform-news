@@ -1838,11 +1838,13 @@ const SUMMARY_PROMPT = (content) =>
 
 // Shared: prepare article text (strip truncation markers, cap length)
 function prepareArticleContent(article) {
-  let content = (article.content && article.content.length > (article.description || '').length)
-    ? article.content
-    : `${article.title}. ${article.description || ''}`;
-  content = content.replace(/\s*\[\+\d+ chars\].*$/s, '').trim();
-  if (!content.toLowerCase().includes(article.title.slice(0, 20).toLowerCase())) {
+  // Strip NewsAPI "[+XXXX chars]" truncation markers before comparing lengths so a
+  // "200-char stub [+2800 chars]" doesn't incorrectly win over a full description.
+  const strippedContent = (article.content || '').replace(/\s*\[\+\d+ chars\].*$/s, '').trim();
+  const desc = (article.description || '').replace(/\s*\[\+\d+ chars\].*$/s, '').trim();
+  const body = strippedContent.length >= desc.length ? strippedContent : desc;
+  let content = body || article.title || '';
+  if (article.title && !content.toLowerCase().includes(article.title.slice(0, 20).toLowerCase())) {
     content = `${article.title}. ${content}`;
   }
   return content.slice(0, 3000);
@@ -1856,16 +1858,18 @@ function parseBullets(text) {
     .map(line => line.replace(/^[\s]*[•*\-–—]+\s*/, '').trim())
     .filter(Boolean);
   if (bullets.length === 0) {
+    // Only treat lines as numbered bullets when they actually start with a digit marker
     bullets = text.split('\n')
+      .filter(line => /^[\s]*\d+[\.\)]/.test(line))
       .map(line => line.replace(/^[\s]*\d+[\.\)]\s*/, '').trim())
-      .filter(line => line.length > 15);
+      .filter(line => line.length > 10);
   }
   return bullets.length > 0 ? bullets.slice(0, 3) : null;
 }
 
 async function summarizeWithGemini(content, key) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${key}`;
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -1882,7 +1886,7 @@ async function summarizeWithGemini(content, key) {
 }
 
 async function summarizeWithGroq(content, key) {
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
     body: JSON.stringify({
@@ -1901,7 +1905,7 @@ async function summarizeWithGroq(content, key) {
 }
 
 async function summarizeWithOpenAI(content, key) {
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
     body: JSON.stringify({
@@ -1920,7 +1924,7 @@ async function summarizeWithOpenAI(content, key) {
 }
 
 async function summarizeWithCohere(content, key) {
-  const res = await fetch('https://api.cohere.com/v2/chat', {
+  const res = await fetchWithTimeout('https://api.cohere.com/v2/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
     body: JSON.stringify({
