@@ -26,6 +26,7 @@ export default function Keywords() {
   const [isLoadingKeywords, setIsLoadingKeywords] = useState(false)
   const [articles, setArticles] = useState<any[]>([])
   const [isLoadingArticles, setIsLoadingArticles] = useState(false)
+  const [dateRange, setDateRange] = useState<'24h' | '3d' | 'week'>('24h')
   // Ref for aborting in-flight keyword fetches
   const abortRef = React.useRef<AbortController | null>(null)
 
@@ -59,7 +60,7 @@ export default function Keywords() {
         countries: ['world'],
         categories: ['world'],
         searchQuery: kw.keyword,
-        dateRange: 'week',
+        dateRange,
       })
       if (controller.signal.aborted) return
       setArticles(result?.articles ?? [])
@@ -70,7 +71,7 @@ export default function Keywords() {
     } finally {
       if (!controller.signal.aborted) setIsLoadingArticles(false)
     }
-  }, [])
+  }, [dateRange])
 
   useEffect(() => {
     if (selectedKeyword) fetchArticlesForKeyword(selectedKeyword)
@@ -300,11 +301,29 @@ export default function Keywords() {
                 <div className="bg-white border-b border-stone-200 px-6 py-3 flex items-center gap-3 flex-shrink-0">
                   <Tag className="w-4 h-4 text-stone-400" />
                   <span className="font-semibold text-stone-900 capitalize">{selectedKeyword.keyword}</span>
-                  {!isLoadingArticles && (
-                    <span className="text-xs text-stone-400 ml-auto">
-                      {articles.length} article{articles.length !== 1 ? 's' : ''}
-                    </span>
-                  )}
+                  <div className="ml-auto flex items-center gap-3">
+                    {/* Timeframe picker */}
+                    <div className="flex items-center gap-1">
+                      {(['24h', '3d', 'week'] as const).map(range => (
+                        <button
+                          key={range}
+                          onClick={() => setDateRange(range)}
+                          className={`px-2.5 py-1 text-xs rounded-full font-medium transition-colors ${
+                            dateRange === range
+                              ? 'bg-slate-900 text-white'
+                              : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                          }`}
+                        >
+                          {range === '24h' ? '24h' : range === '3d' ? '3 days' : '1 week'}
+                        </button>
+                      ))}
+                    </div>
+                    {!isLoadingArticles && (
+                      <span className="text-xs text-stone-400">
+                        {articles.length} article{articles.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <ScrollArea className="flex-1">
