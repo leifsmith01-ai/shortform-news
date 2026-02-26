@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { ThemeProvider } from './contexts/ThemeContext'
 import { SignedIn, SignedOut, RedirectToSignIn, useUser } from '@clerk/clerk-react'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
@@ -53,6 +54,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
+    <ThemeProvider>
     <BrowserRouter>
       <UserInitialiser />
       <Routes>
@@ -125,5 +127,6 @@ export default function App() {
       <Analytics />
       <SpeedInsights />
     </BrowserRouter>
+    </ThemeProvider>
   )
 }

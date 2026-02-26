@@ -7,6 +7,11 @@ const CACHE = {}; // In-memory cache (persists between requests on same instance
 const CACHE_TTL_HOURS = 12; // Refresh articles twice a day
 const CACHE_MAX_ENTRIES = 500; // Prevent unbounded memory growth
 
+// Maximum number of articles to generate AI summaries for per request.
+// Raising this improves coverage but uses more LLM API quota.
+// Override via MAX_SUMMARY_ARTICLES env var (e.g. set to 5 to reduce costs).
+const MAX_SUMMARY_ARTICLES = parseInt(process.env.MAX_SUMMARY_ARTICLES || '10', 10);
+
 // API request timeout (ms) — prevents a single slow API from blocking the whole response
 const API_TIMEOUT_MS = 8000;
 
@@ -2426,9 +2431,9 @@ export default async function handler(req, res) {
       });
       const clean = ranked.map(({ _meta, _coverage, _countryScore, _matchesCategory, ...rest }) => rest);
 
-      // AI summaries for top 5 ranked articles
+      // AI summaries for top ranked articles (up to MAX_SUMMARY_ARTICLES)
       if (HAS_LLM && clean.length > 0) {
-        await Promise.all(clean.slice(0, 5).map(async (article) => {
+        await Promise.all(clean.slice(0, MAX_SUMMARY_ARTICLES).map(async (article) => {
           try {
             const summary = await generateSummary(article, LLM_KEYS);
             if (summary) article.summary_points = summary;
@@ -2500,9 +2505,9 @@ export default async function handler(req, res) {
         .map(({ _coverage, ...rest }) => rest)
         .slice(0, 10);
 
-      // Generate AI summaries for the top 5
+      // Generate AI summaries for top articles (up to MAX_SUMMARY_ARTICLES)
       if (HAS_LLM && top10.length > 0) {
-        await Promise.all(top10.slice(0, 5).map(async (article) => {
+        await Promise.all(top10.slice(0, MAX_SUMMARY_ARTICLES).map(async (article) => {
           try {
             const summary = await generateSummary(article, LLM_KEYS);
             if (summary) article.summary_points = summary;
@@ -2547,8 +2552,17 @@ export default async function handler(req, res) {
     );
 
     const allArticles = [];
-    for (const result of pairResults) {
+    // Track country/category pairs that returned very few articles (coverage gaps)
+    const lowCoverage = [];
+    const LOW_COVERAGE_THRESHOLD = 3;
+    for (let i = 0; i < pairResults.length; i++) {
+      const result = pairResults[i];
       if (result.status === 'fulfilled' && Array.isArray(result.value)) {
+        const count = result.value.length;
+        // Flag non-world pairs with very few articles as low-coverage
+        if (count <= LOW_COVERAGE_THRESHOLD && pairs[i].country !== 'world') {
+          lowCoverage.push({ country: pairs[i].country, category: pairs[i].category, count });
+        }
         allArticles.push(...result.value);
       } else if (result.status === 'rejected') {
         console.error('Pair fetch failed:', result.reason?.message);
@@ -2594,11 +2608,11 @@ export default async function handler(req, res) {
       }
     }
 
-    // AI summaries for the TOP 5 final ranked articles only.
+    // AI summaries for the top final ranked articles (up to MAX_SUMMARY_ARTICLES).
     // Previously summaries were generated per-pair BEFORE ranking, wasting LLM calls
     // on articles that would later be filtered, deduplicated, or ranked below the fold.
     if (HAS_LLM && finalArticles.length > 0) {
-      await Promise.all(finalArticles.slice(0, 5).map(async (article) => {
+      await Promise.all(finalArticles.slice(0, MAX_SUMMARY_ARTICLES).map(async (article) => {
         try {
           const summary = await generateSummary(article, LLM_KEYS);
           if (summary) article.summary_points = summary;
@@ -2614,7 +2628,8 @@ export default async function handler(req, res) {
       status: 'ok',
       articles: finalArticles,
       totalResults: finalArticles.length,
-      cached: false
+      cached: false,
+      lowCoverage: lowCoverage.length > 0 ? lowCoverage : undefined,
     });
 
   } catch (error) {

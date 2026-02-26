@@ -160,7 +160,7 @@ export default function NewsCard({ article, index, rank }) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.1, duration: 0.4 }}
-      className="group bg-white rounded-2xl border border-stone-200 overflow-hidden hover:shadow-xl hover:shadow-stone-200/50 transition-all duration-500 hover:-translate-y-1 relative"
+      className="group bg-white dark:bg-slate-800 rounded-2xl border border-stone-200 dark:border-slate-700 overflow-hidden hover:shadow-xl hover:shadow-stone-200/50 dark:hover:shadow-slate-900/50 transition-all duration-500 hover:-translate-y-1 relative"
     >
       {/* Ranking Badge */}
       <div className="absolute top-4 left-4 z-10 w-10 h-10 bg-slate-900 text-white rounded-full flex items-center justify-center font-bold text-lg shadow-lg">
@@ -216,7 +216,7 @@ export default function NewsCard({ article, index, rank }) {
 
       {/* Image */}
       {article.image_url && !imageError && (
-        <div className="aspect-[16/9] overflow-hidden bg-stone-100">
+        <div className="aspect-[16/9] overflow-hidden bg-stone-100 dark:bg-slate-700">
           <img
             src={article.image_url}
             alt={article.title}
@@ -242,7 +242,7 @@ export default function NewsCard({ article, index, rank }) {
               {article.language.toUpperCase()}
             </span>
           )}
-          <div className="flex items-center gap-1 text-xs text-stone-400 ml-auto">
+          <div className="flex items-center gap-1 text-xs text-stone-400 dark:text-slate-500 ml-auto">
             <Clock className="w-3 h-3" />
             <span>{article.time_ago || 'Today'}</span>
           </div>
@@ -250,42 +250,42 @@ export default function NewsCard({ article, index, rank }) {
 
         {/* Published date */}
         {article.publishedAt && (
-          <div className="flex items-center gap-1 text-xs text-stone-500 mb-3">
+          <div className="flex items-center gap-1 text-xs text-stone-500 dark:text-slate-400 mb-3">
             <span>{new Date(article.publishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
           </div>
         )}
 
         {/* Title */}
-        <h3 className="text-lg font-semibold text-stone-900 leading-snug mb-3 line-clamp-2 group-hover:text-slate-700 transition-colors">
+        <h3 className="text-lg font-semibold text-stone-900 dark:text-stone-100 leading-snug mb-3 line-clamp-2 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors">
           {article.title}
         </h3>
 
         {/* Source */}
-        <p className="text-xs text-stone-400 mb-4 uppercase tracking-wide">
+        <p className="text-xs text-stone-400 dark:text-slate-500 mb-4 uppercase tracking-wide">
           {article.source}
         </p>
 
         {/* AI Summary Bullets */}
         {article.summary_points && article.summary_points.length > 0 ? (
-          <div className="bg-stone-50 rounded-xl p-4 mb-4 border border-stone-100">
+          <div className="bg-stone-50 dark:bg-slate-700/50 rounded-xl p-4 mb-4 border border-stone-100 dark:border-slate-600">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-5 h-5 rounded-md bg-slate-900 flex items-center justify-center">
+              <div className="w-5 h-5 rounded-md bg-slate-900 dark:bg-slate-600 flex items-center justify-center">
                 <span className="text-xs">✨</span>
               </div>
-              <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">AI Summary</span>
+              <span className="text-xs font-semibold text-stone-500 dark:text-slate-400 uppercase tracking-wider">AI Summary</span>
             </div>
             <ul className="space-y-2">
               {article.summary_points.map((point, idx) => (
-                <li key={idx} className="flex items-start gap-2 text-sm text-stone-700">
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-900 mt-2 flex-shrink-0" />
+                <li key={idx} className="flex items-start gap-2 text-sm text-stone-700 dark:text-slate-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-900 dark:bg-slate-400 mt-2 flex-shrink-0" />
                   <span className="leading-relaxed">{point}</span>
                 </li>
               ))}
             </ul>
           </div>
         ) : (
-          <div className="flex items-center gap-2 px-3 py-2 mb-4 rounded-lg bg-stone-50 border border-stone-100">
-            <span className="text-xs text-stone-400 italic">Summary unavailable</span>
+          <div className="flex items-center gap-2 px-3 py-2 mb-4 rounded-lg bg-stone-50 dark:bg-slate-700/30 border border-stone-100 dark:border-slate-700">
+            <span className="text-xs text-stone-400 dark:text-slate-500 italic">Summary unavailable</span>
           </div>
         )}
 
@@ -295,23 +295,23 @@ export default function NewsCard({ article, index, rank }) {
           target="_blank"
           rel="noopener noreferrer"
           onClick={handleArticleClick}
-          className="inline-flex items-center gap-2 text-sm font-medium text-slate-900 hover:text-slate-700 transition-colors group/link"
+          className="inline-flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-200 hover:text-slate-700 dark:hover:text-slate-400 transition-colors group/link"
         >
           Read full article
           <ExternalLink className="w-3.5 h-3.5 group-hover/link:translate-x-0.5 transition-transform" />
         </a>
 
         {/* Reaction row — influences the For You feed */}
-        <div className="flex items-center gap-2 mt-4 pt-3 border-t border-stone-100">
-          <span className="text-xs text-stone-400 flex-1">Relevant to you?</span>
+        <div className="flex items-center gap-2 mt-4 pt-3 border-t border-stone-100 dark:border-slate-700">
+          <span className="text-xs text-stone-400 dark:text-slate-500 flex-1">Relevant to you?</span>
           <button
             onClick={(e) => handleReaction(e, 'up')}
             disabled={isReacting}
             title="Relevant — show me more like this"
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
               reaction === 'up'
-                ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                : 'text-stone-400 hover:bg-stone-100 hover:text-stone-700 border border-transparent'
+                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                : 'text-stone-400 dark:text-slate-500 hover:bg-stone-100 dark:hover:bg-slate-700 hover:text-stone-700 dark:hover:text-slate-300 border border-transparent'
             }`}
           >
             <ThumbsUp className="w-3.5 h-3.5" />
@@ -323,8 +323,8 @@ export default function NewsCard({ article, index, rank }) {
             title="Not relevant — show me less like this"
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
               reaction === 'down'
-                ? 'bg-rose-100 text-rose-600 border border-rose-200'
-                : 'text-stone-400 hover:bg-stone-100 hover:text-stone-700 border border-transparent'
+                ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800'
+                : 'text-stone-400 dark:text-slate-500 hover:bg-stone-100 dark:hover:bg-slate-700 hover:text-stone-700 dark:hover:text-slate-300 border border-transparent'
             }`}
           >
             <ThumbsDown className="w-3.5 h-3.5" />

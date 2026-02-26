@@ -10,6 +10,7 @@ import NewsCard from '@/components/news/NewsCard';
 import LoadingCard from '@/components/news/LoadingCard';
 import EmptyState from '@/components/news/EmptyState';
 import GroupedArticles from '@/components/news/GroupedArticles';
+import LowCoverageTile from '@/components/news/LowCoverageTile';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import AdUnit from '@/components/AdUnit';
 import api from '@/api';
@@ -92,6 +93,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState('24h');
   const [articles, setArticles] = useState([]);
+  const [lowCoverage, setLowCoverage] = useState<{country: string; category: string; count: number}[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -150,6 +152,7 @@ export default function Home() {
       if (result?.articles) {
         const fetchedArticles = result.articles;
         setArticles(fetchedArticles);
+        setLowCoverage(result.lowCoverage || []);
         setLastUpdated(new Date());
 
         // Auto-detect grouping (reads groupBy via closure but doesn't depend on it)
@@ -203,9 +206,9 @@ export default function Home() {
   }[dateRange]), [dateRange]);
 
   return (
-    <div className="flex h-full bg-stone-50">
+    <div className="flex h-full bg-stone-50 dark:bg-slate-900">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:block w-72 flex-shrink-0 border-r border-stone-200">
+      <aside className="hidden lg:block w-72 flex-shrink-0 border-r border-stone-200 dark:border-slate-700">
         <FilterSidebar
           selectedCountries={selectedCountries}
           setSelectedCountries={setSelectedCountries}
@@ -225,7 +228,7 @@ export default function Home() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="bg-white border-b border-stone-200 px-4 lg:px-8 py-4 flex-shrink-0">
+        <header className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-4 lg:px-8 py-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               {/* Mobile Menu */}
@@ -254,11 +257,11 @@ export default function Home() {
               </Sheet>
 
               <div>
-                <h1 className="text-xl lg:text-2xl font-bold text-stone-900 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-slate-900" />
+                <h1 className="text-xl lg:text-2xl font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-slate-900 dark:text-slate-200" />
                   {dateRangeLabel}
                 </h1>
-                <p className="text-sm text-stone-500 hidden sm:block">
+                <p className="text-sm text-stone-500 dark:text-slate-400 hidden sm:block">
                   {hasFilters 
                     ? `${articles.length} articles${searchQuery ? ` matching "${searchQuery}"` : ''}`
                     : 'Select filters to view news'
@@ -269,7 +272,7 @@ export default function Home() {
 
             <div className="flex items-center gap-3">
               {lastUpdated && (
-                <span className="text-xs text-stone-400 hidden sm:inline">
+                <span className="text-xs text-stone-400 dark:text-slate-500 hidden sm:inline">
                   Updated {lastUpdated.toLocaleTimeString()}
                 </span>
               )}
@@ -367,12 +370,16 @@ export default function Home() {
                               <AdUnit
                                 slot="2844757664"
                                 format="horizontal"
-                                className="rounded-xl overflow-hidden bg-stone-100 min-h-[90px]"
+                                className="rounded-xl overflow-hidden bg-stone-100 dark:bg-slate-800 min-h-[90px]"
                               />
                             </div>
                           )}
                         </React.Fragment>
                       ))}
+                      {/* Low coverage notification — shown after articles */}
+                      {lowCoverage.length > 0 && (
+                        <LowCoverageTile items={lowCoverage} index={articles.length} />
+                      )}
                     </div>
                   )}
                 </motion.div>
