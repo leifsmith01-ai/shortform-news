@@ -64,16 +64,16 @@ export default function Trending() {
   }, []);
 
   return (
-    <div className="flex h-full bg-stone-50 flex-col">
+    <div className="flex h-full bg-stone-50 dark:bg-slate-900 flex-col">
       {/* Header */}
-      <header className="bg-white border-b border-stone-200 px-4 lg:px-8 py-4 flex-shrink-0">
+      <header className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-4 lg:px-8 py-4 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl lg:text-2xl font-bold text-stone-900 flex items-center gap-2">
+            <h1 className="text-xl lg:text-2xl font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
               <Flame className="w-5 h-5 text-orange-500" />
               Trending Now
             </h1>
-            <p className="text-sm text-stone-500 hidden sm:block">
+            <p className="text-sm text-stone-500 dark:text-slate-400 hidden sm:block">
               {articles.length > 0
                 ? `Top ${articles.length} most popular articles across all categories`
                 : 'Top articles trending across all categories'}
@@ -82,7 +82,7 @@ export default function Trending() {
 
           <div className="flex items-center gap-3">
             {lastUpdated && (
-              <span className="text-xs text-stone-400 hidden sm:inline">
+              <span className="text-xs text-stone-400 dark:text-slate-500 hidden sm:inline">
                 Updated {lastUpdated.toLocaleTimeString()}
               </span>
             )}
@@ -147,7 +147,7 @@ export default function Trending() {
                 {/* Top 3 highlight */}
                 <div className="flex items-center gap-2 mb-6">
                   <TrendingUp className="w-4 h-4 text-orange-500" />
-                  <span className="text-sm font-semibold text-stone-600 uppercase tracking-wide">
+                  <span className="text-sm font-semibold text-stone-600 dark:text-slate-400 uppercase tracking-wide">
                     Top Stories Right Now
                   </span>
                 </div>
@@ -163,7 +163,7 @@ export default function Trending() {
                           ? 'bg-slate-300 text-slate-700'
                           : index === 2
                           ? 'bg-amber-600 text-white'
-                          : 'bg-stone-200 text-stone-600'
+                          : 'bg-stone-200 dark:bg-slate-700 text-stone-600 dark:text-slate-300'
                       }`}>
                         {index + 1}
                       </div>
@@ -179,9 +179,9 @@ export default function Trending() {
                 animate={{ opacity: 1 }}
                 className="flex flex-col items-center justify-center py-20 text-center"
               >
-                <Flame className="w-12 h-12 text-stone-300 mb-4" />
-                <h3 className="text-lg font-semibold text-stone-500 mb-2">No trending articles</h3>
-                <p className="text-stone-400 text-sm mb-6">
+                <Flame className="w-12 h-12 text-stone-300 dark:text-slate-600 mb-4" />
+                <h3 className="text-lg font-semibold text-stone-500 dark:text-slate-400 mb-2">No trending articles</h3>
+                <p className="text-stone-400 dark:text-slate-500 text-sm mb-6">
                   Could not load trending articles at the moment.
                 </p>
                 <Button onClick={fetchTrending} variant="outline">

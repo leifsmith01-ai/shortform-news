@@ -126,18 +126,18 @@ export default function Keywords() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-stone-50">
+    <div className="h-full flex flex-col bg-stone-50 dark:bg-slate-900">
       {/* Header */}
-      <header className="bg-white border-b border-stone-200 px-4 lg:px-8 py-4 flex-shrink-0">
+      <header className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-4 lg:px-8 py-4 flex-shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-slate-900 dark:bg-slate-700 flex items-center justify-center">
             <Search className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-stone-900">
+            <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100">
               Custom Keywords &amp; Searches
             </h1>
-            <p className="text-sm text-stone-500">
+            <p className="text-sm text-stone-500 dark:text-slate-400">
               {isLoaded && isSignedIn
                 ? `${keywords.length} saved keyword${keywords.length !== 1 ? 's' : ''}`
                 : 'Sign in to save and track keywords'}
@@ -160,11 +160,11 @@ export default function Keywords() {
       {isLoaded && (
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
           {/* Left sidebar — search input + keyword tags (top strip on mobile, sidebar on desktop) */}
-          <aside className="w-full lg:w-72 flex-shrink-0 bg-white border-b lg:border-b-0 lg:border-r border-stone-200 flex flex-col">
+          <aside className="w-full lg:w-72 flex-shrink-0 bg-white dark:bg-slate-800 border-b lg:border-b-0 lg:border-r border-stone-200 dark:border-slate-700 flex flex-col">
 
             {/* Add keyword input */}
-            <div className="p-3 lg:p-4 border-b border-stone-100">
-              <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-2 lg:mb-3 hidden lg:block">
+            <div className="p-3 lg:p-4 border-b border-stone-100 dark:border-slate-700">
+              <p className="text-xs font-semibold text-stone-400 dark:text-slate-500 uppercase tracking-wide mb-2 lg:mb-3 hidden lg:block">
                 Add Keyword or Search
               </p>
               <div className="flex gap-2">
@@ -175,7 +175,7 @@ export default function Keywords() {
                     onChange={e => setInputValue(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder={isSignedIn ? 'e.g., climate change, AI…' : 'Sign in to search…'}
-                    className="pl-8 h-9 rounded-lg border-stone-200 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="pl-8 h-9 rounded-lg border-stone-200 dark:border-slate-600 dark:bg-slate-700 dark:text-stone-100 dark:placeholder:text-slate-500 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                     maxLength={60}
                     disabled={!isSignedIn || isSubmitting}
                   />
@@ -192,7 +192,7 @@ export default function Keywords() {
               </div>
 
               {isSignedIn ? (
-                <p className="text-xs text-stone-400 mt-2 hidden lg:block">Press Enter to add</p>
+                <p className="text-xs text-stone-400 dark:text-slate-500 mt-2 hidden lg:block">Press Enter to add</p>
               ) : (
                 <Link
                   to="/sign-in"
@@ -210,11 +210,11 @@ export default function Keywords() {
                 <div className="p-3 lg:p-4">
                   {!isSignedIn ? (
                     <div className="flex flex-col items-center justify-center py-4 lg:py-10 text-center">
-                      <div className="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center mb-3 hidden lg:flex">
-                        <Lock className="w-5 h-5 text-stone-400" />
+                      <div className="w-12 h-12 rounded-full bg-stone-100 dark:bg-slate-700 flex items-center justify-center mb-3 hidden lg:flex">
+                        <Lock className="w-5 h-5 text-stone-400 dark:text-slate-500" />
                       </div>
-                      <p className="text-sm text-stone-500 font-medium mb-1">Sign in to get started</p>
-                      <p className="text-xs text-stone-400 mb-4 hidden lg:block">Save keywords and track custom news feeds.</p>
+                      <p className="text-sm text-stone-500 dark:text-slate-400 font-medium mb-1">Sign in to get started</p>
+                      <p className="text-xs text-stone-400 dark:text-slate-500 mb-4 hidden lg:block">Save keywords and track custom news feeds.</p>
                       <Link to="/sign-in">
                         <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white gap-2 h-8 text-xs">
                           <LogIn className="w-3.5 h-3.5" />
@@ -225,14 +225,14 @@ export default function Keywords() {
                   ) : isLoadingKeywords ? (
                     <div className="flex flex-nowrap lg:flex-wrap gap-2 overflow-x-auto lg:overflow-x-visible">
                       {[...Array(5)].map((_, i) => (
-                        <div key={i} className="h-8 w-20 bg-stone-100 rounded-full animate-pulse flex-shrink-0" />
+                        <div key={i} className="h-8 w-20 bg-stone-100 dark:bg-slate-700 rounded-full animate-pulse flex-shrink-0" />
                       ))}
                     </div>
                   ) : keywords.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-4 lg:py-10 text-center">
-                      <Tag className="w-6 h-6 text-stone-300 mx-auto mb-2" />
-                      <p className="text-xs text-stone-400">No keywords yet.</p>
-                      <p className="text-xs text-stone-300 mt-1 hidden lg:block">Add one above to create your first feed.</p>
+                      <Tag className="w-6 h-6 text-stone-300 dark:text-slate-600 mx-auto mb-2" />
+                      <p className="text-xs text-stone-400 dark:text-slate-500">No keywords yet.</p>
+                      <p className="text-xs text-stone-300 dark:text-slate-600 mt-1 hidden lg:block">Add one above to create your first feed.</p>
                     </div>
                   ) : (
                     <AnimatePresence>
@@ -248,7 +248,7 @@ export default function Keywords() {
                             className={`inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-full text-sm font-medium cursor-pointer select-none transition-colors flex-shrink-0 lg:flex-shrink ${
                               selectedKeyword?.id === kw.id
                                 ? 'bg-slate-900 text-white'
-                                : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                                : 'bg-stone-100 dark:bg-slate-700 text-stone-700 dark:text-slate-300 hover:bg-stone-200 dark:hover:bg-slate-600'
                             }`}
                           >
                             {kw.keyword}
@@ -277,11 +277,11 @@ export default function Keywords() {
           <div className="flex-1 flex flex-col overflow-hidden">
             {!selectedKeyword ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
-                <Newspaper className="w-12 h-12 text-stone-300 mb-4" />
-                <h3 className="text-lg font-semibold text-stone-700 mb-1">
+                <Newspaper className="w-12 h-12 text-stone-300 dark:text-slate-600 mb-4" />
+                <h3 className="text-lg font-semibold text-stone-700 dark:text-slate-300 mb-1">
                   {isSignedIn ? 'No keyword selected' : 'Sign in to get started'}
                 </h3>
-                <p className="text-stone-400 text-sm max-w-xs">
+                <p className="text-stone-400 dark:text-slate-500 text-sm max-w-xs">
                   {isSignedIn
                     ? 'Add a keyword on the left to create your first custom feed.'
                     : 'Sign in to save keywords and track custom news feeds.'}
@@ -298,9 +298,9 @@ export default function Keywords() {
             ) : (
               <>
                 {/* Feed header */}
-                <div className="bg-white border-b border-stone-200 px-6 py-3 flex items-center gap-3 flex-shrink-0">
-                  <Tag className="w-4 h-4 text-stone-400" />
-                  <span className="font-semibold text-stone-900 capitalize">{selectedKeyword.keyword}</span>
+                <div className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-6 py-3 flex items-center gap-3 flex-shrink-0">
+                  <Tag className="w-4 h-4 text-stone-400 dark:text-slate-500" />
+                  <span className="font-semibold text-stone-900 dark:text-stone-100 capitalize">{selectedKeyword.keyword}</span>
                   <div className="ml-auto flex items-center gap-3">
                     {/* Timeframe picker */}
                     <div className="flex items-center gap-1">
@@ -311,7 +311,7 @@ export default function Keywords() {
                           className={`px-2.5 py-1 text-xs rounded-full font-medium transition-colors ${
                             dateRange === range
                               ? 'bg-slate-900 text-white'
-                              : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                              : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-600'
                           }`}
                         >
                           {range === '24h' ? '24h' : range === '3d' ? '3 days' : '1 week'}
@@ -319,7 +319,7 @@ export default function Keywords() {
                       ))}
                     </div>
                     {!isLoadingArticles && (
-                      <span className="text-xs text-stone-400">
+                      <span className="text-xs text-stone-400 dark:text-slate-500">
                         {articles.length} article{articles.length !== 1 ? 's' : ''}
                       </span>
                     )}
@@ -338,9 +338,9 @@ export default function Keywords() {
                         animate={{ opacity: 1 }}
                         className="flex flex-col items-center justify-center min-h-[400px] text-center"
                       >
-                        <Newspaper className="w-10 h-10 text-stone-300 mb-4" />
-                        <h3 className="text-lg font-semibold text-stone-700 mb-1">No articles found</h3>
-                        <p className="text-stone-400 text-sm max-w-xs">
+                        <Newspaper className="w-10 h-10 text-stone-300 dark:text-slate-600 mb-4" />
+                        <h3 className="text-lg font-semibold text-stone-700 dark:text-slate-300 mb-1">No articles found</h3>
+                        <p className="text-stone-400 dark:text-slate-500 text-sm max-w-xs">
                           No recent articles matched "{selectedKeyword.keyword}". Try a broader term or check back later.
                         </p>
                       </motion.div>

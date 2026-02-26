@@ -117,9 +117,9 @@ export default function Finance() {
   };
 
   return (
-    <div className="flex h-full bg-stone-50">
+    <div className="flex h-full bg-stone-50 dark:bg-slate-900">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:block w-72 flex-shrink-0 border-r border-stone-200">
+      <aside className="hidden lg:block w-72 flex-shrink-0 border-r border-stone-200 dark:border-slate-700">
         <FinanceFilterSidebar
           selectedMarkets={selectedMarkets}
           setSelectedMarkets={setSelectedMarkets}
@@ -137,7 +137,7 @@ export default function Finance() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="bg-white border-b border-stone-200 px-4 lg:px-8 py-4 flex-shrink-0">
+        <header className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-4 lg:px-8 py-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               {/* Mobile Menu */}
@@ -164,11 +164,11 @@ export default function Finance() {
               </Sheet>
 
               <div>
-                <h1 className="text-xl lg:text-2xl font-bold text-stone-900 flex items-center gap-2">
+                <h1 className="text-xl lg:text-2xl font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
                   <TrendingUp className="w-5 h-5 text-emerald-600" />
                   {isToday ? `Finance - ${dateRangeLabel}` : format(selectedDate, 'MMMM d, yyyy')}
                 </h1>
-                <p className="text-sm text-stone-500 hidden sm:block">
+                <p className="text-sm text-stone-500 dark:text-slate-400 hidden sm:block">
                   {hasFilters
                     ? `${articles.length} articles${searchQuery ? ` matching "${searchQuery}"` : ''}`
                     : 'Select filters to view finance news'
@@ -199,7 +199,7 @@ export default function Finance() {
               </Popover>
 
               {lastUpdated && (
-                <span className="text-xs text-stone-400 hidden sm:inline">
+                <span className="text-xs text-stone-400 dark:text-slate-500 hidden sm:inline">
                   Updated {lastUpdated.toLocaleTimeString()}
                 </span>
               )}
@@ -285,10 +285,10 @@ export default function Finance() {
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                         >
-                          <h2 className="text-2xl font-bold text-stone-900 mb-6 flex items-center gap-3">
+                          <h2 className="text-2xl font-bold text-stone-900 dark:text-stone-100 mb-6 flex items-center gap-3">
                             <span className="w-1 h-8 bg-emerald-600 rounded-full" />
                             {groupBy === 'market' ? (MARKET_NAMES[key] || key) : (SECTOR_NAMES[key] || key)}
-                            <span className="text-sm font-normal text-stone-400">
+                            <span className="text-sm font-normal text-stone-400 dark:text-slate-500">
                               ({(groupArts as unknown[]).length} {(groupArts as unknown[]).length === 1 ? 'article' : 'articles'})
                             </span>
                           </h2>

@@ -147,16 +147,16 @@ export default function Personalized() {
   }, [])
 
   return (
-    <div className="h-full flex flex-col bg-stone-50">
-      <header className="bg-white border-b border-stone-200 px-4 lg:px-8 py-4 flex-shrink-0">
+    <div className="h-full flex flex-col bg-stone-50 dark:bg-slate-900">
+      <header className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-4 lg:px-8 py-4 flex-shrink-0">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-slate-900 dark:bg-slate-700 flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-stone-900">For You</h1>
-              <p className="text-sm text-stone-500">
+              <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100">For You</h1>
+              <p className="text-sm text-stone-500 dark:text-slate-400">
                 {historyCount > 0 || likedCount > 0
                   ? [
                       historyCount > 0 && `${historyCount} article${historyCount !== 1 ? 's' : ''} read`,
@@ -172,7 +172,7 @@ export default function Personalized() {
               {topCombos.map(({ country, category }) => (
                 <span
                   key={`${country}:${category}`}
-                  className="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200"
+                  className="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600"
                 >
                   {getComboLabel(country, category)}
                 </span>
@@ -196,13 +196,13 @@ export default function Personalized() {
               animate={{ opacity: 1, scale: 1 }}
               className="flex flex-col items-center justify-center h-full min-h-[500px] text-center px-6"
             >
-              <div className="w-20 h-20 rounded-2xl bg-stone-200 flex items-center justify-center mb-6">
-                <BookOpen className="w-10 h-10 text-stone-400" />
+              <div className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6">
+                <BookOpen className="w-10 h-10 text-stone-400 dark:text-slate-500" />
               </div>
-              <h3 className="text-2xl font-semibold text-stone-900 mb-2">
+              <h3 className="text-2xl font-semibold text-stone-900 dark:text-stone-100 mb-2">
                 Nothing to personalise yet
               </h3>
-              <p className="text-stone-500 max-w-sm mb-8 leading-relaxed">
+              <p className="text-stone-500 dark:text-slate-400 max-w-sm mb-8 leading-relaxed">
                 Read some articles on the Home page and we'll build your personal feed based on what you engage with most.
               </p>
               <Button asChild className="bg-slate-900 hover:bg-slate-800 h-11 px-8">
@@ -215,9 +215,9 @@ export default function Personalized() {
               animate={{ opacity: 1 }}
               className="flex flex-col items-center justify-center h-full min-h-[400px] text-center"
             >
-              <Sparkles className="w-10 h-10 text-stone-300 mb-4" />
-              <p className="text-stone-500">No articles found for your top interests right now.</p>
-              <p className="text-stone-400 text-sm mt-1">Try again later or read more articles to refine your feed.</p>
+              <Sparkles className="w-10 h-10 text-stone-300 dark:text-slate-600 mb-4" />
+              <p className="text-stone-500 dark:text-slate-400">No articles found for your top interests right now.</p>
+              <p className="text-stone-400 dark:text-slate-500 text-sm mt-1">Try again later or read more articles to refine your feed.</p>
             </motion.div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
