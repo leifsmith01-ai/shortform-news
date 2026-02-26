@@ -47,17 +47,17 @@ export default function SavedArticles() {
   const categories = ['all', ...new Set(savedArticles.map(a => a.category))];
 
   return (
-    <div className="h-full flex flex-col bg-stone-50">
+    <div className="h-full flex flex-col bg-stone-50 dark:bg-slate-900">
       {/* Header */}
-      <header className="bg-white border-b border-stone-200 px-4 lg:px-8 py-4">
+      <header className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-4 lg:px-8 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-slate-900 dark:bg-slate-700 flex items-center justify-center">
               <Bookmark className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-stone-900">Saved Articles</h1>
-              <p className="text-sm text-stone-500">
+              <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100">Saved Articles</h1>
+              <p className="text-sm text-stone-500 dark:text-slate-400">
                 {savedArticles.length} saved {savedArticles.length === 1 ? 'article' : 'articles'}
               </p>
             </div>
@@ -69,7 +69,7 @@ export default function SavedArticles() {
               <select
                 value={filterCategory}
                 onChange={(e) => setFilterCategory(e.target.value)}
-                className="px-3 py-1.5 rounded-md border border-stone-200 text-sm bg-white"
+                className="px-3 py-1.5 rounded-md border border-stone-200 dark:border-slate-600 text-sm bg-white dark:bg-slate-700 dark:text-stone-100"
               >
                 {categories.map(cat => (
                   <option key={cat} value={cat}>
@@ -122,13 +122,13 @@ export default function SavedArticles() {
               animate={{ opacity: 1 }}
               className="flex flex-col items-center justify-center h-full min-h-[400px] text-center"
             >
-              <div className="w-20 h-20 rounded-2xl bg-stone-200 flex items-center justify-center mb-6">
-                <Bookmark className="w-10 h-10 text-stone-400" />
+              <div className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6">
+                <Bookmark className="w-10 h-10 text-stone-400 dark:text-slate-500" />
               </div>
-              <h3 className="text-xl font-semibold text-stone-800 mb-2">
+              <h3 className="text-xl font-semibold text-stone-800 dark:text-stone-100 mb-2">
                 No saved articles yet
               </h3>
-              <p className="text-stone-500 max-w-sm">
+              <p className="text-stone-500 dark:text-slate-400 max-w-sm">
                 Articles you bookmark will appear here for easy access later.
               </p>
             </motion.div>
