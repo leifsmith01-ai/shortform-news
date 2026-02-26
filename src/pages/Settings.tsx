@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Settings as SettingsIcon, Building2, Check } from 'lucide-react'
+import { Settings as SettingsIcon, Building2, Check, Moon, Sun } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { TRUSTED_SOURCES, SOURCE_GROUPS, ALL_SOURCE_DOMAINS } from '@/lib/sources'
+import { useTheme } from '@/contexts/ThemeContext'
 
 function getStoredSources(): string[] {
   try {
@@ -20,6 +21,7 @@ function getStoredSources(): string[] {
 
 export default function Settings() {
   const [selectedSources, setSelectedSources] = useState<string[]>(getStoredSources)
+  const { isDark, toggleTheme } = useTheme()
 
   const allSelected = selectedSources.length === 0 || selectedSources.length === ALL_SOURCE_DOMAINS.length
 
@@ -65,42 +67,55 @@ export default function Settings() {
   const activeCount = allSelected ? ALL_SOURCE_DOMAINS.length : selectedSources.length
 
   return (
-    <div className="h-full flex flex-col bg-stone-50">
-      <header className="bg-white border-b border-stone-200 px-4 lg:px-8 py-4 flex-shrink-0">
+    <div className="h-full flex flex-col bg-stone-50 dark:bg-slate-900">
+      <header className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-4 lg:px-8 py-4 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-slate-900 dark:bg-slate-700 flex items-center justify-center">
               <SettingsIcon className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-stone-900">Settings</h1>
-              <p className="text-sm text-stone-500">
+              <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100">Settings</h1>
+              <p className="text-sm text-stone-500 dark:text-slate-400">
                 {activeCount} of {ALL_SOURCE_DOMAINS.length} sources active
               </p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              selectAll()
-              toast.success('All sources enabled')
-            }}
-            disabled={allSelected}
-          >
-            Reset to All
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleTheme}
+              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+            >
+              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              <span className="ml-1.5 hidden sm:inline">{isDark ? 'Light mode' : 'Dark mode'}</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                selectAll()
+                toast.success('All sources enabled')
+              }}
+              disabled={allSelected}
+              className="dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+            >
+              Reset to All
+            </Button>
+          </div>
         </div>
       </header>
 
       <ScrollArea className="flex-1">
         <div className="p-4 lg:p-8 max-w-4xl">
           <div className="mb-6">
-            <h2 className="text-lg font-semibold text-stone-900 flex items-center gap-2 mb-1">
-              <Building2 className="w-5 h-5 text-stone-500" />
+            <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100 flex items-center gap-2 mb-1">
+              <Building2 className="w-5 h-5 text-stone-500 dark:text-slate-400" />
               News Sources
             </h2>
-            <p className="text-sm text-stone-500">
+            <p className="text-sm text-stone-500 dark:text-slate-400">
               Choose which outlets appear in your feed. Deselect sources you don't want to see. Changes apply immediately.
             </p>
           </div>
@@ -118,12 +133,12 @@ export default function Settings() {
                   animate={{ opacity: 1, y: 0 }}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-stone-700 uppercase tracking-wider">
+                    <h3 className="text-sm font-semibold text-stone-700 dark:text-slate-300 uppercase tracking-wider">
                       {group}
                     </h3>
                     <button
                       onClick={() => selectGroup(group, !allInGroupSelected)}
-                      className="text-xs text-slate-500 hover:text-slate-800 transition-colors"
+                      className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
                     >
                       {allInGroupSelected ? 'Deselect all' : 'Select all'}
                     </button>
@@ -136,23 +151,23 @@ export default function Settings() {
                           key={source.domain}
                           className={`flex items-center gap-3 px-4 py-3 rounded-lg border cursor-pointer transition-all duration-200 ${
                             selected
-                              ? 'bg-white border-slate-300 text-stone-900 shadow-sm'
-                              : 'bg-stone-100 border-stone-200 text-stone-400'
+                              ? 'bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-stone-900 dark:text-stone-100 shadow-sm'
+                              : 'bg-stone-100 dark:bg-slate-800 border-stone-200 dark:border-slate-700 text-stone-400 dark:text-slate-500'
                           }`}
                         >
                           <Checkbox
                             checked={selected}
                             onCheckedChange={() => toggleSource(source.domain)}
-                            className="border-stone-300 data-[state=checked]:bg-slate-900 data-[state=checked]:border-slate-900"
+                            className="border-stone-300 dark:border-slate-500 data-[state=checked]:bg-slate-900 data-[state=checked]:border-slate-900 dark:data-[state=checked]:bg-slate-500 dark:data-[state=checked]:border-slate-500"
                           />
                           <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-medium truncate ${selected ? 'text-stone-900' : 'text-stone-400'}`}>
+                            <p className={`text-sm font-medium truncate ${selected ? 'text-stone-900 dark:text-stone-100' : 'text-stone-400 dark:text-slate-500'}`}>
                               {source.name}
                             </p>
-                            <p className="text-xs text-stone-400 truncate">{source.domain}</p>
+                            <p className="text-xs text-stone-400 dark:text-slate-500 truncate">{source.domain}</p>
                           </div>
                           {selected && (
-                            <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
+                            <Check className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />
                           )}
                         </label>
                       )
