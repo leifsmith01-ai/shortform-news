@@ -120,6 +120,7 @@ export default function Layout({ children, currentPageName }: { children: React.
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
               className="h-full"
+              style={{ touchAction: 'pan-y' }}
             >
               {children}
             </motion.div>

@@ -178,6 +178,7 @@ export default function NewsCard({ article, index, rank }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-50px" }}
       transition={{ delay: (index % 6) * 0.06, duration: 0.4 }}
+      style={{ touchAction: 'pan-y' }}
       className="group bg-white dark:bg-slate-800 rounded-2xl border border-stone-200 dark:border-slate-700 overflow-hidden hover:shadow-xl hover:shadow-stone-200/50 dark:hover:shadow-slate-900/50 transition-all duration-500 hover:-translate-y-1 relative"
     >
       {/* Ranking Badge */}

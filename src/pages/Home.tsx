@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCw, Menu, Sparkles, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { toast } from 'sonner';
 import { useUser } from '@clerk/clerk-react';
@@ -365,8 +364,8 @@ export default function Home() {
           </div>
         )}
 
-        {/* Content Area */}
-        <ScrollArea className="flex-1">
+        {/* Content Area — native scroll for smooth mobile performance */}
+        <div className="flex-1 overflow-y-auto overscroll-contain">
           <div className="p-4 lg:p-8">
             <AnimatePresence mode="wait">
               {loading && !hasStaleData ? (
@@ -430,7 +429,7 @@ export default function Home() {
               )}
             </AnimatePresence>
           </div>
-        </ScrollArea>
+        </div>
       </main>
     </div>
   );
