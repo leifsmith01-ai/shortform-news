@@ -173,11 +173,71 @@ export default function FilterSidebar({
   setSelectedSources,
   showNonEnglish,
   setShowNonEnglish,
+  savedKeywords = [],
+}: {
+  selectedCountries: string[];
+  setSelectedCountries: (fn: (prev: string[]) => string[]) => void;
+  selectedCategories: string[];
+  setSelectedCategories: (fn: (prev: string[]) => string[]) => void;
+  searchQuery: string;
+  setSearchQuery: (q: string) => void;
+  dateRange: string;
+  setDateRange: (r: string) => void;
+  selectedSources: string[];
+  setSelectedSources: (fn: (prev: string[]) => string[]) => void;
+  showNonEnglish: boolean;
+  setShowNonEnglish: (v: boolean) => void;
+  savedKeywords?: string[];
 }) {
   const location = useLocation();
   const [countriesOpen, setCountriesOpen] = React.useState(true);
   const [categoriesOpen, setCategoriesOpen] = React.useState(true);
   const [sourcesOpen, setSourcesOpen] = React.useState(false);
+
+  // Autocomplete state
+  const [showSuggestions, setShowSuggestions] = React.useState(false);
+  const [highlightedIndex, setHighlightedIndex] = React.useState(-1);
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+  const suggestionsRef = React.useRef<HTMLDivElement>(null);
+
+  const suggestions = React.useMemo(() => {
+    if (!savedKeywords.length || !searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    return savedKeywords.filter(kw => kw.toLowerCase().includes(q) && kw.toLowerCase() !== q);
+  }, [savedKeywords, searchQuery]);
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedIndex(i => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedIndex(i => Math.max(i - 1, -1));
+    } else if (e.key === 'Enter' && highlightedIndex >= 0) {
+      e.preventDefault();
+      setSearchQuery(suggestions[highlightedIndex]);
+      setShowSuggestions(false);
+      setHighlightedIndex(-1);
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+      setHighlightedIndex(-1);
+    }
+  };
+
+  // Close suggestions when clicking outside
+  React.useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (
+        suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node) &&
+        searchInputRef.current && !searchInputRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
   const [continentStates, setContinentStates] = React.useState<Record<string, boolean>>(() => {
     // Auto-expand any continent that contains a currently selected country
     const init: Record<string, boolean> = {};
@@ -291,13 +351,47 @@ export default function FilterSidebar({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <Input
+              ref={searchInputRef}
               type="text"
-              placeholder="e.g., climate change, AI..."
+              placeholder="e.g., AI, climate AND policy..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => { setSearchQuery(e.target.value); setShowSuggestions(true); setHighlightedIndex(-1); }}
+              onFocus={() => setShowSuggestions(true)}
+              onKeyDown={handleSearchKeyDown}
               className="pl-9 bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 focus:border-slate-500 focus:ring-slate-500"
             />
+            {/* Saved keyword suggestions */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div
+                ref={suggestionsRef}
+                className="absolute z-50 top-full mt-1 w-full bg-slate-800 border border-slate-700 rounded-md shadow-lg overflow-hidden"
+              >
+                {suggestions.map((kw, i) => (
+                  <button
+                    key={kw}
+                    className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors ${
+                      i === highlightedIndex
+                        ? 'bg-slate-700 text-white'
+                        : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                    }`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setSearchQuery(kw);
+                      setShowSuggestions(false);
+                      setHighlightedIndex(-1);
+                    }}
+                    onMouseEnter={() => setHighlightedIndex(i)}
+                  >
+                    <Tag className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                    {kw}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+          <p className="mt-1.5 text-[11px] text-slate-600">
+            Use <span className="font-mono text-slate-500">AND</span> / <span className="font-mono text-slate-500">NOT</span> for precise searches
+          </p>
         </div>
 
         {/* Date Range Section */}

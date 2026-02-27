@@ -1078,7 +1078,7 @@ function categoryRelevanceScore(article, category) {
 // ── Main ranking function ────────────────────────────────────────────────
 // `searchTerms` (optional): when present, enables Signal 7 (keyword relevance)
 // which boosts articles that strongly match the user's search query.
-function rankAndDeduplicateArticles(articles, { usePopularity = false, category = null, searchTerms = null } = {}) {
+function rankAndDeduplicateArticles(articles, { usePopularity = false, category = null, searchTerms = null, rawKeyword = null } = {}) {
   if (articles.length === 0) return [];
 
   // 1. Build IDF map — words that appear in many titles are less distinctive
@@ -1107,7 +1107,7 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
     // _countryScore is set by the country relevance filter (-1 = not set, i.e. world query)
     countryRel: a._countryScore ?? -1,
     // Signal 7: keyword relevance — only active during keyword searches
-    kwRelevance: searchTerms ? keywordRelevanceScore(a, searchTerms) : -1,
+    kwRelevance: searchTerms ? keywordRelevanceScore(a, searchTerms, rawKeyword) : -1,
     domain: getSourceDomain(a),
   }));
 
@@ -1735,10 +1735,22 @@ async function expandQueryWithLLM(keyword, llmKeys) {
   return null; // fallback: no expansion
 }
 
+// Detect user-supplied boolean operators (AND, OR, NOT in uppercase by convention).
+// When present the query is passed as-is to search APIs — no expansion is applied
+// since the user has already expressed their intent explicitly.
+function hasBooleanSyntax(keyword) {
+  return / AND | OR | NOT /i.test(keyword);
+}
+
 // Build the final search query, using LLM expansion if available.
 // Called with await since LLM expansion is async.
 async function buildExpandedSearchQuery(rawKeyword, llmKeys) {
   const normalized = rawKeyword.trim().toLowerCase();
+
+  // 0. Boolean query: user wrote AND/OR/NOT — pass through without expansion
+  if (hasBooleanSyntax(rawKeyword)) {
+    return { query: rawKeyword.trim(), source: 'boolean' };
+  }
 
   // 1. Check static expansion map first (instant, no LLM call needed)
   const staticExpansion = KEYWORD_EXPANSION_MAP[normalized];
@@ -1766,28 +1778,70 @@ async function buildExpandedSearchQuery(rawKeyword, llmKeys) {
 }
 
 // ── Keyword relevance scoring ──────────────────────────────────────────────
+
+// Simple English suffix stemmer — allows "running" to match "run", "runner" etc.
+// Only strips when the result is still >= 3 chars to avoid over-stemming short words.
+function stemWord(word) {
+  if (word.length < 5) return word;
+  const rules = [
+    [/ational$/, 'ate'], [/tional$/, 'tion'], [/ations?$/, 'ate'],
+    [/izing$/, 'ize'],   [/ising$/, 'ise'],   [/ness$/, ''],
+    [/ment$/, ''],       [/ings?$/, ''],       [/edly$/, ''],
+    [/ingly$/, ''],      [/ated?$/, ''],       [/iers?$/, 'y'],
+    [/ies$/, 'y'],       [/ers?$/, ''],        [/ed$/, ''],
+    [/ly$/, ''],         [/es$/, ''],          [/s$/, ''],
+  ];
+  for (const [pattern, replacement] of rules) {
+    const result = word.replace(pattern, replacement);
+    if (result !== word && result.length >= 3) return result;
+  }
+  return word;
+}
+
 // Scores how strongly an article matches the user's search keyword (0-1).
-// Title matches are weighted highest, description mid, content lowest.
+// Improvements over v1:
+//   - Exact phrase bonus: multi-word keyword appearing verbatim in title/desc scores extra
+//   - Stemming: "running" matches articles about "run", "runner", etc.
+//   - Cumulative field scoring: a term found in both title and description scores higher
+//     than a title-only match, rewarding articles with deep keyword coverage
 // This becomes Signal 7 in the ranking engine for keyword searches.
-function keywordRelevanceScore(article, searchTerms) {
+function keywordRelevanceScore(article, searchTerms, rawKeyword) {
   if (!searchTerms || searchTerms.length === 0) return 0;
   const title = (article.title || '').toLowerCase();
   const desc = (article.description || '').toLowerCase();
   const content = (article.content || '').toLowerCase();
 
   let score = 0;
-  for (const term of searchTerms) {
-    const t = term.toLowerCase().replace(/^["']+|["']+$/g, '');
-    if (t.length < 2) continue;
-    // Title match: highest value (visible, most deliberate placement)
-    if (title.includes(t)) score += 3;
-    // Description match
-    else if (desc.includes(t)) score += 1.5;
-    // Content/body match
-    else if (content.includes(t)) score += 0.5;
+
+  // Exact phrase bonus: if the original multi-word keyword appears verbatim, reward it
+  // strongly — this is almost certainly the article the user is looking for.
+  // Skip for boolean queries (they contain AND/OR/NOT which aren't literal phrases).
+  if (rawKeyword) {
+    const phrase = rawKeyword.trim().toLowerCase();
+    if (phrase.includes(' ') && !/\b(and|or|not)\b/i.test(phrase)) {
+      if (title.includes(phrase))     score += 5;
+      else if (desc.includes(phrase)) score += 2.5;
+    }
   }
-  // Normalise to 0-1 range: 1 term in title = 0.6, 2+ = higher
-  return Math.min(score / 5, 1);
+
+  for (const term of searchTerms) {
+    const t = term.toLowerCase().replace(/^["'(]+|["')]+$/g, '');
+    if (t.length < 2) continue;
+    const tStem = stemWord(t);
+
+    const inTitle   = title.includes(t)   || (tStem !== t && title.includes(tStem));
+    const inDesc    = desc.includes(t)    || (tStem !== t && desc.includes(tStem));
+    const inContent = content.includes(t) || (tStem !== t && content.includes(tStem));
+
+    // Cumulative: each field that contains the term contributes independently.
+    // Title is worth most (3), desc adds signal (1), content adds a small bump (0.5).
+    if (inTitle)   score += 3;
+    if (inDesc)    score += 1;
+    if (inContent) score += 0.5;
+  }
+
+  // Normalise to 0-1. Ceiling raised to 8 to accommodate phrase bonus + cumulative scoring.
+  return Math.min(score / 8, 1);
 }
 
 // ── Keyword search helpers ─────────────────────────────────────────────────
@@ -2232,6 +2286,44 @@ function formatRSSArticle(item, feedSource, country, category) {
   };
 }
 
+// ── Search analytics ───────────────────────────────────────────────────────
+// Fire-and-forget logging to Supabase. Requires the search_analytics table:
+//
+//   CREATE TABLE search_analytics (
+//     id               uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+//     keyword          text        NOT NULL,
+//     user_id          text,
+//     expansion_source text,
+//     result_count     integer,
+//     is_boolean       boolean     DEFAULT false,
+//     created_at       timestamptz DEFAULT now()
+//   );
+//
+// Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_ANON_KEY) to enable.
+async function logSearchAnalytics(supabaseUrl, supabaseKey, { keyword, userId, expansionSource, resultCount, isBoolean }) {
+  if (!supabaseUrl || !supabaseKey) return;
+  try {
+    await fetch(`${supabaseUrl}/rest/v1/search_analytics`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseKey}`,
+        'apikey': supabaseKey,
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({
+        keyword,
+        user_id: userId || null,
+        expansion_source: expansionSource,
+        result_count: resultCount,
+        is_boolean: isBoolean,
+      }),
+    });
+  } catch (err) {
+    console.warn('[analytics] Failed to log search:', err.message);
+  }
+}
+
 // Main handler
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -2240,7 +2332,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { countries, categories, searchQuery, dateRange, sources: userSources, language: langParam } = req.method === 'POST' ? req.body : req.query;
+  const { countries, categories, searchQuery, dateRange, sources: userSources, language: langParam, userId } = req.method === 'POST' ? req.body : req.query;
   // showNonEnglish=true removes the language=en filter from all API calls, allowing
   // native-language articles to surface for non-English-dominant countries.
   const showNonEnglish = langParam === 'all' || langParam === true || langParam === 'true';
@@ -2269,6 +2361,8 @@ export default async function handler(req, res) {
   const WORLD_NEWS_API_KEY = process.env.WORLD_NEWS_API_KEY   || null;
   const NEWS_DATA_API_KEY  = process.env.NEWS_DATA_API_KEY    || null;
   const GNEWS_API_KEY      = process.env.GNEWS_API_KEY        || null;
+  const SUPABASE_URL       = process.env.SUPABASE_URL            || process.env.VITE_SUPABASE_URL       || null;
+  const SUPABASE_KEY       = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || null;
 
   // LLM summarisation — collect all configured keys; generateSummary tries them in order
   const LLM_KEYS = {
@@ -2307,9 +2401,10 @@ export default async function handler(req, res) {
     const { query: expandedQuery, source: expansionSource } = await buildExpandedSearchQuery(keyword, LLM_KEYS);
     console.log(`Keyword search: "${keyword}" → ${expansionSource}: ${expandedQuery}`);
 
-    // Extract search terms for keyword relevance scoring (Signal 7)
+    // Extract search terms for keyword relevance scoring (Signal 7).
+    // For boolean queries split on all operators; for OR-expanded queries split on OR only.
     const searchTerms = expandedQuery
-      .split(/ OR /i)
+      .split(expansionSource === 'boolean' ? / AND | OR | NOT /i : / OR /i)
       .map(t => t.trim().replace(/^["'(]+|["')]+$/g, ''))
       .filter(t => t.length > 1);
 
@@ -2456,6 +2551,7 @@ export default async function handler(req, res) {
         usePopularity: usePopularitySort,
         category: categoryList.length === 1 ? categoryList[0] : null,
         searchTerms,
+        rawKeyword: keyword,
       });
       const clean = ranked.map(({ _meta, _coverage, _countryScore, _matchesCategory, ...rest }) => rest);
 
@@ -2474,6 +2570,15 @@ export default async function handler(req, res) {
       // Cache keyword results (1-hour TTL since keyword results are more time-sensitive)
       CACHE[kwCacheKey] = { timestamp: Date.now(), articles: clean };
       evictCacheIfNeeded();
+
+      // Fire-and-forget analytics (non-blocking — never delays the response)
+      logSearchAnalytics(SUPABASE_URL, SUPABASE_KEY, {
+        keyword,
+        userId: userId || null,
+        expansionSource,
+        resultCount: clean.length,
+        isBoolean: expansionSource === 'boolean',
+      });
 
       return res.status(200).json({ status: 'ok', articles: clean, totalResults: clean.length, cached: false });
     } catch (error) {

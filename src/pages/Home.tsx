@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { toast } from 'sonner';
+import { useUser } from '@clerk/clerk-react';
 import FilterSidebar from '@/components/news/FilterSidebar';
 import NewsCard from '@/components/news/NewsCard';
 import LoadingCard from '@/components/news/LoadingCard';
@@ -78,6 +79,18 @@ function getStoredList(key: string, fallback: string[]): string[] {
 }
 
 export default function Home() {
+  const { isSignedIn } = useUser();
+  const [savedKeywords, setSavedKeywords] = useState<string[]>([]);
+
+  // Fetch saved keywords for autocomplete suggestions in the search box.
+  // This is non-critical — failure is silently ignored.
+  useEffect(() => {
+    if (!isSignedIn) { setSavedKeywords([]); return; }
+    api.getKeywords()
+      .then(kws => setSavedKeywords(kws.map((k: { keyword: string }) => k.keyword)))
+      .catch(() => {});
+  }, [isSignedIn]);
+
   const [selectedCountries, setSelectedCountries] = useState<string[]>(() =>
     getStoredList('selectedCountries', ['us'])
   );
@@ -222,6 +235,7 @@ export default function Home() {
           setSelectedSources={setSelectedSources}
           showNonEnglish={showNonEnglish}
           setShowNonEnglish={setShowNonEnglish}
+          savedKeywords={savedKeywords}
         />
       </aside>
 
@@ -252,6 +266,7 @@ export default function Home() {
                     setSelectedSources={setSelectedSources}
                     showNonEnglish={showNonEnglish}
                     setShowNonEnglish={setShowNonEnglish}
+                    savedKeywords={savedKeywords}
                   />
                 </SheetContent>
               </Sheet>
