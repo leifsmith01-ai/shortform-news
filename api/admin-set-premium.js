@@ -4,6 +4,9 @@
 // any privileged action is taken.
 // Requires CLERK_SECRET_KEY to be set in the environment.
 
+import { applyRateLimit } from './lib/rateLimit.js';
+import { validateEnv } from './lib/validateEnv.js';
+
 export default async function handler(req, res) {
   // Restrict CORS to the application's own origin only
   const allowedOrigin = process.env.APP_ORIGIN || 'https://shortform.news';
@@ -14,11 +17,13 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  // Rate limit — this endpoint upgrades accounts; 5 attempts per minute per IP is sufficient
+  if (applyRateLimit(req, res, 5)) return;
+
+  const { valid: envValid } = validateEnv(res, { required: ['CLERK_SECRET_KEY'] });
+  if (!envValid) return;
+
   const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY;
-  if (!CLERK_SECRET_KEY) {
-    console.error('CLERK_SECRET_KEY is not configured');
-    return res.status(500).json({ error: 'Server configuration error' });
-  }
 
   // Extract the Clerk session JWT from the Authorization header
   const authHeader = req.headers.authorization;

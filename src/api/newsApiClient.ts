@@ -1,21 +1,13 @@
 // src/api/newsApiClient.ts
 // Calls our Vercel serverless backend which handles NewsAPI + Gemini + Smart Cache
 
+import type { Article, FetchNewsParams } from '@/types/article';
+
 const API_BASE = '/api'; // Vercel serverless functions are at /api/*
 
 export const newsApiClient = {
 
-  async fetchNews({ countries, categories, searchQuery, dateRange, sources, language, userId, mode, strictMode }: {
-    countries: string[];
-    categories: string[];
-    searchQuery?: string;
-    dateRange?: string;
-    sources?: string[];
-    language?: string;  // 'en' (default, English only) | 'all' (include non-English)
-    userId?: string;    // optional Clerk user ID for search analytics attribution
-    mode?: 'keyword';   // 'keyword' = dedicated keyword monitoring mode (stricter relevance)
-    strictMode?: boolean; // when true, only return articles with keyword in the headline
-  }) {
+  async fetchNews({ countries, categories, searchQuery, dateRange, sources, language, userId, mode, strictMode }: FetchNewsParams) {
     try {
       const response = await fetch(`${API_BASE}/news`, {
         method: 'POST',
@@ -46,7 +38,7 @@ export const newsApiClient = {
     }
   },
 
-  async saveArticle(article: any) {
+  async saveArticle(article: Article) {
     try {
       const saved = await this.getSavedArticles();
       const updated = [...saved, { ...article, savedAt: new Date().toISOString() }];
@@ -60,7 +52,7 @@ export const newsApiClient = {
   async unsaveArticle(articleId: string) {
     try {
       const saved = await this.getSavedArticles();
-      const updated = saved.filter((a: any) => a.id !== articleId);
+      const updated = saved.filter((a: Article) => a.id !== articleId);
       localStorage.setItem('savedArticles', JSON.stringify(updated));
       return true;
     } catch (error) {
@@ -78,11 +70,11 @@ export const newsApiClient = {
     }
   },
 
-  async addToHistory(article: any) {
+  async addToHistory(article: Article) {
     try {
       const history = await this.getReadingHistory();
       // Avoid duplicates - remove if already exists
-      const filtered = history.filter((a: any) => a.id !== article.id);
+      const filtered = history.filter((a: Article) => a.id !== article.id);
       const updated = [{ ...article, readAt: new Date().toISOString() }, ...filtered].slice(0, 100);
       localStorage.setItem('readingHistory', JSON.stringify(updated));
       return article;
@@ -94,7 +86,7 @@ export const newsApiClient = {
   // Cache functions (handled server-side, these are no-ops)
   async getCachedNews() { return null; },
   async cacheNews() { return null; },
-  async summarizeWithClaude() { return null; }
+  async summarizeWithClaude(_articles: Article[]) { return null; }
 };
 
 export default newsApiClient;

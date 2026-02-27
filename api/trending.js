@@ -1,6 +1,10 @@
 // api/trending.js - Dedicated trending news endpoint
 // Fetches top headlines from all categories in parallel, returns top 10 newest
 
+import { applyRateLimit } from './lib/rateLimit.js';
+import { validateEnv } from './lib/validateEnv.js';
+import { getCache, setCache } from './lib/redisCache.js';
+
 const CACHE = {};
 const CACHE_TTL_HOURS = 6; // Refresh trending more frequently than regular news
 
@@ -250,25 +254,30 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const NEWS_API_KEY = process.env.VITE_NEWS_API_KEY || process.env.NEWS_API_KEY;
+  // Rate limiting — 20 requests per IP per minute (trending is cheaper to cache)
+  if (applyRateLimit(req, res, 20)) return;
+
+  const { valid: envValid } = validateEnv(res, {
+    required: ['NEWS_API_KEY'],
+    optional: ['GUARDIAN_API_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'OPENAI_API_KEY', 'COHERE_API_KEY'],
+  });
+  if (!envValid) return;
+
+  const NEWS_API_KEY = process.env.NEWS_API_KEY;
   const GUARDIAN_API_KEY = process.env.GUARDIAN_API_KEY || null;
   const LLM_KEYS = {
-    gemini: process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || null,
+    gemini: process.env.GEMINI_API_KEY || null,
     groq:   process.env.GROQ_API_KEY   || null,
     openai: process.env.OPENAI_API_KEY || null,
     cohere: process.env.COHERE_API_KEY || null,
   };
   const HAS_LLM = Object.values(LLM_KEYS).some(Boolean);
 
-  if (!NEWS_API_KEY) {
-    console.error('NEWS_API_KEY is not configured');
-    return res.status(500).json({ error: 'Server configuration error' });
-  }
-
   const cacheKey = getCacheKey();
-  if (isCacheValid(CACHE[cacheKey])) {
+  const trendingCached = await getCache(cacheKey);
+  if (trendingCached) {
     console.log(`Trending cache HIT: ${cacheKey}`);
-    return res.status(200).json({ status: 'ok', articles: CACHE[cacheKey].articles, cached: true });
+    return res.status(200).json({ status: 'ok', articles: trendingCached.articles, cached: true });
   }
 
   try {
@@ -312,7 +321,7 @@ export default async function handler(req, res) {
       }));
     }
 
-    CACHE[cacheKey] = { timestamp: Date.now(), articles: top10 };
+    await setCache(cacheKey, { timestamp: Date.now(), articles: top10 }, CACHE_TTL_HOURS * 3600);
     return res.status(200).json({ status: 'ok', articles: top10, totalResults: top10.length, cached: false });
 
   } catch (error) {

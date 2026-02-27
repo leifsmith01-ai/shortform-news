@@ -2,10 +2,18 @@
 // Sources: NewsAPI (primary) → WorldNewsAPI → NewsData.io → The Guardian (fallback)
 // Cache: 12-hour TTL (articles refresh twice a day)
 
-const CACHE = {}; // In-memory cache (persists between requests on same instance)
-
-const CACHE_TTL_HOURS = 12; // Refresh articles twice a day
-const CACHE_MAX_ENTRIES = 500; // Prevent unbounded memory growth
+import { applyRateLimit } from './lib/rateLimit.js';
+import { validateEnv } from './lib/validateEnv.js';
+import {
+  CACHE, CACHE_TTL_HOURS, CACHE_MAX_ENTRIES, KEYWORD_CACHE_TTL_HOURS,
+  getCacheKey, getSourceFingerprint, isCacheValid, evictCacheIfNeeded,
+} from './lib/cache.js';
+import { getCache, setCache } from './lib/redisCache.js';
+// articleFilter.js and ranking.js provide the canonical, tested implementations
+// of the functions below. This file still carries its own inline copies during the
+// migration — a full cut-over is the next step once integration tests are in place.
+// import { ... } from './lib/articleFilter.js';
+// import { ... } from './lib/ranking.js';
 
 // Maximum number of articles to generate AI summaries for per request.
 // Raising this improves coverage but uses more LLM API quota.
@@ -849,53 +857,6 @@ const GNEWS_CATEGORY_MAP = {
   politics:      'nation',   // 'nation' covers national politics better than 'general'
   world:         'world',
 };
-
-// Helper: generate cache key (slot = "am" or "pm" to refresh twice a day)
-// Includes a source hash so different source selections don't collide.
-// Includes language so English-only and all-languages results are cached separately.
-function getCacheKey(country, category, dateRange, sourceFingerprint, showNonEnglish) {
-  const now = new Date();
-  const date = now.toISOString().split('T')[0];
-  const slot = now.getUTCHours() < 12 ? 'am' : 'pm';
-  const sf = sourceFingerprint || 'all';
-  const lang = showNonEnglish ? 'all' : 'en';
-  return `${date}-${slot}-${country}-${category}-${dateRange || '24h'}-${sf}-${lang}`;
-}
-
-// Short hash of selected sources to use in cache keys
-function getSourceFingerprint(userSources) {
-  if (!userSources || userSources.length === 0) return 'all';
-  // Simple hash: sort + join + take first 8 chars of a basic checksum
-  const sorted = [...userSources].sort().join(',');
-  let hash = 0;
-  for (let i = 0; i < sorted.length; i++) {
-    hash = ((hash << 5) - hash + sorted.charCodeAt(i)) | 0;
-  }
-  return (hash >>> 0).toString(36);
-}
-
-const KEYWORD_CACHE_TTL_HOURS = 1; // Keyword results refresh more frequently
-
-// Helper: check if cache is still valid
-function isCacheValid(cacheEntry, key) {
-  if (!cacheEntry) return false;
-  const ageInHours = (Date.now() - cacheEntry.timestamp) / (1000 * 60 * 60);
-  // Keyword caches expire after 1 hour (more time-sensitive than category caches)
-  const ttl = (key && key.startsWith('kw-')) ? KEYWORD_CACHE_TTL_HOURS : CACHE_TTL_HOURS;
-  return ageInHours < ttl;
-}
-
-// Evict oldest entries when cache exceeds max size
-function evictCacheIfNeeded() {
-  const keys = Object.keys(CACHE);
-  if (keys.length <= CACHE_MAX_ENTRIES) return;
-  // Sort by timestamp ascending (oldest first), remove excess
-  const sorted = keys
-    .map(k => ({ key: k, ts: CACHE[k].timestamp || 0 }))
-    .sort((a, b) => a.ts - b.ts);
-  const toRemove = sorted.slice(0, keys.length - CACHE_MAX_ENTRIES);
-  for (const { key } of toRemove) delete CACHE[key];
-}
 
 // Fetch with a timeout — wraps any fetch() call with an AbortController
 // so a single slow API can't block the entire serverless response.
@@ -2351,6 +2312,18 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
+  // Rate limiting — 30 requests per IP per minute
+  if (applyRateLimit(req, res)) return;
+
+  // Validate required environment variables up front
+  const { valid: envValid } = validateEnv(res, {
+    required: ['NEWS_API_KEY'],
+    optional: ['GUARDIAN_API_KEY', 'WORLD_NEWS_API_KEY', 'NEWS_DATA_API_KEY', 'GNEWS_API_KEY',
+               'GEMINI_API_KEY', 'GROQ_API_KEY', 'OPENAI_API_KEY', 'COHERE_API_KEY',
+               'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'],
+  });
+  if (!envValid) return;
+
   const { countries, categories, searchQuery, dateRange, sources: userSources, language: langParam, userId, mode, strictMode } = req.method === 'POST' ? req.body : req.query;
   const isKeywordMode = mode === 'keyword';
   // showNonEnglish=true removes the language=en filter from all API calls, allowing
@@ -2393,11 +2366,6 @@ export default async function handler(req, res) {
   };
   const HAS_LLM = Object.values(LLM_KEYS).some(Boolean);
 
-  if (!NEWS_API_KEY) {
-    console.error('NEWS_API_KEY is not configured');
-    return res.status(500).json({ error: 'Server configuration error' });
-  }
-
   // ── Keyword search: search APIs directly when a searchQuery is provided ────
   // Now country/category-aware: if the user has filters active, results are
   // tagged with the correct country/category and the ranking engine applies
@@ -2416,9 +2384,10 @@ export default async function handler(req, res) {
     // Check cache (keyed on keyword + filters + dateRange + sources + mode)
     const modeTag = isKeywordMode ? (strictMode ? 'kw-strict' : 'kw-monitor') : 'kw';
     const kwCacheKey = `${modeTag}-${keyword.toLowerCase()}-${countryList.sort().join(',')}-${categoryList.sort().join(',')}-${dateRange || 'all'}-${sourceFingerprint}`;
-    if (isCacheValid(CACHE[kwCacheKey], kwCacheKey)) {
+    const kwCached = await getCache(kwCacheKey);
+    if (kwCached) {
       console.log(`Keyword cache HIT: "${keyword}"`);
-      return res.status(200).json({ status: 'ok', articles: CACHE[kwCacheKey].articles, totalResults: CACHE[kwCacheKey].articles.length, cached: true });
+      return res.status(200).json({ status: 'ok', articles: kwCached.articles, totalResults: kwCached.articles.length, cached: true });
     }
 
     // Build expanded query — tries static map first, then LLM, then raw
@@ -2638,7 +2607,7 @@ export default async function handler(req, res) {
       }
 
       // Cache keyword results (1-hour TTL since keyword results are more time-sensitive)
-      CACHE[kwCacheKey] = { timestamp: Date.now(), articles: clean };
+      await setCache(kwCacheKey, { timestamp: Date.now(), articles: clean });
       evictCacheIfNeeded();
 
       // Fire-and-forget analytics (non-blocking — never delays the response)
@@ -2853,9 +2822,10 @@ async function fetchCountryCategoryPair(country, category, ctx) {
 
   const cacheKey = getCacheKey(country, category, dateRange, sourceFingerprint, showNonEnglish);
 
-  if (isCacheValid(CACHE[cacheKey])) {
+  const cachedEntry = await getCache(cacheKey);
+  if (cachedEntry) {
     console.log(`Cache HIT: ${cacheKey}`);
-    return CACHE[cacheKey].articles;
+    return cachedEntry.articles;
   }
 
   console.log(`Cache MISS: ${cacheKey} — fetching fresh data`);
@@ -3216,6 +3186,6 @@ async function fetchCountryCategoryPair(country, category, ctx) {
   // strongly they actually mention the requested country — making cache hits rank
   // differently from fresh fetches.
   const cleanForCache = formattedArticles.map(({ _meta, ...rest }) => rest);
-  CACHE[cacheKey] = { timestamp: Date.now(), articles: cleanForCache };
+  await setCache(cacheKey, { timestamp: Date.now(), articles: cleanForCache });
   return cleanForCache;
 }
