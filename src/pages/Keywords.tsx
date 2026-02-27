@@ -1,9 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Tag, Plus, X, Lock, Newspaper, Search, LogIn } from 'lucide-react'
+import { Tag, Plus, X, Lock, Newspaper, Search, LogIn, Globe, CrosshairIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from 'sonner'
 import NewsCard from '@/components/news/NewsCard'
 import LoadingCard from '@/components/news/LoadingCard'
@@ -17,6 +24,43 @@ interface Keyword {
   created_at: string
 }
 
+// Country options for the region focus selector.
+// 'world' = no geographic filter (search globally).
+const REGION_OPTIONS: { value: string; label: string }[] = [
+  { value: 'world', label: 'Global' },
+  { value: 'au', label: 'Australia' },
+  { value: 'us', label: 'United States' },
+  { value: 'gb', label: 'United Kingdom' },
+  { value: 'ca', label: 'Canada' },
+  { value: 'nz', label: 'New Zealand' },
+  { value: 'de', label: 'Germany' },
+  { value: 'fr', label: 'France' },
+  { value: 'in', label: 'India' },
+  { value: 'jp', label: 'Japan' },
+  { value: 'sg', label: 'Singapore' },
+  { value: 'ae', label: 'UAE' },
+  { value: 'za', label: 'South Africa' },
+  { value: 'br', label: 'Brazil' },
+  { value: 'kr', label: 'South Korea' },
+  { value: 'it', label: 'Italy' },
+  { value: 'es', label: 'Spain' },
+  { value: 'nl', label: 'Netherlands' },
+  { value: 'se', label: 'Sweden' },
+  { value: 'no', label: 'Norway' },
+  { value: 'ie', label: 'Ireland' },
+]
+
+// Persist preferences to localStorage so they survive page refreshes
+const STORAGE_KEY_REGION = 'kw-region'
+const STORAGE_KEY_STRICT = 'kw-strict'
+
+function loadPersistedRegion(): string {
+  try { return localStorage.getItem(STORAGE_KEY_REGION) || 'world' } catch { return 'world' }
+}
+function loadPersistedStrict(): boolean {
+  try { return localStorage.getItem(STORAGE_KEY_STRICT) === 'true' } catch { return false }
+}
+
 export default function Keywords() {
   const { isSignedIn, isLoaded } = useUser()
   const [keywords, setKeywords] = useState<Keyword[]>([])
@@ -27,8 +71,22 @@ export default function Keywords() {
   const [articles, setArticles] = useState<any[]>([])
   const [isLoadingArticles, setIsLoadingArticles] = useState(false)
   const [dateRange, setDateRange] = useState<'24h' | '3d' | 'week'>('24h')
+
+  // Region focus — persisted to localStorage
+  const [region, setRegion] = useState<string>(loadPersistedRegion)
+  // Strict/headline-match mode — persisted to localStorage
+  const [strictMode, setStrictMode] = useState<boolean>(loadPersistedStrict)
+
   // Ref for aborting in-flight keyword fetches
   const abortRef = React.useRef<AbortController | null>(null)
+
+  // Persist preferences when they change
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEY_REGION, region) } catch {}
+  }, [region])
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEY_STRICT, String(strictMode)) } catch {}
+  }, [strictMode])
 
   // Load saved keywords on mount (sign-in required)
   useEffect(() => {
@@ -43,10 +101,9 @@ export default function Keywords() {
       .finally(() => setIsLoadingKeywords(false))
   }, [isLoaded, isSignedIn])
 
-  // Fetch articles whenever selected keyword changes.
-  // The backend keyword search is now country/category-aware but for the
-  // Keywords page we do a broad global search — the backend handles LLM
-  // expansion, keyword relevance scoring, and result caching automatically.
+  // Fetch articles whenever selected keyword, date range, region, or strict mode changes.
+  // Uses mode: 'keyword' to activate dedicated monitoring-grade relevance logic
+  // in the backend (tighter LLM expansion, min relevance threshold, keyword-dominant ranking).
   const fetchArticlesForKeyword = useCallback(async (kw: Keyword) => {
     // Cancel any previous in-flight fetch
     if (abortRef.current) abortRef.current.abort()
@@ -56,11 +113,14 @@ export default function Keywords() {
     setIsLoadingArticles(true)
     setArticles([])
     try {
+      const countries = region === 'world' ? ['world'] : [region]
       const result = await api.fetchNews({
-        countries: ['world'],
+        countries,
         categories: ['world'],
         searchQuery: kw.keyword,
         dateRange,
+        mode: 'keyword',
+        strictMode,
       })
       if (controller.signal.aborted) return
       setArticles(result?.articles ?? [])
@@ -71,7 +131,7 @@ export default function Keywords() {
     } finally {
       if (!controller.signal.aborted) setIsLoadingArticles(false)
     }
-  }, [dateRange])
+  }, [dateRange, region, strictMode])
 
   useEffect(() => {
     if (selectedKeyword) fetchArticlesForKeyword(selectedKeyword)
@@ -125,6 +185,8 @@ export default function Keywords() {
     if (e.key === 'Enter') handleAdd()
   }
 
+  const regionLabel = REGION_OPTIONS.find(r => r.value === region)?.label ?? 'Global'
+
   return (
     <div className="h-full flex flex-col bg-stone-50 dark:bg-slate-900">
       {/* Header */}
@@ -135,11 +197,11 @@ export default function Keywords() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100">
-              Custom Keywords &amp; Searches
+              Keyword Monitor
             </h1>
             <p className="text-sm text-stone-500 dark:text-slate-400">
               {isLoaded && isSignedIn
-                ? `${keywords.length} saved keyword${keywords.length !== 1 ? 's' : ''}`
+                ? `${keywords.length} tracked keyword${keywords.length !== 1 ? 's' : ''}`
                 : 'Sign in to save and track keywords'}
             </p>
           </div>
@@ -159,7 +221,7 @@ export default function Keywords() {
 
       {isLoaded && (
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-          {/* Left sidebar — search input + keyword tags (top strip on mobile, sidebar on desktop) */}
+          {/* Left sidebar — search input + keyword tags + monitoring controls */}
           <aside className="w-full lg:w-72 flex-shrink-0 bg-white dark:bg-slate-800 border-b lg:border-b-0 lg:border-r border-stone-200 dark:border-slate-700 flex flex-col">
 
             {/* Add keyword input */}
@@ -192,7 +254,7 @@ export default function Keywords() {
               </div>
 
               {isSignedIn ? (
-                <p className="text-xs text-stone-400 dark:text-slate-500 mt-2 hidden lg:block">Press Enter to add</p>
+                <p className="text-xs text-stone-400 dark:text-slate-500 mt-2 hidden lg:block">Press Enter to add. Supports boolean: AND, OR, NOT</p>
               ) : (
                 <Link
                   to="/sign-in"
@@ -203,6 +265,60 @@ export default function Keywords() {
                 </Link>
               )}
             </div>
+
+            {/* Monitoring controls — region focus + strict mode */}
+            {isSignedIn && (
+              <div className="p-3 lg:p-4 border-b border-stone-100 dark:border-slate-700 space-y-3">
+                <p className="text-xs font-semibold text-stone-400 dark:text-slate-500 uppercase tracking-wide hidden lg:block">
+                  Monitor Settings
+                </p>
+
+                {/* Region focus selector */}
+                <div className="space-y-1.5">
+                  <label className="text-xs text-stone-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <Globe className="w-3 h-3" />
+                    Region Focus
+                  </label>
+                  <Select value={region} onValueChange={setRegion}>
+                    <SelectTrigger className="h-8 text-xs border-stone-200 dark:border-slate-600 dark:bg-slate-700 dark:text-stone-100">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {REGION_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Strict headline-match toggle */}
+                <button
+                  onClick={() => setStrictMode(prev => !prev)}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    strictMode
+                      ? 'bg-slate-900 text-white dark:bg-slate-600'
+                      : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-600'
+                  }`}
+                >
+                  <CrosshairIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="flex-1 text-left">Headline Match Only</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                    strictMode
+                      ? 'bg-white/20 text-white'
+                      : 'bg-stone-200 dark:bg-slate-600 text-stone-500 dark:text-slate-400'
+                  }`}>
+                    {strictMode ? 'ON' : 'OFF'}
+                  </span>
+                </button>
+                <p className="text-[10px] text-stone-400 dark:text-slate-500 leading-tight hidden lg:block">
+                  {strictMode
+                    ? 'Only showing articles with keyword in the headline — highest precision.'
+                    : 'Showing all matching articles ranked by relevance.'}
+                </p>
+              </div>
+            )}
 
             {/* Keyword tags — horizontal scroll on mobile, wrapped list on desktop */}
             <div className="lg:flex-1 lg:overflow-hidden">
@@ -301,6 +417,21 @@ export default function Keywords() {
                 <div className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-6 py-3 flex items-center gap-3 flex-shrink-0">
                   <Tag className="w-4 h-4 text-stone-400 dark:text-slate-500" />
                   <span className="font-semibold text-stone-900 dark:text-stone-100 capitalize">{selectedKeyword.keyword}</span>
+
+                  {/* Active filter badges */}
+                  <div className="flex items-center gap-1.5">
+                    {region !== 'world' && (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                        {regionLabel}
+                      </span>
+                    )}
+                    {strictMode && (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
+                        Headlines
+                      </span>
+                    )}
+                  </div>
+
                   <div className="ml-auto flex items-center gap-3">
                     {/* Timeframe picker */}
                     <div className="flex items-center gap-1">
@@ -341,7 +472,12 @@ export default function Keywords() {
                         <Newspaper className="w-10 h-10 text-stone-300 dark:text-slate-600 mb-4" />
                         <h3 className="text-lg font-semibold text-stone-700 dark:text-slate-300 mb-1">No articles found</h3>
                         <p className="text-stone-400 dark:text-slate-500 text-sm max-w-xs">
-                          No recent articles matched "{selectedKeyword.keyword}". Try a broader term or check back later.
+                          No recent articles matched "{selectedKeyword.keyword}"
+                          {region !== 'world' ? ` in ${regionLabel}` : ''}
+                          {strictMode ? ' (headline match)' : ''}.
+                          {strictMode
+                            ? ' Try turning off "Headline Match Only" for broader results.'
+                            : ' Try a broader term or check back later.'}
                         </p>
                       </motion.div>
                     ) : (

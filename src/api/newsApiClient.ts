@@ -5,7 +5,7 @@ const API_BASE = '/api'; // Vercel serverless functions are at /api/*
 
 export const newsApiClient = {
 
-  async fetchNews({ countries, categories, searchQuery, dateRange, sources, language, userId }: {
+  async fetchNews({ countries, categories, searchQuery, dateRange, sources, language, userId, mode, strictMode }: {
     countries: string[];
     categories: string[];
     searchQuery?: string;
@@ -13,12 +13,14 @@ export const newsApiClient = {
     sources?: string[];
     language?: string;  // 'en' (default, English only) | 'all' (include non-English)
     userId?: string;    // optional Clerk user ID for search analytics attribution
+    mode?: 'keyword';   // 'keyword' = dedicated keyword monitoring mode (stricter relevance)
+    strictMode?: boolean; // when true, only return articles with keyword in the headline
   }) {
     try {
       const response = await fetch(`${API_BASE}/news`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ countries, categories, searchQuery, dateRange, sources, language, userId })
+        body: JSON.stringify({ countries, categories, searchQuery, dateRange, sources, language, userId, mode, strictMode })
       });
 
       if (!response.ok) {

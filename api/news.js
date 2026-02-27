@@ -1078,7 +1078,7 @@ function categoryRelevanceScore(article, category) {
 // ── Main ranking function ────────────────────────────────────────────────
 // `searchTerms` (optional): when present, enables Signal 7 (keyword relevance)
 // which boosts articles that strongly match the user's search query.
-function rankAndDeduplicateArticles(articles, { usePopularity = false, category = null, searchTerms = null, rawKeyword = null } = {}) {
+function rankAndDeduplicateArticles(articles, { usePopularity = false, category = null, searchTerms = null, rawKeyword = null, keywordMode = false } = {}) {
   if (articles.length === 0) return [];
 
   // 1. Build IDF map — words that appear in many titles are less distinctive
@@ -1211,9 +1211,15 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
   //   Keyword Relevance |  2.5            |  2.5   ← only active during keyword searches
   //
   const hasKeywordSearch = searchTerms && searchTerms.length > 0;
-  const W = usePopularity
-    ? { freshness: 1.0, authority: 2.5, coverage: 3.0, cat: 1.5, depth: 1.0, countryRel: 2.0, kwRel: hasKeywordSearch ? 2.5 : 0 }
-    : { freshness: 3.0, authority: 1.5, coverage: 1.5, cat: 2.0, depth: 1.0, countryRel: 2.0, kwRel: hasKeywordSearch ? 2.5 : 0 };
+  // In keyword monitoring mode, keyword relevance is the dominant signal (5.0),
+  // freshness is reduced, and country relevance is boosted — this mirrors
+  // professional media monitoring services like Streem and Isentia where
+  // topical precision matters more than recency.
+  const W = keywordMode
+    ? { freshness: 1.0, authority: 1.5, coverage: 1.5, cat: 1.0, depth: 0.5, countryRel: 3.0, kwRel: 5.0 }
+    : usePopularity
+      ? { freshness: 1.0, authority: 2.5, coverage: 3.0, cat: 1.5, depth: 1.0, countryRel: 2.0, kwRel: hasKeywordSearch ? 2.5 : 0 }
+      : { freshness: 3.0, authority: 1.5, coverage: 1.5, cat: 2.0, depth: 1.0, countryRel: 2.0, kwRel: hasKeywordSearch ? 2.5 : 0 };
 
   for (const s of scored) {
     const { authority, coverage, freshness, depth, catScore, countryRelScore, kwRelevanceScore } = s.signals;
@@ -1671,6 +1677,12 @@ const EXPANSION_CACHE = {};
 const EXPANSION_PROMPT = (keyword) =>
   `You are a search query expansion tool. Given the news search keyword "${keyword}", output 3-5 closely related search terms or synonyms that a journalist might use when writing about this topic. Output ONLY a comma-separated list of terms, nothing else. Do NOT include the original keyword. Example: for "electric cars" you might output: electric vehicles, EV, Tesla, battery vehicles, zero-emission cars`;
 
+// Precision-focused expansion prompt for keyword monitoring mode.
+// Generates tight, specific synonyms instead of broad ones. Avoids generic
+// terms that would match unrelated articles from other countries/sectors.
+const KEYWORD_MONITOR_EXPANSION_PROMPT = (keyword) =>
+  `You are a precision search query expansion tool for a news monitoring service. Given the keyword "${keyword}", output 2-4 highly specific alternative terms or phrases that journalists would use IN THE HEADLINE when writing about this exact topic. Be precise — do NOT output broad or generic synonyms. Each term must be specific enough that an article using it in the headline is almost certainly about "${keyword}". Output ONLY a comma-separated list, nothing else. Do NOT include the original keyword.`;
+
 function parseExpansionResponse(text, originalKeyword) {
   if (!text) return null;
   const terms = text
@@ -1682,11 +1694,13 @@ function parseExpansionResponse(text, originalKeyword) {
   return terms.slice(0, 5).map(t => t.includes(' ') ? `"${t}"` : t);
 }
 
-async function expandQueryWithLLM(keyword, llmKeys) {
-  const cacheKey = keyword.trim().toLowerCase();
+async function expandQueryWithLLM(keyword, llmKeys, useKeywordMonitorPrompt = false) {
+  const cacheKey = (useKeywordMonitorPrompt ? 'kwm:' : '') + keyword.trim().toLowerCase();
   if (EXPANSION_CACHE[cacheKey]) return EXPANSION_CACHE[cacheKey];
 
-  const prompt = EXPANSION_PROMPT(keyword);
+  const prompt = useKeywordMonitorPrompt
+    ? KEYWORD_MONITOR_EXPANSION_PROMPT(keyword)
+    : EXPANSION_PROMPT(keyword);
   // Try Gemini first (fastest/cheapest), then Groq
   const providers = [
     llmKeys.gemini && (async () => {
@@ -1744,7 +1758,8 @@ function hasBooleanSyntax(keyword) {
 
 // Build the final search query, using LLM expansion if available.
 // Called with await since LLM expansion is async.
-async function buildExpandedSearchQuery(rawKeyword, llmKeys) {
+// opts.keywordMode: when true, uses the precision expansion prompt (fewer, tighter synonyms)
+async function buildExpandedSearchQuery(rawKeyword, llmKeys, opts = {}) {
   const normalized = rawKeyword.trim().toLowerCase();
 
   // 0. Boolean query: user wrote AND/OR/NOT — pass through without expansion
@@ -1760,11 +1775,13 @@ async function buildExpandedSearchQuery(rawKeyword, llmKeys) {
 
   // 2. Try LLM-powered expansion for unknown terms
   if (llmKeys && Object.values(llmKeys).some(Boolean)) {
-    const dynamicTerms = await expandQueryWithLLM(rawKeyword, llmKeys);
+    const dynamicTerms = await expandQueryWithLLM(rawKeyword, llmKeys, opts.keywordMode);
     if (dynamicTerms) {
       const kw = rawKeyword.trim();
       const quotedOriginal = kw.includes(' ') ? `"${kw}"` : kw;
-      const expanded = [quotedOriginal, ...dynamicTerms].join(' OR ');
+      // In keyword monitor mode, limit to 3 expansion terms max for precision
+      const limitedTerms = opts.keywordMode ? dynamicTerms.slice(0, 3) : dynamicTerms;
+      const expanded = [quotedOriginal, ...limitedTerms].join(' OR ');
       return { query: expanded, source: 'llm' };
     }
   }
@@ -2332,7 +2349,8 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { countries, categories, searchQuery, dateRange, sources: userSources, language: langParam, userId } = req.method === 'POST' ? req.body : req.query;
+  const { countries, categories, searchQuery, dateRange, sources: userSources, language: langParam, userId, mode, strictMode } = req.method === 'POST' ? req.body : req.query;
+  const isKeywordMode = mode === 'keyword';
   // showNonEnglish=true removes the language=en filter from all API calls, allowing
   // native-language articles to surface for non-English-dominant countries.
   const showNonEnglish = langParam === 'all' || langParam === true || langParam === 'true';
@@ -2390,16 +2408,18 @@ export default async function handler(req, res) {
     const hasCountryFilter = countryList.some(c => c !== 'world');
     const hasCategoryFilter = categoryList.some(c => c !== 'world');
 
-    // Check cache (keyed on keyword + filters + dateRange + sources)
-    const kwCacheKey = `kw-${keyword.toLowerCase()}-${countryList.sort().join(',')}-${categoryList.sort().join(',')}-${dateRange || 'all'}-${sourceFingerprint}`;
+    // Check cache (keyed on keyword + filters + dateRange + sources + mode)
+    const modeTag = isKeywordMode ? (strictMode ? 'kw-strict' : 'kw-monitor') : 'kw';
+    const kwCacheKey = `${modeTag}-${keyword.toLowerCase()}-${countryList.sort().join(',')}-${categoryList.sort().join(',')}-${dateRange || 'all'}-${sourceFingerprint}`;
     if (isCacheValid(CACHE[kwCacheKey], kwCacheKey)) {
       console.log(`Keyword cache HIT: "${keyword}"`);
       return res.status(200).json({ status: 'ok', articles: CACHE[kwCacheKey].articles, totalResults: CACHE[kwCacheKey].articles.length, cached: true });
     }
 
     // Build expanded query — tries static map first, then LLM, then raw
-    const { query: expandedQuery, source: expansionSource } = await buildExpandedSearchQuery(keyword, LLM_KEYS);
-    console.log(`Keyword search: "${keyword}" → ${expansionSource}: ${expandedQuery}`);
+    // In keyword monitor mode, use the precision prompt for tighter synonyms
+    const { query: expandedQuery, source: expansionSource } = await buildExpandedSearchQuery(keyword, LLM_KEYS, { keywordMode: isKeywordMode });
+    console.log(`Keyword search${isKeywordMode ? ' [monitor]' : ''}: "${keyword}" → ${expansionSource}: ${expandedQuery}`);
 
     // Extract search terms for keyword relevance scoring (Signal 7).
     // For boolean queries split on all operators; for OR-expanded queries split on OR only.
@@ -2552,8 +2572,53 @@ export default async function handler(req, res) {
         category: categoryList.length === 1 ? categoryList[0] : null,
         searchTerms,
         rawKeyword: keyword,
+        keywordMode: isKeywordMode,
       });
-      const clean = ranked.map(({ _meta, _coverage, _countryScore, _matchesCategory, ...rest }) => rest);
+
+      // ── Keyword monitoring mode: post-ranking quality filters ──────────
+      let filtered = ranked;
+      if (isKeywordMode) {
+        const kwLower = keyword.toLowerCase();
+        const kwTerms = searchTerms.map(t => t.toLowerCase().replace(/^["'(]+|["')]+$/g, ''));
+
+        // Option A: Minimum relevance threshold — drop articles that barely
+        // mention the keyword. Threshold of 0.12 means at least one search
+        // term must appear in the title, or 2+ terms in the body/description.
+        const MIN_KW_RELEVANCE = 0.12;
+        const beforeThreshold = filtered.length;
+        filtered = filtered.filter(a => {
+          const score = keywordRelevanceScore(a, searchTerms, keyword);
+          return score >= MIN_KW_RELEVANCE;
+        });
+        if (filtered.length < beforeThreshold) {
+          console.log(`  [monitor] Relevance threshold: ${filtered.length}/${beforeThreshold} articles passed (min ${MIN_KW_RELEVANCE})`);
+        }
+
+        // Option D: Strict/headline-match mode — only keep articles where
+        // at least one search term (or the raw keyword) appears in the title.
+        // This mirrors Streem/Isentia headline-focused monitoring.
+        if (strictMode) {
+          const beforeStrict = filtered.length;
+          filtered = filtered.filter(a => {
+            const title = (a.title || '').toLowerCase();
+            // Check raw keyword first (exact phrase)
+            if (title.includes(kwLower)) return true;
+            // Then check individual search terms (including expanded synonyms)
+            for (const term of kwTerms) {
+              if (term.length >= 3 && title.includes(term)) return true;
+              // Also try stemmed version
+              const stemmed = stemWord(term);
+              if (stemmed !== term && stemmed.length >= 3 && title.includes(stemmed)) return true;
+            }
+            return false;
+          });
+          if (filtered.length < beforeStrict) {
+            console.log(`  [monitor] Strict headline filter: ${filtered.length}/${beforeStrict} articles have keyword in title`);
+          }
+        }
+      }
+
+      const clean = filtered.map(({ _meta, _coverage, _countryScore, _matchesCategory, ...rest }) => rest);
 
       // AI summaries for top ranked articles (up to MAX_SUMMARY_ARTICLES)
       if (HAS_LLM && clean.length > 0) {

@@ -42,6 +42,8 @@ class ApiService {
     dateRange?: string
     sources?: string[]
     language?: string
+    mode?: 'keyword'
+    strictMode?: boolean
   }) {
     try {
       // Include userId automatically for search analytics attribution
