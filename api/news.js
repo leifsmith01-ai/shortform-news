@@ -2907,160 +2907,88 @@ async function fetchCountryCategoryPair(country, category, ctx) {
   // (Option A) can call only the ones that were skipped by the raw-count gate.
   const calledSources = new Set();
 
-  // ── Waterfall strategy depends on whether the country is English-dominant ──
-  // English-dominant countries (US/GB/AU/CA/NZ/IE) are well-served by the trusted
-  // domain list (mostly US/UK outlets), so the sequential waterfall with a domain
-  // filter produces high-quality results. For all other countries those same trusted
-  // domains publish very few articles per day — the domain filter is a bottleneck.
-  // Non-English-dominant countries get a parallel first pass (NewsAPI without the
-  // domain filter + WorldNewsAPI + GNews all at once), tripling the raw supply before
-  // the category and country relevance filters run.
+  // ── Unified parallel first pass for ALL countries ────────────────────────
+  // NewsAPI + WorldNewsAPI + GNews fire simultaneously regardless of country type.
+  // This replaces the old two-branch strategy (sequential for English-dominant
+  // countries, parallel for others) — the sequential approach was the root cause
+  // of underserved results: NewsAPI alone returning 15+ raw articles would skip
+  // WorldNewsAPI and GNews entirely, and those 15 raw articles could collapse to
+  // 0-3 after category+country filtering with no fallback left.
+  //
+  // English-dominant countries (US/GB/AU/CA/NZ/IE) keep the trusted-domain filter
+  // on NewsAPI so quality is maintained; non-English-dominant countries drop it
+  // (skipDomains) so NewsAPI searches its full index rather than being restricted
+  // to US/UK outlets that publish very few articles about smaller countries.
   const guardianPriorityCountry = country === 'au' || country === 'gb' || country === 'us';
+  const skipDomains = !RSS_WELL_SERVED_COUNTRIES.has(country) && country !== 'world';
 
-  if (RSS_WELL_SERVED_COUNTRIES.has(country) || country === 'world') {
-    // ── Sequential waterfall for English-dominant countries ──────────────
+  console.log(`  [1+2+6] Parallel fetch [${country}/${category}]${skipDomains ? ' (skipDomains)' : ''}`);
+  const [newsApiRaw, worldNewsRaw, gNewsRaw] = await Promise.all([
+    (country === 'world' || NEWS_API_SUPPORTED_COUNTRIES.has(country))
+      ? fetchFromNewsAPI(country, category, NEWS_API_KEY, activeDomains, activeSourceIds, { from: fromISO, sortByPopularity: usePopularitySort, skipDomains, showNonEnglish })
+          .catch(err => { console.error('  NewsAPI failed:', err.message); return []; })
+      : Promise.resolve([]),
+    (WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country)))
+      ? fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish })
+          .catch(err => { console.error('  WorldNewsAPI failed:', err.message); return []; })
+      : Promise.resolve([]),
+    GNEWS_API_KEY
+      ? fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish })
+          .catch(err => { console.error('  GNews failed:', err.message); return []; })
+      : Promise.resolve([]),
+  ]);
 
-    // ── 1. NewsAPI (primary) ─────────────────────────────────────────────
-    if (country === 'world' || NEWS_API_SUPPORTED_COUNTRIES.has(country)) {
-      calledSources.add('newsapi');
-      console.log(`  [1] NewsAPI [${country}/${category}]`);
-      try {
-        const raw = await fetchFromNewsAPI(country, category, NEWS_API_KEY, activeDomains, activeSourceIds, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish });
-        const valid = raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com');
-        formattedArticles = valid.map(a => formatNewsAPIArticle(a, country, category));
-      } catch (err) {
-        console.error(`  NewsAPI failed:`, err.message);
+  calledSources.add('newsapi');
+  if (WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) calledSources.add('worldnews');
+  if (GNEWS_API_KEY) calledSources.add('gnews');
+
+  const newsApiArticles = newsApiRaw
+    .filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com')
+    .map(a => formatNewsAPIArticle(a, country, category));
+  const worldNewsArticles = worldNewsRaw.map(a => formatWorldNewsAPIArticle(a, country, category));
+  const gNewsArticles = gNewsRaw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category));
+
+  // Merge parallel results; dedup by URL so overlapping wire service articles aren't doubled
+  const seenUrls = new Set();
+  for (const batch of [newsApiArticles, worldNewsArticles, gNewsArticles]) {
+    for (const article of batch) {
+      if (!seenUrls.has(article.url)) {
+        seenUrls.add(article.url);
+        formattedArticles.push(article);
       }
     }
+  }
+  console.log(`  Parallel result: ${newsApiArticles.length} NewsAPI + ${worldNewsArticles.length} WorldNews + ${gNewsArticles.length} GNews = ${formattedArticles.length} unique`);
 
-    // ── 2. WorldNewsAPI if < 15 ──────────────────────────────────────────
-    if (formattedArticles.length < 15 && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) {
-      calledSources.add('worldnews');
-      console.log(`  [2] WorldNewsAPI [${country}/${category}] (have ${formattedArticles.length} so far)`);
-      try {
-        const raw = await fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish });
-        const extra = raw.map(a => formatWorldNewsAPIArticle(a, country, category));
-        formattedArticles = [...formattedArticles, ...extra];
-      } catch (err) {
-        console.error(`  WorldNewsAPI failed:`, err.message);
-      }
+  // ── 3. NewsData.io if < 15 ─────────────────────────────────────────────
+  if (formattedArticles.length < 15 && NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
+    calledSources.add('newsdata');
+    console.log(`  [3] NewsData.io [${country}/${category}] (have ${formattedArticles.length} so far)`);
+    try {
+      const raw = await fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly, showNonEnglish });
+      const valid = raw.filter(a => a.title && a.title !== '[Removed]');
+      const extra = valid.map(a => formatNewsDataArticle(a, country, category)).filter(a => !seenUrls.has(a.url));
+      formattedArticles = [...formattedArticles, ...extra];
+    } catch (err) {
+      console.error(`  NewsData failed:`, err.message);
     }
+  }
 
-    // ── 3. NewsData.io if < 15 ───────────────────────────────────────────
-    if (formattedArticles.length < 15 && NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
-      calledSources.add('newsdata');
-      console.log(`  [3] NewsData.io [${country}/${category}] (have ${formattedArticles.length} so far)`);
-      try {
-        const raw = await fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly, showNonEnglish });
-        const valid = raw.filter(a => a.title && a.title !== '[Removed]');
-        const extra = valid.map(a => formatNewsDataArticle(a, country, category));
-        formattedArticles = [...formattedArticles, ...extra];
-      } catch (err) {
-        console.error(`  NewsData failed:`, err.message);
-      }
-    }
-
-    // ── 4. Guardian (priority for AU/GB/US, fallback if < 15) ────────────
-    // NOTE: If Guardian articles are dominating results for all countries,
-    // the most likely cause is that NewsAPI/WorldNewsAPI/NewsData keys have
-    // hit their daily quota or expired. Guardian uses a generous free tier
-    // and is the last resort that never fails. Check API key status in the
-    // Vercel environment variables and in each API provider's dashboard.
-    if (GUARDIAN_API_KEY && (guardianPriorityCountry || formattedArticles.length < 15)) {
-      calledSources.add('guardian');
-      console.log(`  [4] Guardian [${country}/${category}] (have ${formattedArticles.length} so far)`);
-      try {
-        const results = await fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: fromDateOnly });
-        const extra = results.map(r => formatGuardianArticle(r, country, category));
-        formattedArticles = [...formattedArticles, ...extra];
-      } catch (err) {
-        console.error(`  Guardian failed:`, err.message);
-      }
-    }
-
-    // ── 6. GNews if < 15 ─────────────────────────────────────────────────
-    if (formattedArticles.length < 15 && GNEWS_API_KEY) {
-      calledSources.add('gnews');
-      console.log(`  [6] GNews [${country}/${category}] (have ${formattedArticles.length} so far)`);
-      try {
-        const raw = await fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish });
-        const valid = raw.filter(a => a.title);
-        const extra = valid.map(a => formatGNewsArticle(a, country, category));
-        formattedArticles = [...formattedArticles, ...extra];
-      } catch (err) {
-        console.error(`  GNews failed:`, err.message);
-      }
-    }
-
-  } else {
-    // ── Parallel first pass for non-English-dominant countries ────────────
-    // Fire NewsAPI (no domain filter), WorldNewsAPI, and GNews simultaneously.
-    // The domain filter is dropped for NewsAPI so it searches its full index rather
-    // than being restricted to English-language US/UK outlets that rarely cover
-    // smaller countries in depth.
-    console.log(`  [1+2+6] Parallel fetch [${country}/${category}]`);
-    const [newsApiRaw, worldNewsRaw, gNewsRaw] = await Promise.all([
-      (country === 'world' || NEWS_API_SUPPORTED_COUNTRIES.has(country))
-        ? fetchFromNewsAPI(country, category, NEWS_API_KEY, activeDomains, activeSourceIds, { from: fromISO, sortByPopularity: usePopularitySort, skipDomains: true, showNonEnglish })
-            .catch(err => { console.error('  NewsAPI failed:', err.message); return []; })
-        : Promise.resolve([]),
-      (WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country)))
-        ? fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish })
-            .catch(err => { console.error('  WorldNewsAPI failed:', err.message); return []; })
-        : Promise.resolve([]),
-      GNEWS_API_KEY
-        ? fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish })
-            .catch(err => { console.error('  GNews failed:', err.message); return []; })
-        : Promise.resolve([]),
-    ]);
-
-    calledSources.add('newsapi');
-    if (WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) calledSources.add('worldnews');
-    if (GNEWS_API_KEY) calledSources.add('gnews');
-
-    const newsApiArticles = newsApiRaw
-      .filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com')
-      .map(a => formatNewsAPIArticle(a, country, category));
-    const worldNewsArticles = worldNewsRaw.map(a => formatWorldNewsAPIArticle(a, country, category));
-    const gNewsArticles = gNewsRaw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category));
-
-    // Merge parallel results; dedup by URL so overlapping wire service articles aren't doubled
-    const seenUrls = new Set();
-    for (const batch of [newsApiArticles, worldNewsArticles, gNewsArticles]) {
-      for (const article of batch) {
-        if (!seenUrls.has(article.url)) {
-          seenUrls.add(article.url);
-          formattedArticles.push(article);
-        }
-      }
-    }
-    console.log(`  Parallel result: ${newsApiArticles.length} NewsAPI + ${worldNewsArticles.length} WorldNews + ${gNewsArticles.length} GNews = ${formattedArticles.length} unique`);
-
-    // ── 3. NewsData.io if < 15 ───────────────────────────────────────────
-    if (formattedArticles.length < 15 && NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
-      calledSources.add('newsdata');
-      console.log(`  [3] NewsData.io [${country}/${category}] (have ${formattedArticles.length} so far)`);
-      try {
-        const raw = await fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly, showNonEnglish });
-        const valid = raw.filter(a => a.title && a.title !== '[Removed]');
-        const extra = valid.map(a => formatNewsDataArticle(a, country, category)).filter(a => !seenUrls.has(a.url));
-        formattedArticles = [...formattedArticles, ...extra];
-      } catch (err) {
-        console.error(`  NewsData failed:`, err.message);
-      }
-    }
-
-    // ── 4. Guardian if < 15 ──────────────────────────────────────────────
-    if (GUARDIAN_API_KEY && formattedArticles.length < 15) {
-      calledSources.add('guardian');
-      console.log(`  [4] Guardian [${country}/${category}] (have ${formattedArticles.length} so far)`);
-      try {
-        const results = await fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: fromDateOnly });
-        const extra = results.map(r => formatGuardianArticle(r, country, category)).filter(a => !seenUrls.has(a.url));
-        formattedArticles = [...formattedArticles, ...extra];
-      } catch (err) {
-        console.error(`  Guardian failed:`, err.message);
-      }
+  // ── 4. Guardian (priority for AU/GB/US, fallback if < 15) ─────────────
+  // NOTE: If Guardian articles are dominating results for all countries,
+  // the most likely cause is that NewsAPI/WorldNewsAPI/NewsData keys have
+  // hit their daily quota or expired. Guardian uses a generous free tier
+  // and is the last resort that never fails. Check API key status in the
+  // Vercel environment variables and in each API provider's dashboard.
+  if (GUARDIAN_API_KEY && (guardianPriorityCountry || formattedArticles.length < 15)) {
+    calledSources.add('guardian');
+    console.log(`  [4] Guardian [${country}/${category}] (have ${formattedArticles.length} so far)`);
+    try {
+      const results = await fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: fromDateOnly });
+      const extra = results.map(r => formatGuardianArticle(r, country, category)).filter(a => !seenUrls.has(a.url));
+      formattedArticles = [...formattedArticles, ...extra];
+    } catch (err) {
+      console.error(`  Guardian failed:`, err.message);
     }
   }
 
