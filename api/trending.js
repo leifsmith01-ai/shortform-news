@@ -243,7 +243,9 @@ async function generateSummary(article, llmKeys) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const allowedOrigin = process.env.APP_ORIGIN || 'https://shortform.news';
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -259,7 +261,8 @@ export default async function handler(req, res) {
   const HAS_LLM = Object.values(LLM_KEYS).some(Boolean);
 
   if (!NEWS_API_KEY) {
-    return res.status(500).json({ error: 'NewsAPI key not configured' });
+    console.error('NEWS_API_KEY is not configured');
+    return res.status(500).json({ error: 'Server configuration error' });
   }
 
   const cacheKey = getCacheKey();
@@ -314,6 +317,6 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Trending handler error:', error);
-    return res.status(500).json({ error: 'Failed to fetch trending news', message: error.message });
+    return res.status(500).json({ error: 'Failed to fetch trending news' });
   }
 }

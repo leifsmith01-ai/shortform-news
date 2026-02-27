@@ -2343,7 +2343,9 @@ async function logSearchAnalytics(supabaseUrl, supabaseKey, { keyword, userId, e
 
 // Main handler
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const allowedOrigin = process.env.APP_ORIGIN || 'https://shortform.news';
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -2391,7 +2393,10 @@ export default async function handler(req, res) {
   };
   const HAS_LLM = Object.values(LLM_KEYS).some(Boolean);
 
-  if (!NEWS_API_KEY) return res.status(500).json({ error: 'NewsAPI key not configured' });
+  if (!NEWS_API_KEY) {
+    console.error('NEWS_API_KEY is not configured');
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
 
   // ── Keyword search: search APIs directly when a searchQuery is provided ────
   // Now country/category-aware: if the user has filters active, results are
@@ -2648,7 +2653,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'ok', articles: clean, totalResults: clean.length, cached: false });
     } catch (error) {
       console.error('Keyword search error:', error);
-      return res.status(500).json({ error: 'Failed to search news', message: error.message });
+      return res.status(500).json({ error: 'Failed to search news' });
     }
   }
 
@@ -2719,7 +2724,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'ok', articles: top10, totalResults: top10.length, cached: false });
     } catch (error) {
       console.error('Trending fetch error:', error);
-      return res.status(500).json({ error: 'Failed to fetch trending news', message: error.message });
+      return res.status(500).json({ error: 'Failed to fetch trending news' });
     }
   }
 
@@ -2832,7 +2837,7 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('News fetch error:', error);
-    return res.status(500).json({ error: 'Failed to fetch news', message: error.message });
+    return res.status(500).json({ error: 'Failed to fetch news' });
   }
 }
 
