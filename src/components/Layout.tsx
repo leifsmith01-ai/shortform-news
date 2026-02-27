@@ -22,7 +22,7 @@ export default function Layout({ children, currentPageName }: { children: React.
     location.pathname === page || currentPageName === page;
 
   return (
-    <div className="h-screen flex flex-col md:flex-row">
+    <div className="app-container flex flex-col md:flex-row">
 
       {/* ── Mobile top header (hidden on md+) ─────────────────────────── */}
       <header className="md:hidden flex-shrink-0 bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between">
