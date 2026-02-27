@@ -15,6 +15,7 @@ import LowCoverageTile from '@/components/news/LowCoverageTile';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import AdUnit from '@/components/AdUnit';
 import api from '@/api';
+import { sanitizeSearchQuery } from '@/lib/sanitize';
 
 const COUNTRY_NAMES: Record<string, string> = {
   // North America
@@ -153,7 +154,7 @@ export default function Home() {
       const result = await api.fetchNews({
         countries: selectedCountries,
         categories: selectedCategories,
-        searchQuery,
+        searchQuery: searchQuery ? sanitizeSearchQuery(searchQuery) : undefined,
         dateRange,
         sources: selectedSources.length > 0 ? selectedSources : undefined,
         language: showNonEnglish ? 'all' : 'en',

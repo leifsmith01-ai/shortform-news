@@ -17,6 +17,8 @@ import LoadingCard from '@/components/news/LoadingCard'
 import api from '@/api'
 import { useUser } from '@clerk/clerk-react'
 import { Link } from 'react-router-dom'
+import { sanitizeKeyword, isValidKeyword } from '@/lib/sanitize'
+import type { Article } from '@/types/article'
 
 interface Keyword {
   id: string
@@ -68,7 +70,7 @@ export default function Keywords() {
   const [inputValue, setInputValue] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoadingKeywords, setIsLoadingKeywords] = useState(false)
-  const [articles, setArticles] = useState<any[]>([])
+  const [articles, setArticles] = useState<Article[]>([])
   const [isLoadingArticles, setIsLoadingArticles] = useState(false)
   const [dateRange, setDateRange] = useState<'24h' | '3d' | 'week'>('24h')
 
@@ -117,7 +119,7 @@ export default function Keywords() {
       const result = await api.fetchNews({
         countries,
         categories: ['world'],
-        searchQuery: kw.keyword,
+        searchQuery: sanitizeKeyword(kw.keyword),
         dateRange,
         mode: 'keyword',
         strictMode,
@@ -138,8 +140,8 @@ export default function Keywords() {
   }, [selectedKeyword, fetchArticlesForKeyword])
 
   const handleAdd = async () => {
-    const trimmed = inputValue.trim()
-    if (!trimmed || !isSignedIn) return
+    const trimmed = sanitizeKeyword(inputValue)
+    if (!isValidKeyword(trimmed) || !isSignedIn) return
 
     setIsSubmitting(true)
     try {

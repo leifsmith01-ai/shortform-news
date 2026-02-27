@@ -5,6 +5,7 @@
 import { mockApiService } from './mockApiService'
 import { newsApiClient } from './newsApiClient'
 import SupabaseApiService from './supabaseApiService'
+import type { ApiClient, Article, FetchNewsParams } from '@/types/article'
 
 // Use mock API ONLY if explicitly set to 'true', otherwise always use real API
 const USE_MOCK_API = String(import.meta.env.VITE_USE_MOCK_API).toLowerCase() === 'true'
@@ -12,14 +13,14 @@ const USE_MOCK_API = String(import.meta.env.VITE_USE_MOCK_API).toLowerCase() ===
 console.log(`Using ${USE_MOCK_API ? 'MOCK' : 'REAL'} API`)
 
 class ApiService {
-  private client: any
+  private client: ApiClient
   // Supabase service instance — set once the Clerk user ID is known
   private supabase: SupabaseApiService | null = null
   // Stored separately so fetchNews can include it for search analytics
   private userId: string | null = null
 
   constructor() {
-    this.client = USE_MOCK_API ? mockApiService : newsApiClient
+    this.client = (USE_MOCK_API ? mockApiService : newsApiClient) as ApiClient
   }
 
   // Call this from a React component once the Clerk user is loaded
@@ -35,16 +36,7 @@ class ApiService {
 
   // ─── News fetching ────────────────────────────────────────────────────────
 
-  async fetchNews(params: {
-    countries: string[]
-    categories: string[]
-    searchQuery?: string
-    dateRange?: string
-    sources?: string[]
-    language?: string
-    mode?: 'keyword'
-    strictMode?: boolean
-  }) {
+  async fetchNews(params: FetchNewsParams) {
     try {
       // Include userId automatically for search analytics attribution
       return await this.client.fetchNews({ ...params, userId: this.userId || undefined })
@@ -57,32 +49,32 @@ class ApiService {
   async getCachedNews(date?: string, country?: string, category?: string) {
     try {
       return await this.client.getCachedNews(date, country, category)
-    } catch (error) {
+    } catch {
       return null
     }
   }
 
-  async cacheNews(data: any) {
+  async cacheNews(data: unknown) {
     try {
       return await this.client.cacheNews(data)
-    } catch (error) {
+    } catch {
       return null
     }
   }
 
   // ─── Saved Articles — uses Supabase if signed in, mock otherwise ──────────
 
-  async getSavedArticles() {
+  async getSavedArticles(): Promise<Article[]> {
     try {
       if (this.supabase) return await this.supabase.getSavedArticles()
       return await this.client.getSavedArticles()
-    } catch (error) {
+    } catch {
       return []
     }
   }
 
-  async saveArticle(article: any) {
-    if (this.supabase) return await this.supabase.saveArticle(article)
+  async saveArticle(article: Article) {
+    if (this.supabase) return await this.supabase.saveArticle(article as Record<string, unknown>)
     return await this.client.saveArticle(article)
   }
 
@@ -93,20 +85,20 @@ class ApiService {
 
   // ─── Reading History — uses Supabase if signed in, mock otherwise ─────────
 
-  async getReadingHistory() {
+  async getReadingHistory(): Promise<Article[]> {
     try {
       if (this.supabase) return await this.supabase.getReadingHistory()
       return await this.client.getReadingHistory()
-    } catch (error) {
+    } catch {
       return []
     }
   }
 
-  async addToHistory(article: any) {
+  async addToHistory(article: Article): Promise<Article | null> {
     try {
-      if (this.supabase) return await this.supabase.addToHistory(article)
+      if (this.supabase) return await this.supabase.addToHistory(article as Record<string, unknown>) as Article
       return await this.client.addToHistory(article)
-    } catch (error) {
+    } catch {
       return null
     }
   }
@@ -134,14 +126,14 @@ class ApiService {
     try {
       if (!this.supabase) return []
       return await this.supabase.getReactions()
-    } catch (error) {
+    } catch {
       return []
     }
   }
 
-  async setReaction(article: any, reaction: 'up' | 'down') {
+  async setReaction(article: Article, reaction: 'up' | 'down') {
     if (!this.supabase) throw new Error('Must be signed in to react to articles')
-    return await this.supabase.setReaction(article, reaction)
+    return await this.supabase.setReaction(article as Record<string, unknown>, reaction)
   }
 
   async removeReaction(articleUrl: string) {
@@ -151,7 +143,7 @@ class ApiService {
 
   // ─── AI Summarization (unchanged) ─────────────────────────────────────────
 
-  async summarizeWithClaude(articles: any[]) {
+  async summarizeWithClaude(articles: Article[]) {
     try {
       return await this.client.summarizeWithClaude(articles)
     } catch (error) {
