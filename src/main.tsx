@@ -15,7 +15,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/">
       <App />
-      <Toaster position="top-right" richColors />
+      <Toaster position="top-right" richColors closeButton />
     </ClerkProvider>
   </React.StrictMode>,
 )

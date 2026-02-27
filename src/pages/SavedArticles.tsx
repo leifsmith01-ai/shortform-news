@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Bookmark, Trash2, Filter } from 'lucide-react';
+import { useCountUp } from '@/hooks/useCountUp';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import NewsCard from '@/components/news/NewsCard';
@@ -40,7 +41,9 @@ export default function SavedArticles() {
     }
   };
 
-  const filteredArticles = filterCategory === 'all' 
+  const animatedCount = useCountUp(savedArticles.length);
+
+  const filteredArticles = filterCategory === 'all'
     ? savedArticles 
     : savedArticles.filter(a => a.category === filterCategory);
 
@@ -58,7 +61,7 @@ export default function SavedArticles() {
             <div>
               <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100">Saved Articles</h1>
               <p className="text-sm text-stone-500 dark:text-slate-400">
-                {savedArticles.length} saved {savedArticles.length === 1 ? 'article' : 'articles'}
+                {animatedCount} saved {savedArticles.length === 1 ? 'article' : 'articles'}
               </p>
             </div>
           </div>
@@ -122,9 +125,13 @@ export default function SavedArticles() {
               animate={{ opacity: 1 }}
               className="flex flex-col items-center justify-center h-full min-h-[400px] text-center"
             >
-              <div className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6">
+              <motion.div
+                className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6"
+                animate={{ y: [0, -8, 0] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              >
                 <Bookmark className="w-10 h-10 text-stone-400 dark:text-slate-500" />
-              </div>
+              </motion.div>
               <h3 className="text-xl font-semibold text-stone-800 dark:text-stone-100 mb-2">
                 No saved articles yet
               </h3>

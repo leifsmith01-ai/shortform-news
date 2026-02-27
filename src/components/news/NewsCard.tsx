@@ -62,6 +62,7 @@ export default function NewsCard({ article, index, rank }) {
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const [reaction, setReaction] = useState<'up' | 'down' | null>(null);
   const [isReacting, setIsReacting] = useState(false);
   const { isSignedIn } = useUser();
@@ -174,8 +175,9 @@ export default function NewsCard({ article, index, rank }) {
   return (
     <motion.article
       initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1, duration: 0.4 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ delay: (index % 6) * 0.06, duration: 0.4 }}
       className="group bg-white dark:bg-slate-800 rounded-2xl border border-stone-200 dark:border-slate-700 overflow-hidden hover:shadow-xl hover:shadow-stone-200/50 dark:hover:shadow-slate-900/50 transition-all duration-500 hover:-translate-y-1 relative"
     >
       {/* Ranking Badge */}
@@ -237,7 +239,10 @@ export default function NewsCard({ article, index, rank }) {
             src={article.image_url}
             alt={article.title}
             loading="lazy"
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+            className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-700 ${
+              imageLoaded ? '' : 'blur-sm scale-105'
+            }`}
+            onLoad={() => setImageLoaded(true)}
             onError={() => setImageError(true)}
           />
         </div>

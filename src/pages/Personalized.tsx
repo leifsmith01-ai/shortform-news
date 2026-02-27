@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Sparkles, BookOpen } from 'lucide-react'
+import { useCountUp } from '@/hooks/useCountUp'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -146,6 +147,9 @@ export default function Personalized() {
     load()
   }, [])
 
+  const animatedHistoryCount = useCountUp(historyCount);
+  const animatedLikedCount = useCountUp(likedCount);
+
   return (
     <div className="h-full flex flex-col bg-stone-50 dark:bg-slate-900">
       <header className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-4 lg:px-8 py-4 flex-shrink-0">
@@ -159,8 +163,8 @@ export default function Personalized() {
               <p className="text-sm text-stone-500 dark:text-slate-400">
                 {historyCount > 0 || likedCount > 0
                   ? [
-                      historyCount > 0 && `${historyCount} article${historyCount !== 1 ? 's' : ''} read`,
-                      likedCount > 0 && `${likedCount} liked`,
+                      historyCount > 0 && `${animatedHistoryCount} article${historyCount !== 1 ? 's' : ''} read`,
+                      likedCount > 0 && `${animatedLikedCount} liked`,
                     ].filter(Boolean).join(' · ')
                   : 'Your personalised feed'}
               </p>
@@ -196,9 +200,13 @@ export default function Personalized() {
               animate={{ opacity: 1, scale: 1 }}
               className="flex flex-col items-center justify-center h-full min-h-[500px] text-center px-6"
             >
-              <div className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6">
+              <motion.div
+                className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6"
+                animate={{ y: [0, -8, 0] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              >
                 <BookOpen className="w-10 h-10 text-stone-400 dark:text-slate-500" />
-              </div>
+              </motion.div>
               <h3 className="text-2xl font-semibold text-stone-900 dark:text-stone-100 mb-2">
                 Nothing to personalise yet
               </h3>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Clock, Calendar, Trash2 } from 'lucide-react';
+import { useCountUp } from '@/hooks/useCountUp';
 import { format } from 'date-fns';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ export default function History() {
   };
 
   const groupedHistory = groupByDate(history);
+  const animatedCount = useCountUp(history.length);
 
   return (
     <div className="h-full flex flex-col bg-stone-50 dark:bg-slate-900">
@@ -61,7 +63,7 @@ export default function History() {
             <div>
               <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100">Reading History</h1>
               <p className="text-sm text-stone-500 dark:text-slate-400">
-                {history.length} articles read
+                {animatedCount} articles read
               </p>
             </div>
           </div>
@@ -130,9 +132,13 @@ export default function History() {
               animate={{ opacity: 1 }}
               className="flex flex-col items-center justify-center h-full min-h-[400px] text-center"
             >
-              <div className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6">
+              <motion.div
+                className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6"
+                animate={{ y: [0, -8, 0] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              >
                 <Clock className="w-10 h-10 text-stone-400 dark:text-slate-500" />
-              </div>
+              </motion.div>
               <h3 className="text-xl font-semibold text-stone-800 dark:text-stone-100 mb-2">
                 No reading history yet
               </h3>
