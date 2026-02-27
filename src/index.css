@@ -130,4 +130,5 @@
 [data-radix-scroll-area-viewport] {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+  touch-action: pan-y;
 }
