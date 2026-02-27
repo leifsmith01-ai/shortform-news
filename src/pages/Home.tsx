@@ -110,6 +110,8 @@ export default function Home() {
   const [lowCoverage, setLowCoverage] = useState<{country: string; category: string; count: number}[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  // Stale-while-revalidate: keeps the last successful fetch visible while a new one runs.
+  const [hasStaleData, setHasStaleData] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [groupBy, setGroupBy] = useState(null);
@@ -166,6 +168,7 @@ export default function Home() {
       if (result?.articles) {
         const fetchedArticles = result.articles;
         setArticles(fetchedArticles);
+        setHasStaleData(true);
         setLowCoverage(result.lowCoverage || []);
         setLastUpdated(new Date());
 
@@ -208,7 +211,7 @@ export default function Home() {
         retry: true
       });
       toast.error('Unable to fetch news. Please try again.');
-      setArticles([]);
+      // Keep stale articles visible — don't wipe the screen on a failed refresh
     } finally {
       // Only clear loading if this is still the active request
       if (!controller.signal.aborted) {
@@ -366,8 +369,9 @@ export default function Home() {
         <ScrollArea className="flex-1">
           <div className="p-4 lg:p-8">
             <AnimatePresence mode="wait">
-              {loading ? (
-                <motion.div 
+              {loading && !hasStaleData ? (
+                // First-ever load — no previous data to show, render skeletons
+                <motion.div
                   key="loading"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -379,12 +383,18 @@ export default function Home() {
                   ))}
                 </motion.div>
               ) : articles.length > 0 ? (
-                <motion.div 
+                <motion.div
                   key="articles"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                 >
+                  {loading && (
+                    <div className="flex items-center gap-2 text-xs text-stone-400 dark:text-slate-500 mb-4">
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      <span>Refreshing…</span>
+                    </div>
+                  )}
                   {groupBy && groupBy !== 'none' ? (
                     <GroupedArticles
                       articles={articles}
