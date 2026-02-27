@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Home, Bookmark, Clock, Sparkles, Tag, Bell, TrendingUp, LogIn, Flame, Settings } from 'lucide-react';
 import { UserButton, SignedIn, SignedOut } from '@clerk/clerk-react';
 
@@ -66,13 +67,20 @@ export default function Layout({ children, currentPageName }: { children: React.
                 <div key={item.page} className="relative group/navitem">
                   <Link
                     to={item.page}
-                    className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
+                    className={`relative w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
                       isActive(item.page)
-                        ? 'bg-white text-slate-900'
+                        ? 'text-slate-900'
                         : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                     }`}
                   >
-                    <Icon className="w-5 h-5" />
+                    {isActive(item.page) && (
+                      <motion.div
+                        layoutId="desktop-active-nav"
+                        className="absolute inset-0 bg-white rounded-xl"
+                        transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
+                      />
+                    )}
+                    <Icon className="w-5 h-5 relative z-10" />
                   </Link>
                   {/* Hover tooltip — appears to the right of the icon */}
                   <span className="pointer-events-none absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1 text-xs font-medium text-white bg-slate-700 rounded-lg opacity-0 group-hover/navitem:opacity-100 transition-opacity duration-150 whitespace-nowrap z-50 shadow-lg">
@@ -104,7 +112,18 @@ export default function Layout({ children, currentPageName }: { children: React.
 
         {/* Main content */}
         <main className="flex-1 min-h-0 overflow-hidden">
-          {children}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="h-full"
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
 
@@ -118,19 +137,23 @@ export default function Layout({ children, currentPageName }: { children: React.
               <Link
                 key={item.page}
                 to={item.page}
-                className={`relative flex flex-col items-center gap-1 min-w-[52px] px-1.5 py-2 rounded-xl transition-all duration-200 ${
+                className={`relative flex flex-col items-center gap-1 min-w-[52px] px-1.5 py-2 rounded-xl transition-colors ${
                   active
-                    ? 'bg-white/15 text-white'
+                    ? 'text-white'
                     : 'text-slate-500 hover:text-slate-300 active:bg-white/10'
                 }`}
               >
-                <Icon className={`w-5 h-5 flex-shrink-0 ${active ? 'text-white' : ''}`} />
-                <span className={`text-[10px] font-medium leading-tight text-center ${active ? 'text-white' : 'text-slate-500'}`}>
+                {active && (
+                  <motion.div
+                    layoutId="mobile-active-nav"
+                    className="absolute inset-0 bg-white/15 rounded-xl"
+                    transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
+                  />
+                )}
+                <Icon className={`w-5 h-5 flex-shrink-0 relative z-10 ${active ? 'text-white' : ''}`} />
+                <span className={`text-[10px] font-medium leading-tight text-center relative z-10 ${active ? 'text-white' : 'text-slate-500'}`}>
                   {item.name}
                 </span>
-                {active && (
-                  <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white" />
-                )}
                 {item.isPremium && (
                   <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
                 )}

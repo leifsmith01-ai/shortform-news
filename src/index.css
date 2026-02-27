@@ -59,6 +59,15 @@
   }
 }
 
+/* Premium focus rings */
+@layer base {
+  *:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: var(--radius);
+  }
+}
+
 /* Shimmer loading animation */
 @keyframes shimmer {
   0% {
