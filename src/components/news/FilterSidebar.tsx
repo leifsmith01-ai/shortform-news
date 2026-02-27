@@ -157,7 +157,6 @@ const CATEGORIES = [
   { id: 'film', name: 'Film', icon: '🎬' },
   { id: 'tv', name: 'TV', icon: '📺' },
   { id: 'politics', name: 'Politics', icon: '🏛️' },
-  { id: 'world', name: 'World', icon: '🌍' },
 ];
 
 export default function FilterSidebar({
