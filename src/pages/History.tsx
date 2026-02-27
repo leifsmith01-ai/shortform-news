@@ -74,7 +74,7 @@ export default function History() {
           {loading ? (
             <div className="space-y-4">
               {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-24 bg-white dark:bg-slate-800 rounded-xl animate-pulse" />
+                <div key={i} className="h-24 rounded-xl skeleton-shimmer" />
               ))}
             </div>
           ) : history.length > 0 ? (
