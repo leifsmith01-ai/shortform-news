@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCw, Menu, Sparkles, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { toast } from 'sonner';
 import { useUser } from '@clerk/clerk-react';
@@ -364,8 +365,8 @@ export default function Home() {
           </div>
         )}
 
-        {/* Content Area — native scroll for smooth mobile performance */}
-        <div className="flex-1 overflow-y-auto overscroll-contain">
+        {/* Content Area */}
+        <ScrollArea className="flex-1">
           <div className="p-4 lg:p-8">
             <AnimatePresence mode="wait">
               {loading && !hasStaleData ? (
@@ -375,6 +376,7 @@ export default function Home() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
+                  style={{ touchAction: 'pan-y' }}
                   className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
                 >
                   {[...Array(6)].map((_, i) => (
@@ -387,6 +389,7 @@ export default function Home() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
+                  style={{ touchAction: 'pan-y' }}
                 >
                   {loading && (
                     <div className="flex items-center gap-2 text-xs text-stone-400 dark:text-slate-500 mb-4">
@@ -429,7 +432,7 @@ export default function Home() {
               )}
             </AnimatePresence>
           </div>
-        </div>
+        </ScrollArea>
       </main>
     </div>
   );
