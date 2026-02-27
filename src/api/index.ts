@@ -15,6 +15,8 @@ class ApiService {
   private client: any
   // Supabase service instance — set once the Clerk user ID is known
   private supabase: SupabaseApiService | null = null
+  // Stored separately so fetchNews can include it for search analytics
+  private userId: string | null = null
 
   constructor() {
     this.client = USE_MOCK_API ? mockApiService : newsApiClient
@@ -22,14 +24,16 @@ class ApiService {
 
   // Call this from a React component once the Clerk user is loaded
   setUser(userId: string) {
+    this.userId = userId
     this.supabase = new SupabaseApiService(userId)
   }
 
   clearUser() {
+    this.userId = null
     this.supabase = null
   }
 
-  // ─── News fetching (unchanged) ────────────────────────────────────────────
+  // ─── News fetching ────────────────────────────────────────────────────────
 
   async fetchNews(params: {
     countries: string[]
@@ -37,9 +41,11 @@ class ApiService {
     searchQuery?: string
     dateRange?: string
     sources?: string[]
+    language?: string
   }) {
     try {
-      return await this.client.fetchNews(params)
+      // Include userId automatically for search analytics attribution
+      return await this.client.fetchNews({ ...params, userId: this.userId || undefined })
     } catch (error) {
       console.error('Failed to fetch news:', error)
       throw error
