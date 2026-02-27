@@ -23,6 +23,46 @@ const MAX_SUMMARY_ARTICLES = parseInt(process.env.MAX_SUMMARY_ARTICLES || '10', 
 // API request timeout (ms) — prevents a single slow API from blocking the whole response
 const API_TIMEOUT_MS = 8000;
 
+// ── Daily API call counters ────────────────────────────────────────────────
+// Tracks how many calls have been made to each external API today (UTC).
+// When any primary API approaches its daily limit, the cache TTL is doubled
+// to reduce further fetches. Counters are in-process and reset on cold-start;
+// they degrade gracefully (best-effort, not guaranteed cross-instance).
+// Override daily limits via env vars to match your subscription tier.
+const API_DAILY_LIMITS = {
+  newsapi:   parseInt(process.env.NEWS_API_DAILY_LIMIT   || '100',  10),
+  worldnews: parseInt(process.env.WORLDNEWS_DAILY_LIMIT  || '500',  10),
+  newsdata:  parseInt(process.env.NEWSDATA_DAILY_LIMIT   || '200',  10),
+  guardian:  parseInt(process.env.GUARDIAN_DAILY_LIMIT   || '5000', 10),
+  gnews:     parseInt(process.env.GNEWS_DAILY_LIMIT      || '100',  10),
+};
+const API_DAILY_COUNTERS = {};
+
+function todayUTC() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function incrementApiCounter(apiName) {
+  const key = `${todayUTC()}-${apiName}`;
+  API_DAILY_COUNTERS[key] = (API_DAILY_COUNTERS[key] || 0) + 1;
+}
+
+function getApiDailyCount(apiName) {
+  return API_DAILY_COUNTERS[`${todayUTC()}-${apiName}`] || 0;
+}
+
+/**
+ * Returns a TTL override in seconds when any primary API has consumed ≥ 80% of its
+ * daily limit. Doubles the standard 12-hour TTL to reduce further API calls.
+ * Returns undefined when quota is healthy (setCache uses its default TTL).
+ */
+function getEffectiveCacheTTL() {
+  const nearQuota = Object.entries(API_DAILY_LIMITS).some(
+    ([api, limit]) => getApiDailyCount(api) >= limit * 0.8
+  );
+  return nearQuota ? CACHE_TTL_HOURS * 2 * 3600 : undefined;
+}
+
 // Countries supported by NewsAPI free tier top-headlines endpoint
 const NEWS_API_SUPPORTED_COUNTRIES = new Set([
   'ae', 'ar', 'at', 'au', 'be', 'bg', 'br', 'ca', 'ch', 'cn',
@@ -58,6 +98,12 @@ const NEWS_DATA_SUPPORTED_COUNTRIES = new Set([
   'mm', 'kh', 'np', 'lk', 'fj', 'pg',
   'ir', 'iq', 'bh', 'om', 'lu', 'ie', 'rs', 'hr', 'bg', 'sk', 'lt', 'lv', 'ee', 'is'
 ]);
+
+// Countries where NewsAPI alone reliably returns 20+ high-quality articles per
+// category — skip WorldNewsAPI and GNews in the parallel first pass to conserve
+// their daily quotas. If post-filter article count still falls below MIN_ARTICLES,
+// the post-filter retry automatically calls those APIs as a safety net.
+const NEWSAPI_FIRST_PASS_COUNTRIES = new Set(['us', 'gb', 'au', 'ca']);
 
 // Full country name lookup for Guardian/WorldNewsAPI search queries
 const COUNTRY_NAMES = {
@@ -1307,6 +1353,7 @@ const EVERYTHING_QUERY_MAP = {
   gaming:     '(gaming OR "video game" OR esports OR console OR PlayStation OR Xbox OR Nintendo)',
   film:       '(film OR movie OR cinema OR "box office" OR director OR Oscar OR screenplay OR "film festival")',
   tv:         '(television OR "TV series" OR streaming OR "TV show" OR showrunner OR Netflix OR HBO OR Emmy)',
+  trending:   '(politics OR technology OR business OR science OR health OR sports OR economy OR election OR climate OR entertainment)',
 };
 
 // Helper: fetch from NewsAPI (primary - ~55 countries)
@@ -1574,10 +1621,23 @@ function parseRSSFeed(xml) {
   return items;
 }
 
+// RSS feed result cache — prevents re-fetching the same feed URL within the TTL window.
+// Most feeds update at most hourly; a 5-hour in-process cache dramatically reduces
+// redundant network calls across multiple country/category pair requests.
+// Override the TTL via RSS_CACHE_TTL_MINUTES env var (default: 300 = 5 hours).
+const RSS_CACHE = {};
+const RSS_CACHE_TTL_MS = parseInt(process.env.RSS_CACHE_TTL_MINUTES || '300', 10) * 60 * 1000;
+
 // Fetch an RSS/Atom feed and return parsed items.
 // Sends a browser-like User-Agent and Accept header — many feed servers
 // return 403 for bare fetch() calls without these.
 async function fetchRSSFeed(url) {
+  // Return cached result if still within TTL
+  const cached = RSS_CACHE[url];
+  if (cached && (Date.now() - cached.timestamp) < RSS_CACHE_TTL_MS) {
+    return cached.items;
+  }
+
   const response = await fetchWithTimeout(url, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (compatible; RSS reader)',
@@ -1586,7 +1646,10 @@ async function fetchRSSFeed(url) {
   });
   if (!response.ok) throw new Error(`RSS ${response.status}: ${url}`);
   const xml = await response.text();
-  return parseRSSFeed(xml);
+  const items = parseRSSFeed(xml);
+
+  RSS_CACHE[url] = { timestamp: Date.now(), items };
+  return items;
 }
 
 // ── Keyword query expansion ────────────────────────────────────────────────
@@ -2077,6 +2140,12 @@ async function summarizeWithCohere(content, key) {
   return parseBullets(data.message?.content?.[0]?.text);
 }
 
+// Per-article summary cache — avoids re-generating LLM summaries for the same article
+// across multiple cache refreshes. TTL of 36 hours is longer than the 12-hour news
+// cache since article content doesn't change after publication.
+const SUMMARY_CACHE = new Map();
+const SUMMARY_CACHE_TTL_MS = 36 * 60 * 60 * 1000; // 36 hours
+
 // Main: try each configured provider in order; skip to next on quota exhaustion
 async function generateSummary(article, llmKeys) {
   const content = prepareArticleContent(article);
@@ -2100,6 +2169,32 @@ async function generateSummary(article, llmKeys) {
     }
   }
   return null;
+}
+
+/**
+ * Cached wrapper around generateSummary. Returns a previously-generated summary
+ * for the same article URL when still within SUMMARY_CACHE_TTL_MS, avoiding
+ * redundant LLM calls across cache refreshes or concurrent requests.
+ */
+async function generateSummaryCached(article, llmKeys) {
+  const key = article.url;
+  if (!key) return generateSummary(article, llmKeys);
+
+  const cached = SUMMARY_CACHE.get(key);
+  if (cached && (Date.now() - cached.timestamp) < SUMMARY_CACHE_TTL_MS) {
+    return cached.points;
+  }
+
+  const points = await generateSummary(article, llmKeys);
+  if (points) {
+    SUMMARY_CACHE.set(key, { points, timestamp: Date.now() });
+    // Evict oldest entry when cache exceeds 2000 articles
+    if (SUMMARY_CACHE.size > 2000) {
+      const oldest = [...SUMMARY_CACHE.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
+      SUMMARY_CACHE.delete(oldest[0]);
+    }
+  }
+  return points;
 }
 
 // Helper: human-readable time ago (e.g. "2h ago", "3d ago")
@@ -2670,7 +2765,7 @@ export default async function handler(req, res) {
       if (HAS_LLM && clean.length > 0) {
         await Promise.all(clean.slice(0, MAX_SUMMARY_ARTICLES).map(async (article) => {
           try {
-            const summary = await generateSummary(article, LLM_KEYS);
+            const summary = await generateSummaryCached(article, LLM_KEYS);
             if (summary) article.summary_points = summary;
           } catch (err) {
             console.error('Summary failed:', err.message);
@@ -2698,46 +2793,36 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── Trending: fetch across all categories for 'world' and return top 10 by views ──
+  // ── Trending: single broad fetch across all topics, top 10 by rank ──────
+  // Previously made 9 separate per-category NewsAPI calls (one per trending category).
+  // Now uses one call with a combined query — reduces API spend from 9 calls → 1,
+  // and uses an 8-hour TTL (3 refreshes/day) instead of the default 12 hours.
   const isTrending = Array.isArray(categories)
     ? categories.includes('trending')
     : categories === 'trending';
 
   if (isTrending) {
-    const trendingCategories = ['technology', 'business', 'politics', 'science', 'health', 'sports', 'gaming', 'film', 'tv'];
     const trendingCacheKey = getCacheKey('world', 'trending', dateRange, 'all');
-
-    if (isCacheValid(CACHE[trendingCacheKey])) {
+    // Custom 8-hour TTL check (isCacheValid uses 12h by default)
+    const trendingEntry = CACHE[trendingCacheKey];
+    if (trendingEntry && (Date.now() - trendingEntry.timestamp) / 3600000 < 8) {
       console.log(`Cache HIT: ${trendingCacheKey}`);
-      return res.status(200).json({ status: 'ok', articles: CACHE[trendingCacheKey].articles, totalResults: CACHE[trendingCacheKey].articles.length, cached: true });
+      return res.status(200).json({ status: 'ok', articles: trendingEntry.articles, totalResults: trendingEntry.articles.length, cached: true });
     }
 
     try {
-      console.log('Fetching trending articles across all categories (parallel)');
+      console.log('Fetching trending articles — single broad query');
+      incrementApiCounter('newsapi');
+      let trendingArticles = await fetchFromNewsAPI('world', 'trending', NEWS_API_KEY, activeDomains, activeSourceIds, { sortByPopularity: true })
+        .then(raw => raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com').map(a => formatNewsAPIArticle(a, 'world', 'trending')))
+        .catch(err => { console.error('  Trending NewsAPI failed:', err.message); return []; });
 
-      // Fetch all categories in parallel to avoid serverless timeout
-      const categoryResults = await Promise.allSettled(
-        trendingCategories.map(async (cat) => {
-          const catCacheKey = getCacheKey('world', cat, dateRange, 'all');
-          if (isCacheValid(CACHE[catCacheKey])) {
-            return CACHE[catCacheKey].articles;
-          }
-          const raw = await fetchFromNewsAPI('world', cat, NEWS_API_KEY, activeDomains, activeSourceIds, { sortByPopularity: true });
-          const valid = raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com');
-          const formatted = valid.map(a => formatNewsAPIArticle(a, 'world', cat));
-          const clean = formatted.map(({ _meta, ...rest }) => rest);
-          CACHE[catCacheKey] = { timestamp: Date.now(), articles: clean };
-          return clean;
-        })
-      );
-
-      const trendingArticles = [];
-      for (const result of categoryResults) {
-        if (result.status === 'fulfilled' && Array.isArray(result.value)) {
-          trendingArticles.push(...result.value);
-        } else if (result.status === 'rejected') {
-          console.error('Trending category fetch failed:', result.reason?.message);
-        }
+      // Guardian fallback when NewsAPI returns too few results
+      if (trendingArticles.length < 10 && GUARDIAN_API_KEY) {
+        console.log('  Trending Guardian fallback');
+        incrementApiCounter('guardian');
+        const gRaw = await fetchFromGuardian('world', 'politics', GUARDIAN_API_KEY, {}).catch(() => []);
+        trendingArticles = [...trendingArticles, ...gRaw.map(r => formatGuardianArticle(r, 'world', 'trending'))];
       }
 
       if (trendingArticles.length === 0) {
@@ -2749,11 +2834,11 @@ export default async function handler(req, res) {
         .map(({ _coverage, ...rest }) => rest)
         .slice(0, 10);
 
-      // Generate AI summaries for top articles (up to MAX_SUMMARY_ARTICLES)
+      // Generate AI summaries (with per-article cache to avoid re-generating on refresh)
       if (HAS_LLM && top10.length > 0) {
         await Promise.all(top10.slice(0, MAX_SUMMARY_ARTICLES).map(async (article) => {
           try {
-            const summary = await generateSummary(article, LLM_KEYS);
+            const summary = await generateSummaryCached(article, LLM_KEYS);
             if (summary) article.summary_points = summary;
           } catch (err) {
             console.error('Trending summary failed:', err.message);
@@ -2762,6 +2847,7 @@ export default async function handler(req, res) {
       }
 
       CACHE[trendingCacheKey] = { timestamp: Date.now(), articles: top10 };
+      await setCache(trendingCacheKey, { timestamp: Date.now(), articles: top10 }, 8 * 3600);
       return res.status(200).json({ status: 'ok', articles: top10, totalResults: top10.length, cached: false });
     } catch (error) {
       console.error('Trending fetch error:', error);
@@ -2882,16 +2968,17 @@ export default async function handler(req, res) {
   }
 }
 
-// ── Fetch a single country/category pair ──────────────────────────────────
-// Extracted from the main handler so pairs can be fetched in parallel.
-// Returns an array of formatted, filtered articles (without summaries).
-async function fetchCountryCategoryPair(country, category, ctx) {
-  const {
-    NEWS_API_KEY, WORLD_NEWS_API_KEY, NEWS_DATA_API_KEY, GUARDIAN_API_KEY, GNEWS_API_KEY,
-    activeDomains, activeSourceIds, fromISO, fromDateOnly, usePopularitySort,
-    rangeHours, dateRange, sourceFingerprint, showNonEnglish,
-  } = ctx;
+// ── In-flight request deduplication ───────────────────────────────────────
+// If two requests for the same country/category pair arrive simultaneously
+// (e.g. at a cache-slot boundary), only one fires the API cascade — the
+// second awaits the first promise instead of launching its own API calls.
+const IN_FLIGHT_REQUESTS = new Map();
 
+// ── Fetch a single country/category pair ──────────────────────────────────
+// Thin dispatcher: checks cache, deduplicates in-flight requests, delegates
+// to _doFetchPair for the actual API work.
+async function fetchCountryCategoryPair(country, category, ctx) {
+  const { dateRange, sourceFingerprint, showNonEnglish } = ctx;
   const cacheKey = getCacheKey(country, category, dateRange, sourceFingerprint, showNonEnglish);
 
   const cachedEntry = await getCache(cacheKey);
@@ -2900,7 +2987,28 @@ async function fetchCountryCategoryPair(country, category, ctx) {
     return cachedEntry.articles;
   }
 
+  // Deduplicate: return the in-flight promise if one already exists for this key
+  if (IN_FLIGHT_REQUESTS.has(cacheKey)) {
+    console.log(`In-flight dedup HIT: ${cacheKey}`);
+    return IN_FLIGHT_REQUESTS.get(cacheKey);
+  }
+
   console.log(`Cache MISS: ${cacheKey} — fetching fresh data`);
+  const promise = _doFetchPair(cacheKey, country, category, ctx);
+  IN_FLIGHT_REQUESTS.set(cacheKey, promise);
+  promise.finally(() => IN_FLIGHT_REQUESTS.delete(cacheKey));
+  return promise;
+}
+
+// Inner implementation — all API cascade logic lives here. Registered in
+// IN_FLIGHT_REQUESTS so concurrent requests for the same key share one result.
+async function _doFetchPair(cacheKey, country, category, ctx) {
+  const {
+    NEWS_API_KEY, WORLD_NEWS_API_KEY, NEWS_DATA_API_KEY, GUARDIAN_API_KEY, GNEWS_API_KEY,
+    activeDomains, activeSourceIds, fromISO, fromDateOnly, usePopularitySort,
+    rangeHours, dateRange, showNonEnglish,
+  } = ctx;
+
   let formattedArticles = [];
 
   // Track which secondary sources were consulted so the post-filter retry
@@ -2919,28 +3027,40 @@ async function fetchCountryCategoryPair(country, category, ctx) {
   // on NewsAPI so quality is maintained; non-English-dominant countries drop it
   // (skipDomains) so NewsAPI searches its full index rather than being restricted
   // to US/UK outlets that publish very few articles about smaller countries.
+  //
+  // Well-covered countries (NEWSAPI_FIRST_PASS_COUNTRIES) skip WorldNewsAPI/GNews
+  // in this pass to conserve their daily quotas — the post-filter retry below
+  // will call them as a safety net if article count falls below MIN_ARTICLES.
   const guardianPriorityCountry = country === 'au' || country === 'gb' || country === 'us';
   const skipDomains = !RSS_WELL_SERVED_COUNTRIES.has(country) && country !== 'world';
+  const skipSecondaryAPIs = NEWSAPI_FIRST_PASS_COUNTRIES.has(country);
 
-  console.log(`  [1+2+6] Parallel fetch [${country}/${category}]${skipDomains ? ' (skipDomains)' : ''}`);
+  console.log(`  [1+2+6] Parallel fetch [${country}/${category}]${skipDomains ? ' (skipDomains)' : ''}${skipSecondaryAPIs ? ' (NewsAPI-first)' : ''}`);
   const [newsApiRaw, worldNewsRaw, gNewsRaw] = await Promise.all([
     (country === 'world' || NEWS_API_SUPPORTED_COUNTRIES.has(country))
       ? fetchFromNewsAPI(country, category, NEWS_API_KEY, activeDomains, activeSourceIds, { from: fromISO, sortByPopularity: usePopularitySort, skipDomains, showNonEnglish })
           .catch(err => { console.error('  NewsAPI failed:', err.message); return []; })
       : Promise.resolve([]),
-    (WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country)))
+    (!skipSecondaryAPIs && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country)))
       ? fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish })
           .catch(err => { console.error('  WorldNewsAPI failed:', err.message); return []; })
       : Promise.resolve([]),
-    GNEWS_API_KEY
+    (!skipSecondaryAPIs && GNEWS_API_KEY)
       ? fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish })
           .catch(err => { console.error('  GNews failed:', err.message); return []; })
       : Promise.resolve([]),
   ]);
 
   calledSources.add('newsapi');
-  if (WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) calledSources.add('worldnews');
-  if (GNEWS_API_KEY) calledSources.add('gnews');
+  incrementApiCounter('newsapi');
+  if (!skipSecondaryAPIs && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) {
+    calledSources.add('worldnews');
+    incrementApiCounter('worldnews');
+  }
+  if (!skipSecondaryAPIs && GNEWS_API_KEY) {
+    calledSources.add('gnews');
+    incrementApiCounter('gnews');
+  }
 
   const newsApiArticles = newsApiRaw
     .filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com')
@@ -2963,6 +3083,7 @@ async function fetchCountryCategoryPair(country, category, ctx) {
   // ── 3. NewsData.io if < 15 ─────────────────────────────────────────────
   if (formattedArticles.length < 15 && NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
     calledSources.add('newsdata');
+    incrementApiCounter('newsdata');
     console.log(`  [3] NewsData.io [${country}/${category}] (have ${formattedArticles.length} so far)`);
     try {
       const raw = await fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly, showNonEnglish });
@@ -2982,6 +3103,7 @@ async function fetchCountryCategoryPair(country, category, ctx) {
   // Vercel environment variables and in each API provider's dashboard.
   if (GUARDIAN_API_KEY && (guardianPriorityCountry || formattedArticles.length < 15)) {
     calledSources.add('guardian');
+    incrementApiCounter('guardian');
     console.log(`  [4] Guardian [${country}/${category}] (have ${formattedArticles.length} so far)`);
     try {
       const results = await fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: fromDateOnly });
@@ -3191,6 +3313,7 @@ async function fetchCountryCategoryPair(country, category, ctx) {
   // strongly they actually mention the requested country — making cache hits rank
   // differently from fresh fetches.
   const cleanForCache = formattedArticles.map(({ _meta, ...rest }) => rest);
-  await setCache(cacheKey, { timestamp: Date.now(), articles: cleanForCache });
+  // When any API is near its daily quota, double the TTL to reduce further fetches.
+  await setCache(cacheKey, { timestamp: Date.now(), articles: cleanForCache }, getEffectiveCacheTTL());
   return cleanForCache;
 }

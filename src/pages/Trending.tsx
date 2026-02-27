@@ -26,6 +26,7 @@ export default function Trending() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [hasStaleData, setHasStaleData] = useState(false);
 
   const fetchTrending = async () => {
     setLoading(true);
@@ -41,6 +42,7 @@ export default function Trending() {
 
       if (result?.articles) {
         setArticles(result.articles);
+        setHasStaleData(true);
         setLastUpdated(new Date());
         toast.success(`Loaded ${result.articles.length} trending articles`);
       } else {
@@ -53,7 +55,7 @@ export default function Trending() {
         details: err.message,
       });
       toast.error('Unable to fetch trending news. Please try again.');
-      setArticles([]);
+      // Keep stale articles visible on error — don't wipe the screen on a failed refresh
     } finally {
       setLoading(false);
     }
@@ -125,7 +127,8 @@ export default function Trending() {
       <ScrollArea className="flex-1">
         <div className="p-4 lg:p-8">
           <AnimatePresence mode="wait">
-            {loading ? (
+            {loading && !hasStaleData ? (
+              // First-ever load — no previous data to show, render skeletons
               <motion.div
                 key="loading"
                 initial={{ opacity: 0 }}
@@ -144,6 +147,12 @@ export default function Trending() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
+                {loading && (
+                  <div className="flex items-center gap-2 text-xs text-stone-400 dark:text-slate-500 mb-4">
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    <span>Refreshing…</span>
+                  </div>
+                )}
                 {/* Top 3 highlight */}
                 <div className="flex items-center gap-2 mb-6">
                   <TrendingUp className="w-4 h-4 text-orange-500" />

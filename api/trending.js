@@ -6,7 +6,7 @@ import { validateEnv } from './lib/validateEnv.js';
 import { getCache, setCache } from './lib/redisCache.js';
 
 const CACHE = {};
-const CACHE_TTL_HOURS = 6; // Refresh trending more frequently than regular news
+const CACHE_TTL_HOURS = 8; // 3 refreshes per day (was 6h/4x)
 
 // Trusted NewsAPI source IDs — only surface articles from reputable outlets
 // Note: NewsAPI enforces a maximum of 20 sources per request
@@ -22,7 +22,7 @@ const TRUSTED_SOURCE_IDS = [
 function getCacheKey() {
   const now = new Date();
   const date = now.toISOString().split('T')[0];
-  const slot = Math.floor(now.getUTCHours() / 6); // 4 slots per day
+  const slot = Math.floor(now.getUTCHours() / 8); // 3 slots per day (every 8h)
   return `trending-${date}-${slot}`;
 }
 
@@ -246,6 +246,31 @@ async function generateSummary(article, llmKeys) {
   return null;
 }
 
+// Per-article summary cache shared across trending refreshes.
+// 36-hour TTL means the same article won't be re-summarized on the next 8-hour cache slot.
+const SUMMARY_CACHE = new Map();
+const SUMMARY_CACHE_TTL_MS = 36 * 60 * 60 * 1000;
+
+async function generateSummaryCached(article, llmKeys) {
+  const key = article.url;
+  if (!key) return generateSummary(article, llmKeys);
+
+  const cached = SUMMARY_CACHE.get(key);
+  if (cached && (Date.now() - cached.timestamp) < SUMMARY_CACHE_TTL_MS) {
+    return cached.points;
+  }
+
+  const points = await generateSummary(article, llmKeys);
+  if (points) {
+    SUMMARY_CACHE.set(key, { points, timestamp: Date.now() });
+    if (SUMMARY_CACHE.size > 500) {
+      const oldest = [...SUMMARY_CACHE.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
+      SUMMARY_CACHE.delete(oldest[0]);
+    }
+  }
+  return points;
+}
+
 export default async function handler(req, res) {
   const allowedOrigin = process.env.APP_ORIGIN || 'https://shortform.news';
   res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
@@ -309,11 +334,11 @@ export default async function handler(req, res) {
       .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
       .slice(0, 10);
 
-    // AI summaries for top 5 — multi-provider fallback (Gemini → Groq → OpenAI → Cohere)
+    // AI summaries for top 5 — cached per article URL to avoid re-generating on refresh
     if (HAS_LLM) {
       await Promise.all(top10.slice(0, 5).map(async article => {
         try {
-          const summary = await generateSummary(article, LLM_KEYS);
+          const summary = await generateSummaryCached(article, LLM_KEYS);
           if (summary) article.summary_points = summary;
         } catch (e) {
           console.error('Summary error:', e.message);
