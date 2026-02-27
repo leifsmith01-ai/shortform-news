@@ -177,7 +177,23 @@ export default function Home() {
           return prev;
         });
 
-        toast.success(`Loaded ${fetchedArticles.length} articles`);
+        const rangeLabel = {
+          '24h': 'Last 24 hours', '3d': 'Last 3 days',
+          'week': 'This week', 'month': 'This month', 'all': 'All time',
+        }[dateRange] ?? 'News';
+        toast.custom(() => (
+          <div className="flex items-center gap-3 bg-slate-900 text-white pl-4 pr-3 py-3 rounded-xl shadow-xl border border-slate-700 w-72">
+            <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm leading-tight">
+                {fetchedArticles.length} article{fetchedArticles.length !== 1 ? 's' : ''} loaded
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5">{rangeLabel}</p>
+            </div>
+          </div>
+        ), { duration: 3000 });
       } else {
         throw new Error('No articles returned from API');
       }
