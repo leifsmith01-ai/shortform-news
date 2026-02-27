@@ -2361,8 +2361,8 @@ export default async function handler(req, res) {
   const WORLD_NEWS_API_KEY = process.env.WORLD_NEWS_API_KEY   || null;
   const NEWS_DATA_API_KEY  = process.env.NEWS_DATA_API_KEY    || null;
   const GNEWS_API_KEY      = process.env.GNEWS_API_KEY        || null;
-  const SUPABASE_URL       = process.env.SUPABASE_URL         || null;
-  const SUPABASE_KEY       = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || null;
+  const SUPABASE_URL       = process.env.SUPABASE_URL            || process.env.VITE_SUPABASE_URL       || null;
+  const SUPABASE_KEY       = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || null;
 
   // LLM summarisation — collect all configured keys; generateSummary tries them in order
   const LLM_KEYS = {
