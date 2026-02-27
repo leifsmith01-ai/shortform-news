@@ -137,10 +137,26 @@ export default function NewsCard({ article, index, rank }) {
     }
   };
 
+  const getSafeArticleUrl = (): string | null => {
+    try {
+      const parsed = new URL(article.url);
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+      return article.url;
+    } catch {
+      return null;
+    }
+  };
+
   const handleShare = (platform) => {
-    const url = encodeURIComponent(article.url);
+    const safeUrl = getSafeArticleUrl();
+    if (!safeUrl) {
+      toast.error('Cannot share: invalid article URL');
+      return;
+    }
+
+    const url = encodeURIComponent(safeUrl);
     const text = encodeURIComponent(article.title);
-    
+
     const shareUrls = {
       twitter: `https://twitter.com/intent/tweet?text=${text}&url=${url}`,
       facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}`,
@@ -148,10 +164,10 @@ export default function NewsCard({ article, index, rank }) {
     };
 
     if (platform === 'copy') {
-      navigator.clipboard.writeText(article.url);
+      navigator.clipboard.writeText(safeUrl);
       toast.success('Link copied to clipboard!');
-    } else {
-      window.open(shareUrls[platform], '_blank', 'width=600,height=400');
+    } else if (platform in shareUrls) {
+      window.open(shareUrls[platform], '_blank', 'width=600,height=400,noopener,noreferrer');
     }
   };
 
@@ -291,7 +307,7 @@ export default function NewsCard({ article, index, rank }) {
 
         {/* Read More */}
         <a
-          href={article.url}
+          href={getSafeArticleUrl() ?? '#'}
           target="_blank"
           rel="noopener noreferrer"
           onClick={handleArticleClick}
