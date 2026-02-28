@@ -1,6 +1,5 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Home, Bookmark, Clock, Sparkles, Tag, Bell, TrendingUp, LogIn, Flame, Settings, Info, Shield } from 'lucide-react';
 import { UserButton, SignedIn, SignedOut } from '@clerk/clerk-react';
 
@@ -30,7 +29,7 @@ export default function Layout({ children, currentPageName }: { children: React.
       <header className="md:hidden flex-shrink-0 bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg overflow-hidden bg-white">
-            <img src="/logo.png" alt="Shortform" className="w-full h-full object-cover" />
+            <img src="/logo.webp" alt="Shortform" fetchPriority="high" className="w-full h-full object-cover" />
           </div>
           <span className="text-white font-semibold text-sm tracking-tight">Shortform</span>
         </Link>
@@ -57,7 +56,7 @@ export default function Layout({ children, currentPageName }: { children: React.
           {/* Logo */}
           <Link to="/">
             <div className="w-12 h-12 rounded-xl overflow-hidden bg-white border border-slate-700 mb-4">
-              <img src="/logo.png" alt="Shortform" className="w-full h-full object-cover" />
+              <img src="/logo.webp" alt="Shortform" fetchPriority="high" className="w-full h-full object-cover" />
             </div>
           </Link>
 
@@ -76,11 +75,7 @@ export default function Layout({ children, currentPageName }: { children: React.
                     }`}
                   >
                     {isActive(item.page) && (
-                      <motion.div
-                        layoutId="desktop-active-nav"
-                        className="absolute inset-0 bg-white rounded-xl"
-                        transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
-                      />
+                      <span className="absolute inset-0 bg-white rounded-xl" />
                     )}
                     <Icon className="w-5 h-5 relative z-10" />
                   </Link>
@@ -113,20 +108,8 @@ export default function Layout({ children, currentPageName }: { children: React.
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 min-h-0 overflow-hidden">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="h-full"
-              style={{ touchAction: 'pan-y' }}
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
+        <main className="flex-1 min-h-0 overflow-hidden h-full" style={{ touchAction: 'pan-y' }}>
+          {children}
         </main>
       </div>
 
@@ -147,11 +130,7 @@ export default function Layout({ children, currentPageName }: { children: React.
                 }`}
               >
                 {active && (
-                  <motion.div
-                    layoutId="mobile-active-nav"
-                    className="absolute inset-0 bg-white/15 rounded-xl"
-                    transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
-                  />
+                  <span className="absolute inset-0 bg-white/15 rounded-xl" />
                 )}
                 <Icon className={`w-5 h-5 flex-shrink-0 relative z-10 ${active ? 'text-white' : ''}`} />
                 <span className={`text-[10px] font-medium leading-tight text-center relative z-10 ${active ? 'text-white' : 'text-slate-500'}`}>

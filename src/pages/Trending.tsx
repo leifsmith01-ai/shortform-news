@@ -174,7 +174,7 @@ export default function Trending() {
                       }`}>
                         {index + 1}
                       </div>
-                      <NewsCard article={article} index={index} rank={index + 1} />
+                      <NewsCard article={article} index={index} rank={index + 1} isPriority={index < 3} />
                     </div>
                   ))}
                 </div>
