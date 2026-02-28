@@ -4,7 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Globe, Newspaper, ChevronDown, Search, Calendar, Flame, TrendingUp, Tag, Sparkles, Bookmark, Clock, Building2, Settings, Languages } from 'lucide-react';
+import { Globe, Newspaper, ChevronDown, Search, Calendar, Flame, TrendingUp, Tag, Sparkles, Bookmark, Clock, Building2, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Collapsible,
@@ -170,8 +170,6 @@ export default function FilterSidebar({
   setDateRange,
   selectedSources,
   setSelectedSources,
-  showNonEnglish,
-  setShowNonEnglish,
   savedKeywords = [],
 }: {
   selectedCountries: string[];
@@ -184,8 +182,6 @@ export default function FilterSidebar({
   setDateRange: (r: string) => void;
   selectedSources: string[];
   setSelectedSources: (fn: (prev: string[]) => string[]) => void;
-  showNonEnglish: boolean;
-  setShowNonEnglish: (v: boolean) => void;
   savedKeywords?: string[];
 }) {
   const location = useLocation();
@@ -412,48 +408,6 @@ export default function FilterSidebar({
             </SelectContent>
           </Select>
         </div>
-
-        {/* Language Section */}
-        {setShowNonEnglish && (
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <Languages className="w-4 h-4 text-slate-400" />
-              <span className="text-sm font-medium text-slate-300">Language</span>
-            </div>
-            <div className="flex rounded-lg border border-slate-700 overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setShowNonEnglish(false)}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-sm transition-all duration-200 ${
-                  !showNonEnglish
-                    ? 'bg-slate-700 text-white font-medium'
-                    : 'bg-slate-800 text-slate-400 hover:text-slate-300 hover:bg-slate-800/80'
-                }`}
-              >
-                <span>🇬🇧</span>
-                <span>English only</span>
-              </button>
-              <div className="w-px bg-slate-700 flex-shrink-0" />
-              <button
-                type="button"
-                onClick={() => setShowNonEnglish(true)}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-sm transition-all duration-200 ${
-                  showNonEnglish
-                    ? 'bg-slate-700 text-white font-medium'
-                    : 'bg-slate-800 text-slate-400 hover:text-slate-300 hover:bg-slate-800/80'
-                }`}
-              >
-                <span>🌐</span>
-                <span>All languages</span>
-              </button>
-            </div>
-            {showNonEnglish && (
-              <p className="text-[11px] text-slate-500 mt-1.5 px-1">
-                Articles in the country's local language will appear with a language badge.
-              </p>
-            )}
-          </div>
-        )}
 
         {/* Countries Section */}
         <Collapsible open={countriesOpen} onOpenChange={setCountriesOpen}>
