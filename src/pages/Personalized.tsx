@@ -198,11 +198,13 @@ export default function Personalized() {
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
+              style={{ touchAction: 'pan-y' }}
               className="flex flex-col items-center justify-center h-full min-h-[500px] text-center px-6"
             >
               <motion.div
                 className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6"
                 animate={{ y: [0, -8, 0] }}
+                style={{ touchAction: 'pan-y' }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
               >
                 <BookOpen className="w-10 h-10 text-stone-400 dark:text-slate-500" />
@@ -221,6 +223,7 @@ export default function Personalized() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
+              style={{ touchAction: 'pan-y' }}
               className="flex flex-col items-center justify-center h-full min-h-[400px] text-center"
             >
               <Sparkles className="w-10 h-10 text-stone-300 dark:text-slate-600 mb-4" />

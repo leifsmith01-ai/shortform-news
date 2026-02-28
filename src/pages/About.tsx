@@ -87,6 +87,7 @@ export default function About() {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.07, duration: 0.35 }}
+                style={{ touchAction: 'pan-y' }}
                 className="bg-white dark:bg-slate-800 border border-stone-200 dark:border-slate-700 rounded-xl p-5"
               >
                 <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100 mb-2">{p.title}</h3>

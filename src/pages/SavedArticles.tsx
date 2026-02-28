@@ -123,11 +123,13 @@ export default function SavedArticles() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
+              style={{ touchAction: 'pan-y' }}
               className="flex flex-col items-center justify-center h-full min-h-[400px] text-center"
             >
               <motion.div
                 className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6"
                 animate={{ y: [0, -8, 0] }}
+                style={{ touchAction: 'pan-y' }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
               >
                 <Bookmark className="w-10 h-10 text-stone-400 dark:text-slate-500" />

@@ -69,6 +69,7 @@ export default function LowCoverageTile({ items, index = 0 }: LowCoverageTilePro
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05, duration: 0.4 }}
+      style={{ touchAction: 'pan-y' }}
       className="col-span-full rounded-2xl border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-950/20 p-5"
     >
       <div className="flex items-start gap-3">

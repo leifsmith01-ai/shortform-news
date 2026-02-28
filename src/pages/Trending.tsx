@@ -130,6 +130,7 @@ export default function Trending() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
+                style={{ touchAction: 'pan-y' }}
                 className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
               >
                 {[...Array(6)].map((_, i) => (
@@ -142,6 +143,7 @@ export default function Trending() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
+                style={{ touchAction: 'pan-y' }}
               >
                 {loading && (
                   <div className="flex items-center gap-2 text-xs text-stone-400 dark:text-slate-500 mb-4">
@@ -182,6 +184,7 @@ export default function Trending() {
                 key="empty"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
+                style={{ touchAction: 'pan-y' }}
                 className="flex flex-col items-center justify-center py-20 text-center"
               >
                 <Flame className="w-12 h-12 text-stone-300 dark:text-slate-600 mb-4" />

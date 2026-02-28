@@ -96,6 +96,7 @@ export default function History() {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: idx * 0.05 }}
+                        style={{ touchAction: 'pan-y' }}
                         className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-stone-200 dark:border-slate-700 hover:shadow-md transition-shadow"
                       >
                         <div className="flex items-start justify-between gap-4">
@@ -130,11 +131,13 @@ export default function History() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
+              style={{ touchAction: 'pan-y' }}
               className="flex flex-col items-center justify-center h-full min-h-[400px] text-center"
             >
               <motion.div
                 className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6"
                 animate={{ y: [0, -8, 0] }}
+                style={{ touchAction: 'pan-y' }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
               >
                 <Clock className="w-10 h-10 text-stone-400 dark:text-slate-500" />

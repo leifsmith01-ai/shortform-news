@@ -264,6 +264,7 @@ export default function Finance() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
+                  style={{ touchAction: 'pan-y' }}
                   className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
                 >
                   {[...Array(6)].map((_, i) => (
@@ -276,6 +277,7 @@ export default function Finance() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
+                  style={{ touchAction: 'pan-y' }}
                 >
                   {groupedArticles ? (
                     <div className="space-y-12">
@@ -284,6 +286,7 @@ export default function Finance() {
                           key={key}
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
+                          style={{ touchAction: 'pan-y' }}
                         >
                           <h2 className="text-2xl font-bold text-stone-900 dark:text-stone-100 mb-6 flex items-center gap-3">
                             <span className="w-1 h-8 bg-emerald-600 rounded-full" />
