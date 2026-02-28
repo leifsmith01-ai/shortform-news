@@ -101,9 +101,6 @@ export default function Home() {
   const [selectedSources, setSelectedSources] = useState<string[]>(() =>
     getStoredList('selectedSources', [])
   );
-  const [showNonEnglish, setShowNonEnglish] = useState<boolean>(() =>
-    localStorage.getItem('showNonEnglish') === 'true'
-  );
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState('24h');
   const [articles, setArticles] = useState([]);
@@ -129,10 +126,6 @@ export default function Home() {
     localStorage.setItem('selectedSources', JSON.stringify(selectedSources));
   }, [selectedSources]);
 
-  useEffect(() => {
-    localStorage.setItem('showNonEnglish', String(showNonEnglish));
-  }, [showNonEnglish]);
-
   // Ref for aborting in-flight requests when filters change
   const abortControllerRef = React.useRef<AbortController | null>(null);
 
@@ -153,13 +146,19 @@ export default function Home() {
     setError(null);
 
     try {
+      // For non-English-primary countries, the backend automatically includes
+      // native-language articles alongside English coverage. We signal 'all'
+      // whenever at least one selected country is not English-primary.
+      const ENGLISH_PRIMARY = new Set(['us', 'gb', 'au', 'ca', 'nz', 'ie']);
+      const language = selectedCountries.every(c => ENGLISH_PRIMARY.has(c)) ? 'en' : 'all';
+
       const result = await api.fetchNews({
         countries: selectedCountries,
         categories: selectedCategories,
         searchQuery: searchQuery ? sanitizeSearchQuery(searchQuery) : undefined,
         dateRange,
         sources: selectedSources.length > 0 ? selectedSources : undefined,
-        language: showNonEnglish ? 'all' : 'en',
+        language,
       });
 
       // If this request was aborted while in flight, discard the result
@@ -218,7 +217,7 @@ export default function Home() {
         setLoading(false);
       }
     }
-  }, [selectedCountries, selectedCategories, selectedSources, searchQuery, dateRange, showNonEnglish]);
+  }, [selectedCountries, selectedCategories, selectedSources, searchQuery, dateRange]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -253,8 +252,6 @@ export default function Home() {
           setDateRange={setDateRange}
           selectedSources={selectedSources}
           setSelectedSources={setSelectedSources}
-          showNonEnglish={showNonEnglish}
-          setShowNonEnglish={setShowNonEnglish}
           savedKeywords={savedKeywords}
         />
       </aside>
@@ -284,8 +281,6 @@ export default function Home() {
                     setDateRange={setDateRange}
                     selectedSources={selectedSources}
                     setSelectedSources={setSelectedSources}
-                    showNonEnglish={showNonEnglish}
-                    setShowNonEnglish={setShowNonEnglish}
                     savedKeywords={savedKeywords}
                   />
                 </SheetContent>

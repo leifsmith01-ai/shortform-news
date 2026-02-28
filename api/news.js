@@ -260,6 +260,26 @@ const ALL_TRUSTED_SOURCES = [
   { domain: 'indiewire.com',         sourceId: null,                   name: 'IndieWire',             group: 'film' },
   { domain: 'vulture.com',           sourceId: null,                   name: 'Vulture',               group: 'film' },
   { domain: 'buzzfeed.com',          sourceId: 'buzzfeed',             name: 'BuzzFeed',              group: 'tv' },
+  // ── Middle East (additional) ──────────────────────────────────────────────
+  { domain: 'dailysabah.com',        sourceId: null,                   name: 'Daily Sabah',              group: 'regional' },
+  // ── Asia (additional) ─────────────────────────────────────────────────────
+  { domain: 'nhk.or.jp',            sourceId: null,                   name: 'NHK World',                group: 'regional' },
+  { domain: 'dawn.com',             sourceId: null,                   name: 'Dawn (Pakistan)',           group: 'regional' },
+  { domain: 'thedailystar.net',     sourceId: null,                   name: 'The Daily Star (BD)',       group: 'regional' },
+  { domain: 'vietnamnews.vn',       sourceId: null,                   name: 'Vietnam News',             group: 'regional' },
+  // ── Africa (additional) ───────────────────────────────────────────────────
+  { domain: 'theeastafrican.co.ke', sourceId: null,                   name: 'The East African',         group: 'regional' },
+  // ── Europe (additional) ───────────────────────────────────────────────────
+  { domain: 'thelocal.de',          sourceId: null,                   name: 'The Local (Germany)',       group: 'regional' },
+  { domain: 'thelocal.fr',          sourceId: null,                   name: 'The Local (France)',        group: 'regional' },
+  { domain: 'thelocal.es',          sourceId: null,                   name: 'The Local (Spain)',         group: 'regional' },
+  { domain: 'thelocal.se',          sourceId: null,                   name: 'The Local (Sweden)',        group: 'regional' },
+  { domain: 'thelocal.it',          sourceId: null,                   name: 'The Local (Italy)',         group: 'regional' },
+  { domain: 'thelocal.no',          sourceId: null,                   name: 'The Local (Norway)',        group: 'regional' },
+  { domain: 'euractiv.com',         sourceId: null,                   name: 'Euractiv',                  group: 'regional' },
+  // ── Americas (additional) ─────────────────────────────────────────────────
+  { domain: 'ticotimes.net',        sourceId: null,                   name: 'Tico Times',               group: 'regional' },
+  { domain: 'colombiareports.com',  sourceId: null,                   name: 'Colombia Reports',         group: 'regional' },
 ];
 
 // Build domain and source-ID strings, optionally filtered by a user-supplied domain list
@@ -946,6 +966,267 @@ const RSS_SOURCES = [
     url: process.env.RTE_RSS_URL || 'https://www.rte.ie/news/rss/rte-news-national.xml',
     countries: new Set(['ie']),
   },
+  // ── Middle East ──────────────────────────────────────────────────────────
+  {
+    name: 'Arab News',
+    domain: 'arabnews.com',
+    // Leading English-language newspaper for the Arab world. Covers Saudi Arabia,
+    // UAE, Gulf states, Egypt, Jordan, Lebanon, and wider Middle East. Free RSS feed.
+    url: process.env.ARABNEWS_RSS_URL || 'https://www.arabnews.com/rss.xml',
+    countries: new Set(['sa', 'ae', 'kw', 'qa', 'bh', 'om', 'jo', 'lb', 'iq', 'eg', 'ma', 'dz', 'tn']),
+  },
+  {
+    name: 'Times of Israel',
+    domain: 'timesofisrael.com',
+    // Comprehensive English-language coverage of Israel and the Palestinian territories.
+    // Free RSS feed with breaking news, politics, and regional affairs.
+    url: process.env.TIMES_OF_ISRAEL_RSS_URL || 'https://www.timesofisrael.com/feed/',
+    countries: new Set(['il', 'ps']),
+  },
+  {
+    name: 'Middle East Eye',
+    domain: 'middleeasteye.net',
+    // Independent news outlet covering the broader Middle East and North Africa region.
+    // Free RSS feed, no paywall for feed content.
+    url: process.env.MIDDLE_EAST_EYE_RSS_URL || 'https://www.middleeasteye.net/rss',
+    countries: new Set(['il', 'ps', 'ae', 'sa', 'tr', 'jo', 'lb', 'iq', 'ir', 'eg', 'ma']),
+  },
+  {
+    name: 'Daily Sabah',
+    domain: 'dailysabah.com',
+    // Turkey's leading English-language newspaper. Covers Turkish politics, economy,
+    // and regional affairs. Free RSS feed.
+    url: process.env.DAILY_SABAH_RSS_URL || 'https://www.dailysabah.com/rssfeed/home',
+    countries: new Set(['tr']),
+  },
+  // ── Asia ─────────────────────────────────────────────────────────────────
+  {
+    name: 'Japan Times',
+    domain: 'japantimes.co.jp',
+    // Japan's oldest and most widely read English-language newspaper. Covers
+    // Japanese politics, business, culture, and regional Asia-Pacific affairs.
+    // Free RSS feed.
+    url: process.env.JAPAN_TIMES_RSS_URL || 'https://www.japantimes.co.jp/feed/',
+    countries: new Set(['jp']),
+  },
+  {
+    name: 'NHK World',
+    domain: 'nhk.or.jp',
+    // Japan's public broadcaster international English service. Reliable breaking
+    // news from Japan and Asia. Free RSS feed, no paywall.
+    url: process.env.NHK_WORLD_RSS_URL || 'https://www3.nhk.or.jp/nhkworld/en/news/feeds/rss_en_all.xml',
+    countries: new Set(['jp']),
+  },
+  {
+    name: 'Korea Herald',
+    domain: 'koreaherald.com',
+    // South Korea's largest English-language newspaper. Covers Korean politics,
+    // business, tech, and society. Free RSS feed.
+    url: process.env.KOREA_HERALD_RSS_URL || 'https://www.koreaherald.com/common/rss_xml.php?ct=020100000000',
+    countries: new Set(['kr']),
+  },
+  {
+    name: 'Bangkok Post',
+    domain: 'bangkokpost.com',
+    // Thailand's leading English-language newspaper. Covers Thai politics, economy,
+    // society, and Southeast Asia. Free RSS feed.
+    url: process.env.BANGKOK_POST_RSS_URL || 'https://www.bangkokpost.com/rss/data/topstories.xml',
+    countries: new Set(['th']),
+  },
+  {
+    name: 'Jakarta Globe',
+    domain: 'jakartaglobe.id',
+    // Indonesia's English-language news outlet covering politics, business, and
+    // culture. Free RSS feed.
+    url: process.env.JAKARTA_GLOBE_RSS_URL || 'https://jakartaglobe.id/feed',
+    countries: new Set(['id']),
+  },
+  {
+    name: 'Rappler',
+    domain: 'rappler.com',
+    // Award-winning Philippine digital journalism outlet. Covers Philippine
+    // politics, society, and Southeast Asia. Free RSS feed.
+    url: process.env.RAPPLER_RSS_URL || 'https://www.rappler.com/feed',
+    countries: new Set(['ph']),
+  },
+  {
+    name: 'Vietnam News',
+    domain: 'vietnamnews.vn',
+    // Official English-language newspaper of Vietnam. Covers domestic politics,
+    // economy, and society. Free RSS feed.
+    url: process.env.VIETNAM_NEWS_RSS_URL || 'https://vietnamnews.vn/rss/home.rss',
+    countries: new Set(['vn']),
+  },
+  {
+    name: 'Straits Times',
+    domain: 'straitstimes.com',
+    // Singapore's flagship English-language broadsheet. Excellent coverage of
+    // Singapore, Malaysia, Indonesia, and Southeast Asia. Free RSS feed.
+    url: process.env.STRAITS_TIMES_RSS_URL || 'https://www.straitstimes.com/news/singapore/rss.xml',
+    countries: new Set(['sg', 'my', 'id', 'th', 'ph', 'vn']),
+  },
+  {
+    name: 'Channel NewsAsia',
+    domain: 'channelnewsasia.com',
+    // Singapore's international broadcaster covering Asia-Pacific news in depth.
+    // Free RSS feed, broad Southeast and East Asia coverage.
+    url: process.env.CNA_RSS_URL || 'https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=10416',
+    countries: new Set(['sg', 'my', 'id', 'ph', 'th', 'vn', 'mm', 'kh', 'bd', 'lk', 'np']),
+  },
+  {
+    name: 'Dawn (Pakistan)',
+    domain: 'dawn.com',
+    // Pakistan's most widely read English-language newspaper. Covers politics,
+    // security, economy, and South Asian affairs. Free RSS feed.
+    url: process.env.DAWN_RSS_URL || 'https://www.dawn.com/feeds/home',
+    countries: new Set(['pk']),
+  },
+  {
+    name: 'The Daily Star (Bangladesh)',
+    domain: 'thedailystar.net',
+    // Bangladesh's leading English-language newspaper. Covers politics, business,
+    // and society. Free RSS feed.
+    url: process.env.DAILY_STAR_BD_RSS_URL || 'https://www.thedailystar.net/feeds/frontpage',
+    countries: new Set(['bd']),
+  },
+  // ── Africa ───────────────────────────────────────────────────────────────
+  {
+    name: 'Nation Africa',
+    domain: 'nation.africa',
+    // East Africa's most widely read media group. Strong Kenya, Tanzania, Uganda,
+    // and Rwanda coverage. Free RSS feed.
+    url: process.env.NATION_AFRICA_RSS_URL || 'https://nation.africa/feed',
+    countries: new Set(['ke', 'tz', 'ug', 'rw']),
+  },
+  {
+    name: 'BusinessDay Nigeria',
+    domain: 'businessday.ng',
+    // Nigeria's leading business and financial newspaper. Covers Nigerian economy,
+    // politics, and West Africa. Free RSS feed.
+    url: process.env.BUSINESSDAY_NG_RSS_URL || 'https://businessday.ng/feed',
+    countries: new Set(['ng', 'gh']),
+  },
+  {
+    name: 'Africanews',
+    domain: 'africanews.com',
+    // Pan-African English-language news outlet covering the entire continent.
+    // Strong reporting on Sub-Saharan Africa. Free RSS feed.
+    url: process.env.AFRICANEWS_RSS_URL || 'https://www.africanews.com/feed',
+    countries: new Set(['ng', 'gh', 'et', 'tz', 'ug', 'sn', 'ci', 'cm', 'rw', 'za', 'ke']),
+  },
+  {
+    name: 'The East African',
+    domain: 'theeastafrican.co.ke',
+    // Regional weekly newspaper covering Kenya, Tanzania, Uganda, Rwanda, and
+    // East Africa broadly. Free RSS feed.
+    url: process.env.EAST_AFRICAN_RSS_URL || 'https://www.theeastafrican.co.ke/feed',
+    countries: new Set(['ke', 'tz', 'ug', 'rw', 'et']),
+  },
+  // ── Europe (English-language regional outlets) ───────────────────────────
+  {
+    name: 'The Local (Germany)',
+    domain: 'thelocal.de',
+    // English-language news about Germany for expats and international audiences.
+    // Covers German politics, society, and lifestyle. Free RSS feed.
+    url: process.env.THE_LOCAL_DE_RSS_URL || 'https://www.thelocal.de/feeds/rss.php',
+    countries: new Set(['de', 'at']),
+  },
+  {
+    name: 'The Local (France)',
+    domain: 'thelocal.fr',
+    // English-language news about France for expats and international audiences.
+    // Free RSS feed.
+    url: process.env.THE_LOCAL_FR_RSS_URL || 'https://www.thelocal.fr/feeds/rss.php',
+    countries: new Set(['fr']),
+  },
+  {
+    name: 'The Local (Spain)',
+    domain: 'thelocal.es',
+    // English-language news about Spain. Free RSS feed.
+    url: process.env.THE_LOCAL_ES_RSS_URL || 'https://www.thelocal.es/feeds/rss.php',
+    countries: new Set(['es']),
+  },
+  {
+    name: 'The Local (Sweden)',
+    domain: 'thelocal.se',
+    // English-language news about Sweden. Free RSS feed.
+    url: process.env.THE_LOCAL_SE_RSS_URL || 'https://www.thelocal.se/feeds/rss.php',
+    countries: new Set(['se']),
+  },
+  {
+    name: 'The Local (Italy)',
+    domain: 'thelocal.it',
+    // English-language news about Italy. Free RSS feed.
+    url: process.env.THE_LOCAL_IT_RSS_URL || 'https://www.thelocal.it/feeds/rss.php',
+    countries: new Set(['it']),
+  },
+  {
+    name: 'The Local (Norway)',
+    domain: 'thelocal.no',
+    // English-language news about Norway. Free RSS feed.
+    url: process.env.THE_LOCAL_NO_RSS_URL || 'https://www.thelocal.no/feeds/rss.php',
+    countries: new Set(['no']),
+  },
+  {
+    name: 'Notes from Poland',
+    domain: 'notesfrompoland.com',
+    // English-language Polish news and analysis. Strong political and judicial
+    // reporting. Free RSS feed.
+    url: process.env.NOTES_FROM_POLAND_RSS_URL || 'https://notesfrompoland.com/feed',
+    countries: new Set(['pl']),
+  },
+  {
+    name: 'Kyiv Independent',
+    domain: 'kyivindependent.com',
+    // Ukraine's leading English-language outlet. Critical coverage of the war,
+    // Ukrainian politics, and Eastern Europe. Free RSS feed.
+    url: process.env.KYIV_INDEPENDENT_RSS_URL || 'https://kyivindependent.com/feed/',
+    countries: new Set(['ua', 'rs', 'bg', 'ro', 'hu', 'sk', 'hr']),
+  },
+  {
+    name: 'Meduza',
+    domain: 'meduza.io',
+    // Independent Russian-language and English outlet covering Russia and the
+    // post-Soviet space from exile. Free RSS feed.
+    url: process.env.MEDUZA_RSS_URL || 'https://meduza.io/rss/en/all',
+    countries: new Set(['ru', 'ua', 'by', 'kz']),
+  },
+  {
+    name: 'SWI swissinfo.ch',
+    domain: 'swissinfo.ch',
+    // Switzerland's international public broadcaster in English. Covers Swiss
+    // politics, economy, and international affairs. Free RSS feed.
+    url: process.env.SWISSINFO_RSS_URL || 'https://www.swissinfo.ch/eng/rss/news.xml',
+    countries: new Set(['ch', 'lu']),
+  },
+  {
+    name: 'Euractiv',
+    domain: 'euractiv.com',
+    // Leading EU policy and politics outlet. Covers EU institutions, elections,
+    // and national politics across Europe. Free RSS feed.
+    url: process.env.EURACTIV_RSS_URL || 'https://www.euractiv.com/feed/',
+    countries: new Set([
+      'de', 'fr', 'it', 'es', 'nl', 'be', 'pl', 'cz', 'hu', 'ro', 'pt', 'gr',
+      'at', 'se', 'dk', 'fi', 'bg', 'hr', 'sk', 'lt', 'lv', 'ee', 'lu', 'ie',
+    ]),
+  },
+  // ── Americas (supplemental regional) ────────────────────────────────────
+  {
+    name: 'Tico Times',
+    domain: 'ticotimes.net',
+    // Costa Rica's English-language newspaper. Covers Central American politics
+    // and society. Free RSS feed.
+    url: process.env.TICO_TIMES_RSS_URL || 'https://ticotimes.net/feed',
+    countries: new Set(['cr', 'pa', 'gt', 'hn', 'do']),
+  },
+  {
+    name: 'Colombia Reports',
+    domain: 'colombiareports.com',
+    // English-language news outlet focused on Colombia. Covers politics, security,
+    // and economy. Free RSS feed.
+    url: process.env.COLOMBIA_REPORTS_RSS_URL || 'https://colombiareports.com/feed/',
+    countries: new Set(['co', 've', 'ec']),
+  },
 ];
 
 // Countries already well-served by targeted API sources (NewsAPI top-headlines,
@@ -954,6 +1235,12 @@ const RSS_SOURCES = [
 // regional feeds (e.g. Nikkei) from flooding results for countries that have
 // strong dedicated API coverage. Underserved countries always get RSS.
 const RSS_WELL_SERVED_COUNTRIES = new Set(['us', 'gb', 'au', 'ca', 'nz', 'ie']);
+
+// Countries where English is the primary official language.
+// For all other countries, both English AND native-language articles are
+// automatically included (showNonEnglish is forced true) so users get local
+// perspectives alongside international wire coverage — no toggle required.
+const ENGLISH_PRIMARY_COUNTRIES = new Set(['us', 'gb', 'au', 'ca', 'nz', 'ie']);
 
 // Map app categories to GNews API categories
 // GNews categories: general, world, nation, business, technology, entertainment, sports, science, health
@@ -1009,13 +1296,22 @@ const SOURCE_AUTHORITY_TIER = {
   'cbc.ca': 2, 'globeandmail.com': 2, 'irishtimes.com': 2,
   'rnz.co.nz': 2, 'nzherald.co.nz': 2, 'rte.ie': 2,
   'politico.eu': 2, 'swissinfo.ch': 2,
+  // Tier 2 — strong regionals (new outlets with solid editorial track records)
+  'japantimes.co.jp': 2, 'nhk.or.jp': 2, 'dawn.com': 2, 'koreaherald.com': 2,
+  'bangkokpost.com': 2, 'timesofisrael.com': 2, 'arabnews.com': 2,
+  'middleeasteye.net': 2, 'dailysabah.com': 2, 'euractiv.com': 2,
+  'kyivindependent.com': 2, 'theeastafrican.co.ke': 2, 'nation.africa': 2,
   // Tier 1 — quality regionals (default tier, listed explicitly for clarity)
   'brazilianreport.com': 1, 'batimes.com.ar': 1, 'mexiconewsdaily.com': 1,
-  'businessday.ng': 1, 'nation.africa': 1, 'africanews.com': 1,
-  'middleeasteye.net': 1, 'jakartaglobe.id': 1, 'inquirer.net': 1,
-  'rappler.com': 1, 'notesfrompoland.com': 1, 'meduza.io': 1,
+  'businessday.ng': 1, 'africanews.com': 1,
+  'jakartaglobe.id': 1, 'inquirer.net': 1, 'rappler.com': 1,
+  'notesfrompoland.com': 1, 'meduza.io': 1,
   'nationalpost.com': 1, 'thestar.com': 1, 'thelocal.com': 1,
   'dutchnews.nl': 1, 'polandin.com': 1,
+  'thelocal.de': 1, 'thelocal.fr': 1, 'thelocal.es': 1, 'thelocal.se': 1,
+  'thelocal.it': 1, 'thelocal.no': 1,
+  'vietnamnews.vn': 1, 'thedailystar.net': 1, 'ticotimes.net': 1,
+  'colombiareports.com': 1, 'swissinfo.ch': 1,
 };
 
 // Normalise a source name or URL to a domain key for tier lookup
@@ -3009,6 +3305,12 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
     rangeHours, dateRange, showNonEnglish,
   } = ctx;
 
+  // For non-English-primary countries, automatically include native-language articles
+  // alongside English coverage so users get local perspectives without needing a toggle.
+  // English-primary countries (US/GB/AU/CA/NZ/IE) remain English-only unless the
+  // caller explicitly requests all languages.
+  const effectiveShowNonEnglish = !ENGLISH_PRIMARY_COUNTRIES.has(country) ? true : showNonEnglish;
+
   let formattedArticles = [];
 
   // Track which secondary sources were consulted so the post-filter retry
@@ -3016,12 +3318,17 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
   const calledSources = new Set();
 
   // ── Unified parallel first pass for ALL countries ────────────────────────
-  // NewsAPI + WorldNewsAPI + GNews fire simultaneously regardless of country type.
+  // NewsAPI + WorldNewsAPI + GNews + NewsData.io fire simultaneously regardless
+  // of country type for maximum article coverage and source diversity.
   // This replaces the old two-branch strategy (sequential for English-dominant
   // countries, parallel for others) — the sequential approach was the root cause
   // of underserved results: NewsAPI alone returning 15+ raw articles would skip
   // WorldNewsAPI and GNews entirely, and those 15 raw articles could collapse to
   // 0-3 after category+country filtering with no fallback left.
+  //
+  // NewsData.io is now included in the parallel pass (instead of a deferred
+  // waterfall step) to bolster article volume from the start — it covers 100+
+  // countries including many not supported by NewsAPI.
   //
   // English-dominant countries (US/GB/AU/CA/NZ/IE) keep the trusted-domain filter
   // on NewsAPI so quality is maintained; non-English-dominant countries drop it
@@ -3035,19 +3342,25 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
   const skipDomains = !RSS_WELL_SERVED_COUNTRIES.has(country) && country !== 'world';
   const skipSecondaryAPIs = NEWSAPI_FIRST_PASS_COUNTRIES.has(country);
 
-  console.log(`  [1+2+6] Parallel fetch [${country}/${category}]${skipDomains ? ' (skipDomains)' : ''}${skipSecondaryAPIs ? ' (NewsAPI-first)' : ''}`);
-  const [newsApiRaw, worldNewsRaw, gNewsRaw] = await Promise.all([
+  console.log(`  [1+2+3+6] Parallel fetch [${country}/${category}]${skipDomains ? ' (skipDomains)' : ''}${skipSecondaryAPIs ? ' (NewsAPI-first)' : ''}${effectiveShowNonEnglish ? ' (bilingual)' : ''}`);
+  const [newsApiRaw, worldNewsRaw, gNewsRaw, newsDataRaw] = await Promise.all([
     (country === 'world' || NEWS_API_SUPPORTED_COUNTRIES.has(country))
-      ? fetchFromNewsAPI(country, category, NEWS_API_KEY, activeDomains, activeSourceIds, { from: fromISO, sortByPopularity: usePopularitySort, skipDomains, showNonEnglish })
+      ? fetchFromNewsAPI(country, category, NEWS_API_KEY, activeDomains, activeSourceIds, { from: fromISO, sortByPopularity: usePopularitySort, skipDomains, showNonEnglish: effectiveShowNonEnglish })
           .catch(err => { console.error('  NewsAPI failed:', err.message); return []; })
       : Promise.resolve([]),
     (!skipSecondaryAPIs && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country)))
-      ? fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish })
+      ? fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
           .catch(err => { console.error('  WorldNewsAPI failed:', err.message); return []; })
       : Promise.resolve([]),
     (!skipSecondaryAPIs && GNEWS_API_KEY)
-      ? fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish })
+      ? fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
           .catch(err => { console.error('  GNews failed:', err.message); return []; })
+      : Promise.resolve([]),
+    // NewsData.io in the parallel pass — broadest country coverage (100+), bolsters
+    // article volume especially for non-English and underserved markets.
+    (NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country)))
+      ? fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly, showNonEnglish: effectiveShowNonEnglish })
+          .catch(err => { console.error('  NewsData failed:', err.message); return []; })
       : Promise.resolve([]),
   ]);
 
@@ -3061,16 +3374,21 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
     calledSources.add('gnews');
     incrementApiCounter('gnews');
   }
+  if (NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
+    calledSources.add('newsdata');
+    incrementApiCounter('newsdata');
+  }
 
   const newsApiArticles = newsApiRaw
     .filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com')
     .map(a => formatNewsAPIArticle(a, country, category));
   const worldNewsArticles = worldNewsRaw.map(a => formatWorldNewsAPIArticle(a, country, category));
   const gNewsArticles = gNewsRaw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category));
+  const newsDataArticles = newsDataRaw.filter(a => a.title && a.title !== '[Removed]').map(a => formatNewsDataArticle(a, country, category));
 
   // Merge parallel results; dedup by URL so overlapping wire service articles aren't doubled
   const seenUrls = new Set();
-  for (const batch of [newsApiArticles, worldNewsArticles, gNewsArticles]) {
+  for (const batch of [newsApiArticles, worldNewsArticles, gNewsArticles, newsDataArticles]) {
     for (const article of batch) {
       if (!seenUrls.has(article.url)) {
         seenUrls.add(article.url);
@@ -3078,30 +3396,14 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
       }
     }
   }
-  console.log(`  Parallel result: ${newsApiArticles.length} NewsAPI + ${worldNewsArticles.length} WorldNews + ${gNewsArticles.length} GNews = ${formattedArticles.length} unique`);
+  console.log(`  Parallel result: ${newsApiArticles.length} NewsAPI + ${worldNewsArticles.length} WorldNews + ${gNewsArticles.length} GNews + ${newsDataArticles.length} NewsData = ${formattedArticles.length} unique`);
 
-  // ── 3. NewsData.io if < 15 ─────────────────────────────────────────────
-  if (formattedArticles.length < 15 && NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
-    calledSources.add('newsdata');
-    incrementApiCounter('newsdata');
-    console.log(`  [3] NewsData.io [${country}/${category}] (have ${formattedArticles.length} so far)`);
-    try {
-      const raw = await fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly, showNonEnglish });
-      const valid = raw.filter(a => a.title && a.title !== '[Removed]');
-      const extra = valid.map(a => formatNewsDataArticle(a, country, category)).filter(a => !seenUrls.has(a.url));
-      formattedArticles = [...formattedArticles, ...extra];
-    } catch (err) {
-      console.error(`  NewsData failed:`, err.message);
-    }
-  }
-
-  // ── 4. Guardian (priority for AU/GB/US, fallback if < 15) ─────────────
-  // NOTE: If Guardian articles are dominating results for all countries,
-  // the most likely cause is that NewsAPI/WorldNewsAPI/NewsData keys have
-  // hit their daily quota or expired. Guardian uses a generous free tier
-  // and is the last resort that never fails. Check API key status in the
-  // Vercel environment variables and in each API provider's dashboard.
-  if (GUARDIAN_API_KEY && (guardianPriorityCountry || formattedArticles.length < 15)) {
+  // ── 4. Guardian (priority for AU/GB/US, fallback if < 20) ─────────────
+  // NOTE: NewsData.io now fires in the parallel first pass; Guardian remains the
+  // trusted editorial fallback. If Guardian articles are dominating results for
+  // all countries, check API key status — NewsAPI/WorldNewsAPI/NewsData may have
+  // hit their daily quota. Guardian's generous free tier (5000/day) never fails.
+  if (GUARDIAN_API_KEY && (guardianPriorityCountry || formattedArticles.length < 20)) {
     calledSources.add('guardian');
     incrementApiCounter('guardian');
     console.log(`  [4] Guardian [${country}/${category}] (have ${formattedArticles.length} so far)`);
@@ -3114,11 +3416,11 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
     }
   }
 
-  // ── 5. RSS feeds (Caixin Global, Nikkei Asia, MercoPress, Daily Maverick …) ─────────────────────
+  // ── 5. RSS feeds (Caixin, Nikkei, MercoPress, Arab News, Japan Times …) ──
   {
     const applicableFeeds = RSS_SOURCES.filter(f => {
       if (!f.url || !f.countries.has(country)) return false;
-      if (RSS_WELL_SERVED_COUNTRIES.has(country) && formattedArticles.length >= 20) return false;
+      if (RSS_WELL_SERVED_COUNTRIES.has(country) && formattedArticles.length >= 25) return false;
       return true;
     });
     if (applicableFeeds.length > 0) {
@@ -3191,14 +3493,14 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
 
     if (!calledSources.has('worldnews') && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) {
       retryPromises.push(
-        fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort })
+        fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
           .then(raw => raw.map(a => formatWorldNewsAPIArticle(a, country, category)))
           .catch(() => [])
       );
     }
     if (!calledSources.has('newsdata') && NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
       retryPromises.push(
-        fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly })
+        fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly, showNonEnglish: effectiveShowNonEnglish })
           .then(raw => raw.filter(a => a.title && a.title !== '[Removed]').map(a => formatNewsDataArticle(a, country, category)))
           .catch(() => [])
       );
@@ -3212,7 +3514,7 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
     }
     if (!calledSources.has('gnews') && GNEWS_API_KEY) {
       retryPromises.push(
-        fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort })
+        fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
           .then(raw => raw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category)))
           .catch(() => [])
       );

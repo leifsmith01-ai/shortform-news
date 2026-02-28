@@ -67,21 +67,38 @@ export const TRUSTED_SOURCES: TrustedSource[] = [
   { domain: 'kyivindependent.com',          name: 'Kyiv Independent',           group: 'Regional' },
   { domain: 'notesfrompoland.com',          name: 'Notes from Poland',          group: 'Regional' },
   { domain: 'meduza.io',                    name: 'Meduza',                     group: 'Regional' },
+  // Regional — Asia (additional)
+  { domain: 'nhk.or.jp',                   name: 'NHK World',                  group: 'Regional' },
+  { domain: 'dawn.com',                     name: 'Dawn (Pakistan)',             group: 'Regional' },
+  { domain: 'thedailystar.net',             name: 'The Daily Star (BD)',         group: 'Regional' },
+  { domain: 'vietnamnews.vn',               name: 'Vietnam News',               group: 'Regional' },
+  // Regional — Europe (additional)
+  { domain: 'thelocal.de',                  name: 'The Local (Germany)',         group: 'Regional' },
+  { domain: 'thelocal.fr',                  name: 'The Local (France)',          group: 'Regional' },
+  { domain: 'thelocal.es',                  name: 'The Local (Spain)',           group: 'Regional' },
+  { domain: 'thelocal.se',                  name: 'The Local (Sweden)',          group: 'Regional' },
+  { domain: 'thelocal.it',                  name: 'The Local (Italy)',           group: 'Regional' },
+  { domain: 'thelocal.no',                  name: 'The Local (Norway)',          group: 'Regional' },
+  { domain: 'euractiv.com',                 name: 'Euractiv',                    group: 'Regional' },
   // Regional — Middle East
   { domain: 'arabnews.com',                 name: 'Arab News',                  group: 'Regional' },
   { domain: 'thenationalnews.com',          name: 'The National',               group: 'Regional' },
   { domain: 'timesofisrael.com',            name: 'Times of Israel',            group: 'Regional' },
   { domain: 'middleeasteye.net',            name: 'Middle East Eye',            group: 'Regional' },
+  { domain: 'dailysabah.com',               name: 'Daily Sabah',                group: 'Regional' },
   // Regional — Africa
   { domain: 'dailymaverick.co.za',          name: 'Daily Maverick',             group: 'Regional' },
   { domain: 'businessday.ng',               name: 'BusinessDay Nigeria',        group: 'Regional' },
   { domain: 'nation.africa',                name: 'Nation Africa',              group: 'Regional' },
   { domain: 'africanews.com',               name: 'Africanews',                 group: 'Regional' },
+  { domain: 'theeastafrican.co.ke',         name: 'The East African',           group: 'Regional' },
   // Regional — Latin America
   { domain: 'brazilianreport.com',          name: 'The Brazilian Report',       group: 'Regional' },
   { domain: 'mercopress.com',               name: 'MercoPress',                 group: 'Regional' },
   { domain: 'batimes.com.ar',               name: 'Buenos Aires Times',         group: 'Regional' },
   { domain: 'mexiconewsdaily.com',          name: 'Mexico News Daily',          group: 'Regional' },
+  { domain: 'ticotimes.net',                name: 'Tico Times',                 group: 'Regional' },
+  { domain: 'colombiareports.com',          name: 'Colombia Reports',           group: 'Regional' },
   // Business & Finance
   { domain: 'politico.com',       name: 'Politico',              group: 'Business & Finance' },
   { domain: 'economist.com',      name: 'The Economist',         group: 'Business & Finance' },
