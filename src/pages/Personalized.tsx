@@ -20,8 +20,8 @@ const COUNTRY_NAMES: Record<string, string> = {
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
-  technology: 'Technology', business: 'Business', science: 'Science', health: 'Health',
-  sports: 'Sports', gaming: 'Gaming', film: 'Film', tv: 'TV',
+  'health-tech-science': 'Health, Tech & Science', business: 'Business',
+  sports: 'Sports', entertainment: 'Entertainment',
   politics: 'Politics', world: 'World',
 }
 

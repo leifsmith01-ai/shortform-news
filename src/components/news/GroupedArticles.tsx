@@ -36,8 +36,8 @@ const COUNTRY_NAMES: Record<string, string> = {
 };
 
 const CATEGORY_NAMES = {
-  technology: 'Technology', business: 'Business', science: 'Science', health: 'Health',
-  sports: 'Sports', gaming: 'Gaming', film: 'Film', tv: 'TV',
+  'health-tech-science': 'Health, Tech and Science', business: 'Business',
+  sports: 'Sports', entertainment: 'Entertainment (gaming, film and tv)',
   politics: 'Politics', world: 'World'
 };
 

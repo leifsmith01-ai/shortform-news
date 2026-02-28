@@ -25,12 +25,12 @@ const generateMockArticles = (countries: string[], categories: string[], count =
   ];
 
   const headlines: Record<string, string[]> = {
-    technology: [
+    'health-tech-science': [
       'New AI breakthrough promises to revolutionize healthcare diagnostics',
-      'Tech giant announces major sustainability initiative',
-      'Cybersecurity experts warn of emerging threats in cloud computing',
+      'Scientists discover potentially habitable exoplanet',
       'Breakthrough in quantum computing brings practical applications closer',
-      'Major social media platform unveils new privacy features'
+      'New medical treatment shows remarkable results in trials',
+      'Climate research shows accelerating environmental changes'
     ],
     business: [
       'Global markets rally on positive economic indicators',
@@ -39,20 +39,6 @@ const generateMockArticles = (countries: string[], categories: string[], count =
       'Startup raises record funding in latest investment round',
       'Trade agreement reached between major economic powers'
     ],
-    science: [
-      'Scientists discover potentially habitable exoplanet',
-      'New study reveals promising cancer treatment approach',
-      'Climate research shows accelerating environmental changes',
-      'Breakthrough in renewable energy storage technology',
-      'Archaeological discovery rewrites ancient history'
-    ],
-    health: [
-      'New medical treatment shows remarkable results in trials',
-      'Public health officials announce updated guidelines',
-      'Study links lifestyle factors to longevity',
-      'Hospital system implements innovative patient care model',
-      'Mental health awareness campaign launches nationwide'
-    ],
     sports: [
       'Underdog team pulls off stunning championship victory',
       'Star athlete announces retirement after decorated career',
@@ -60,26 +46,12 @@ const generateMockArticles = (countries: string[], categories: string[], count =
       'Record-breaking performance stuns sports world',
       'Major tournament announces expanded format'
     ],
-    gaming: [
+    entertainment: [
       'Highly anticipated game sequel breaks sales records on launch day',
-      'Esports tournament draws millions of viewers worldwide',
-      'Indie game studio wins game of the year award',
-      'New console hardware update announced by major manufacturer',
-      'Game streaming platform announces exclusive partnerships'
-    ],
-    film: [
       'Blockbuster film breaks box office records worldwide',
-      'Independent film wins top prize at international festival',
-      'Major studio announces ambitious cinematic universe plans',
-      'Award-winning director reveals next ambitious project',
-      'Streaming platform invests billions in original films'
-    ],
-    tv: [
       'Hit series renewed for multiple new seasons',
-      'Streaming service announces slate of original content',
-      'Television ratings reach record highs for drama series',
-      'Popular reality show format expands to new markets',
-      'Limited series adaptation receives critical acclaim'
+      'Major studio announces ambitious cinematic universe plans',
+      'Esports tournament draws millions of viewers worldwide'
     ],
     politics: [
       'Legislative body passes landmark reform bill',
