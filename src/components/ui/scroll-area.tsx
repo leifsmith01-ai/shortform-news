@@ -17,11 +17,16 @@ const ScrollArea = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("relative overflow-y-auto overscroll-none touch-pan-y min-h-0", className)}
+    className={cn("relative overflow-y-auto overscroll-contain touch-pan-y min-h-0", className)}
     style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
     {...props}
   >
     {children}
+    {/* 1 px spacer — keeps the -webkit-overflow-scrolling compositing layer
+        1 px from its absolute scroll boundary. Without this, Safari snaps
+        scrollTop to 0 and freezes the layer when the rubber-band bounce
+        comes to rest at the exact maximum scroll position. */}
+    <div aria-hidden style={{ height: 1 }} />
   </div>
 ))
 ScrollArea.displayName = "ScrollArea"
