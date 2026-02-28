@@ -60,6 +60,7 @@ const CATEGORY_COLORS = {
 
 export default function NewsCard({ article, index, rank }) {
   const [isSaved, setIsSaved] = useState(false);
+  const [savedId, setSavedId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -79,16 +80,21 @@ export default function NewsCard({ article, index, rank }) {
 
     setIsSaving(true);
     try {
-      if (isSaved) {
+      if (isSaved && savedId) {
+        await api.unsaveArticle(savedId);
         toast.success('Article unsaved');
         setIsSaved(false);
+        setSavedId(null);
       } else {
-        await api.saveArticle({
+        const result = await api.saveArticle({
           ...article,
           saved_date: new Date().toISOString()
         });
         toast.success('Article saved!');
         setIsSaved(true);
+        if (result && (result as Record<string, unknown>).id) {
+          setSavedId((result as Record<string, unknown>).id as string);
+        }
       }
     } catch (error) {
       toast.error('Failed to save article');

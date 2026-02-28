@@ -15,6 +15,7 @@ import Keywords from './pages/Keywords'
 import Personalized from './pages/Personalized'
 import Trending from './pages/Trending'
 import Settings from './pages/Settings'
+import PrivacyPolicy from './pages/PrivacyPolicy'
 import { api } from './api'
 
 // Placeholder components for routes referenced in Layout
@@ -98,6 +99,12 @@ export default function App() {
         <Route path="/settings" element={
           <Layout currentPageName="/settings">
             <Settings />
+          </Layout>
+        } />
+
+        <Route path="/privacy-policy" element={
+          <Layout currentPageName="/privacy-policy">
+            <PrivacyPolicy />
           </Layout>
         } />
 

@@ -34,6 +34,7 @@ class SupabaseApiService {
       url: article.url as string,
       time_ago: article.time_ago as string,
       summary_points: article.summary_points ?? [],
+      saved_date: (article.saved_date ?? new Date().toISOString()) as string,
     }
 
     const { data, error } = await supabase
