@@ -6,8 +6,8 @@ export default function SignInPage() {
       <div className="flex flex-col items-center gap-8">
         {/* Logo */}
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center">
-            <span className="text-lg font-bold text-slate-900" style={{ fontFamily: 'monospace' }}>SF</span>
+          <div className="w-12 h-12 rounded-xl overflow-hidden">
+            <img src="/logo.png" alt="Shortform" className="w-full h-full object-cover" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-white">Shortform News</h1>
