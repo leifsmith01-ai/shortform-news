@@ -28,8 +28,8 @@ export default function Layout({ children, currentPageName }: { children: React.
       {/* ── Mobile top header (hidden on md+) ─────────────────────────── */}
       <header className="md:hidden flex-shrink-0 bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg overflow-hidden bg-white">
-            <img src="/logo.webp" alt="Shortform" fetchPriority="high" className="w-full h-full object-cover" />
+          <div className="w-9 h-9 rounded-lg overflow-hidden">
+            <img src="/logo.webp" alt="Shortform" fetchPriority="high" className="w-full h-full object-contain" />
           </div>
           <span className="text-white font-semibold text-sm tracking-tight">Shortform</span>
         </Link>
