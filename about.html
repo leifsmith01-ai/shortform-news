@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>About – Shortform News</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f3f4f6;
+      --surface: #ffffff;
+      --sidebar: #1a2035;
+      --sidebar-text: #e8eaf0;
+      --sidebar-muted: #8b92b0;
+      --border: #e5e7eb;
+      --accent: #6366f1;
+      --accent-light: #818cf8;
+      --tag-bg: #eff6ff;
+      --tag-border: #bfdbfe;
+      --tag-text: #3b82f6;
+      --text: #111827;
+      --muted: #6b7280;
+      --heading: #0f172a;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-weight: 400;
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 280px;
+      min-height: 100vh;
+      background: var(--sidebar);
+      flex-shrink: 0;
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-mark {
+      width: 40px;
+      height: 40px;
+      background: #fff;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.85rem;
+      color: var(--sidebar);
+      flex-shrink: 0;
+    }
+
+    .logo-text {
+      color: var(--sidebar-text);
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .logo-text span {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 400;
+      color: var(--sidebar-muted);
+    }
+
+    .sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .sidebar-nav a {
+      color: var(--sidebar-muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      padding: 8px 12px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .sidebar-nav a:hover { background: rgba(255,255,255,0.07); color: var(--sidebar-text); }
+    .sidebar-nav a.active { background: rgba(255,255,255,0.1); color: var(--sidebar-text); font-weight: 500; }
+
+    /* Main content */
+    .main {
+      flex: 1;
+      min-width: 0;
+      padding: 48px;
+    }
+
+    /* Page header */
+    .page-header {
+      margin-bottom: 40px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .page-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--tag-bg);
+      border: 1px solid var(--tag-border);
+      color: var(--tag-text);
+      font-size: 0.72rem;
+      font-weight: 500;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 20px;
+      letter-spacing: 0.03em;
+    }
+
+    h1 {
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+      color: var(--heading);
+      margin-bottom: 16px;
+    }
+
+    h1 em {
+      font-style: normal;
+      color: var(--accent);
+    }
+
+    .hero-intro {
+      font-size: 1rem;
+      color: var(--muted);
+      max-width: 580px;
+      line-height: 1.75;
+    }
+
+    /* Pillars */
+    .pillars {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .pillar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      opacity: 0;
+      transform: translateY(16px);
+      animation: fadeUp 0.5s ease forwards;
+    }
+
+    .pillar:nth-child(1) { animation-delay: 0.05s; }
+    .pillar:nth-child(2) { animation-delay: 0.12s; }
+    .pillar:nth-child(3) { animation-delay: 0.19s; }
+    .pillar:nth-child(4) { animation-delay: 0.26s; }
+
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .pillar-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--tag-bg);
+      border: 1px solid var(--tag-border);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      margin-bottom: 14px;
+    }
+
+    .pillar h2 {
+      font-size: 0.92rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--heading);
+      letter-spacing: -0.01em;
+    }
+
+    .pillar p {
+      font-size: 0.83rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    /* Pull quote */
+    .pull-quote-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 12px;
+      padding: 28px 28px 28px 32px;
+      margin-bottom: 32px;
+    }
+
+    blockquote {
+      font-size: 1.05rem;
+      font-weight: 500;
+      line-height: 1.6;
+      color: var(--heading);
+      letter-spacing: -0.01em;
+    }
+
+    blockquote footer {
+      margin-top: 12px;
+      font-size: 0.75rem;
+      font-weight: 400;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* How it works */
+    .section-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .steps {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 16px;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      align-items: start;
+    }
+
+    .step:last-child { border-bottom: none; }
+
+    .step-num {
+      width: 32px;
+      height: 32px;
+      background: var(--tag-bg);
+      border: 1px solid var(--tag-border);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--tag-text);
+      margin-top: 2px;
+    }
+
+    .step-content h3 {
+      font-size: 0.88rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: var(--heading);
+    }
+
+    .step-content p {
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    /* Footer */
+    .page-footer {
+      margin-top: 40px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .page-footer p { font-size: 0.78rem; color: var(--muted); }
+    .page-footer a { color: var(--muted); text-decoration: none; }
+    .page-footer a:hover { color: var(--text); }
+
+    @media (max-width: 768px) {
+      body { flex-direction: column; }
+      .sidebar { width: 100%; min-height: auto; height: auto; position: static; flex-direction: row; flex-wrap: wrap; padding: 16px 20px; }
+      .main { padding: 24px 20px; }
+      .pillars { grid-template-columns: 1fr; }
+      .page-footer { flex-direction: column; gap: 12px; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">SF</div>
+      <div class="logo-text">
+        Shortform
+        <span>Your news, in short</span>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="https://shortform-news.vercel.app">🏠 Home</a>
+      <a href="#" class="active">ℹ️ About</a>
+      <a href="/privacy">🔒 Privacy Policy</a>
+      <a href="mailto:shortformnewsaus@gmail.com">✉️ Contact</a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <div class="page-header">
+      <div class="page-eyebrow">✦ About Shortform</div>
+      <h1>Your news.<br><em>Your</em> way.</h1>
+      <p class="hero-intro">
+        Shortform is a news platform built on a simple idea: you should be in control of what you read, and where in the world you're reading about — not an algorithm designed for someone else. It was built to give you a quick, shortform briefing of the top stories that matter to you, through AI-generated summaries of news relevant to your interests.
+      </p>
+    </div>
+
+    <div class="pillars">
+      <div class="pillar">
+        <h2>News about the places that matter to you</h2>
+        <p>Whether you're tracking developments in your home country, following a region for work, or simply curious about somewhere new — Shortform lets you choose the locations you care about and surfaces news from those places directly.</p>
+      </div>
+      <div class="pillar">
+        <h2>Topics you choose, not topics chosen for you</h2>
+        <p>From politics and business to sport and technology, you decide which categories appear in your feed. No black-box recommendation engine, no engagement-driven rabbit holes — just the subjects you've selected, updated daily.</p>
+      </div>
+      <div class="pillar">
+        <h2>Control your own algorithm</h2>
+        <p>Big platforms use opaque algorithms to decide what you see. Shortform puts that power back in your hands. Filter by region, refine by topic, combine them however you like. The feed you get is the feed you built.</p>
+      </div>
+      <div class="pillar">
+        <h2>Media monitoring, for everyone</h2>
+        <p>Tracking news about a specific topic, brand, or region used to require expensive tools — the kind only large businesses could afford. Shortform brings that capability to anyone.</p>
+      </div>
+    </div>
+
+    <div class="pull-quote-card">
+      <blockquote>
+        Enterprise-grade media monitoring used to cost thousands. We think staying informed about the world should be accessible.
+        <footer>— Shortform News</footer>
+      </blockquote>
+    </div>
+
+    <div class="section-label">How it works</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <div class="step-content">
+          <h3>Choose your locations</h3>
+          <p>Select one or more countries or regions you want to follow. Shortform pulls in the latest news from those places so you're always up to date on what matters where.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <div class="step-content">
+          <h3>Pick your topics</h3>
+          <p>Choose the categories you care about — politics, business, technology, sport, and more. Mix and match to create a feed that reflects your interests, not a platform's priorities.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <div class="step-content">
+          <h3>Read what's relevant</h3>
+          <p>Shortform aggregates articles from trusted sources and uses AI to generate concise summaries, so you can stay across the news that matters to you without spending hours scrolling.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">04</div>
+        <div class="step-content">
+          <h3>Refine anytime</h3>
+          <p>Your preferences are always in your hands. Update your locations and topics whenever your interests change — your personalised feed updates instantly.</p>
+        </div>
+      </div>
+    </div>
+
+    <footer class="page-footer">
+      <p>© 2026 Shortform News — Australia</p>
+      <p>
+        <a href="https://shortform-news.vercel.app">Home</a> &nbsp;·&nbsp;
+        <a href="/privacy">Privacy Policy</a> &nbsp;·&nbsp;
+        <a href="mailto:shortformnewsaus@gmail.com">Contact</a>
+      </p>
+    </footer>
+
+  </main>
+
+</body>
+</html>
