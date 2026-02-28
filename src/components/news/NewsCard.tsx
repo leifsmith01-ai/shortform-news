@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
 import { ExternalLink, Clock, Bookmark, BookmarkCheck, Share2, Twitter, Facebook, Linkedin, Link2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -179,12 +178,9 @@ export default function NewsCard({ article, index, rank }) {
   };
 
   return (
-    <motion.article
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: Math.min(index, 5) * 0.05, duration: 0.3 }}
-      style={{ touchAction: 'pan-y' }}
-      className="group bg-white dark:bg-slate-800 rounded-2xl border border-stone-200 dark:border-slate-700 overflow-hidden hover:shadow-xl hover:shadow-stone-200/50 dark:hover:shadow-slate-900/50 transition-all duration-500 hover:-translate-y-1 relative"
+    <article
+      style={{ animationDelay: `${Math.min(index, 5) * 50}ms` }}
+      className="news-card-enter group bg-white dark:bg-slate-800 rounded-2xl border border-stone-200 dark:border-slate-700 overflow-hidden hover:shadow-xl hover:shadow-stone-200/50 dark:hover:shadow-slate-900/50 transition-[box-shadow,transform] duration-500 hover:-translate-y-1 relative"
     >
       {/* Ranking Badge */}
       <div className="absolute top-4 left-4 z-10 w-10 h-10 bg-slate-900 text-white rounded-full flex items-center justify-center font-bold text-lg shadow-lg">
@@ -359,6 +355,6 @@ export default function NewsCard({ article, index, rank }) {
           </button>
         </div>
       </div>
-    </motion.article>
+    </article>
   );
 }
