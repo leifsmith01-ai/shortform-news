@@ -143,12 +143,3 @@
   height: 100dvh;
 }
 
-/* iOS momentum (inertial) scrolling + prevent scroll chaining on all
-   Radix ScrollArea viewports. Without overscroll-behavior:contain,
-   reaching the edge of a scroll area propagates the scroll event to
-   the parent document, which feels like the list is "getting stuck". */
-[data-radix-scroll-area-viewport] {
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  touch-action: pan-y;
-}
