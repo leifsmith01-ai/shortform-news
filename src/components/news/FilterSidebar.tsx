@@ -148,14 +148,10 @@ const COUNTRIES_BY_CONTINENT = {
 };
 
 const CATEGORIES = [
-  { id: 'technology', name: 'Technology', icon: '💻' },
+  { id: 'health-tech-science', name: 'Health, Tech and Science', icon: '🧬' },
   { id: 'business', name: 'Business', icon: '📈' },
-  { id: 'science', name: 'Science', icon: '🔬' },
-  { id: 'health', name: 'Health', icon: '🏥' },
   { id: 'sports', name: 'Sports', icon: '⚽' },
-  { id: 'gaming', name: 'Gaming', icon: '🎮' },
-  { id: 'film', name: 'Film', icon: '🎬' },
-  { id: 'tv', name: 'TV', icon: '📺' },
+  { id: 'entertainment', name: 'Entertainment (gaming, film and tv)', icon: '🎬' },
   { id: 'politics', name: 'Politics', icon: '🏛️' },
 ];
 

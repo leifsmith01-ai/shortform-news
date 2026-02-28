@@ -51,14 +51,19 @@ const COUNTRY_NAMES: Record<string, string> = {
 };
 
 const CATEGORY_NAMES = {
-  technology: 'Technology', business: 'Business', science: 'Science', health: 'Health',
-  sports: 'Sports', gaming: 'Gaming', film: 'Film', tv: 'TV',
+  'health-tech-science': 'Health, Tech and Science', business: 'Business',
+  sports: 'Sports', entertainment: 'Entertainment (gaming, film and tv)',
   politics: 'Politics', world: 'World'
 };
 
-// Migrate old "entertainment" category to the new subcategories
+// Migrate old subcategories to the new combined categories
 const CATEGORY_MIGRATIONS: Record<string, string[]> = {
-  entertainment: ['gaming', 'film', 'tv'],
+  technology: ['health-tech-science'],
+  science: ['health-tech-science'],
+  health: ['health-tech-science'],
+  gaming: ['entertainment'],
+  film: ['entertainment'],
+  tv: ['entertainment'],
 };
 
 function getStoredList(key: string, fallback: string[]): string[] {
@@ -96,7 +101,7 @@ export default function Home() {
     getStoredList('selectedCountries', ['us'])
   );
   const [selectedCategories, setSelectedCategories] = useState<string[]>(() =>
-    getStoredList('selectedCategories', ['technology'])
+    getStoredList('selectedCategories', ['health-tech-science'])
   );
   const [selectedSources, setSelectedSources] = useState<string[]>(() =>
     getStoredList('selectedSources', [])
