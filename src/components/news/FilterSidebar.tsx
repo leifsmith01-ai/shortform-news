@@ -306,8 +306,8 @@ export default function FilterSidebar({
       {/* Header */}
       <div className="p-6 border-b border-slate-800">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white border border-slate-700 flex items-center justify-center">
-            <span className="text-sm font-bold text-slate-900" style={{ fontFamily: 'monospace' }}>SF</span>
+          <div className="w-10 h-10 rounded-xl overflow-hidden border border-slate-700">
+            <img src="/logo.png" alt="Shortform" className="w-full h-full object-cover" />
           </div>
           <div>
             <h1 className="text-lg font-semibold tracking-tight">Shortform</h1>

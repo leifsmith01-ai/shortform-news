@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Bookmark, Clock, Sparkles, Tag, Bell, TrendingUp, LogIn, Flame, Settings } from 'lucide-react';
+import { Home, Bookmark, Clock, Sparkles, Tag, Bell, TrendingUp, LogIn, Flame, Settings, Info, Shield } from 'lucide-react';
 import { UserButton, SignedIn, SignedOut } from '@clerk/clerk-react';
 
 export default function Layout({ children, currentPageName }: { children: React.ReactNode; currentPageName: string }) {
@@ -16,6 +16,8 @@ export default function Layout({ children, currentPageName }: { children: React.
     { name: 'Saved',    icon: Bookmark,   page: '/saved' },
     { name: 'History',  icon: Clock,      page: '/history' },
     { name: 'Settings', icon: Settings,   page: '/settings' },
+    { name: 'About',    icon: Info,        page: '/about' },
+    { name: 'Privacy',  icon: Shield,      page: '/privacy-policy' },
   ];
 
   const isActive = (page: string) =>
@@ -28,7 +30,7 @@ export default function Layout({ children, currentPageName }: { children: React.
       <header className="md:hidden flex-shrink-0 bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg overflow-hidden bg-white">
-            <img src="/logo.png" alt="Shortform" className="w-full h-full object-contain" />
+            <img src="/logo.png" alt="Shortform" className="w-full h-full object-cover" />
           </div>
           <span className="text-white font-semibold text-sm tracking-tight">Shortform</span>
         </Link>
@@ -55,7 +57,7 @@ export default function Layout({ children, currentPageName }: { children: React.
           {/* Logo */}
           <Link to="/">
             <div className="w-12 h-12 rounded-xl overflow-hidden bg-white border border-slate-700 mb-4">
-              <img src="/logo.png" alt="Shortform" className="w-full h-full object-contain" />
+              <img src="/logo.png" alt="Shortform" className="w-full h-full object-cover" />
             </div>
           </Link>
 
