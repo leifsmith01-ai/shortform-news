@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Settings as SettingsIcon, Building2, Check, Moon, Sun } from 'lucide-react'
+import { Settings as SettingsIcon, Building2, Check, Moon, Sun, Shield } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
@@ -176,6 +177,20 @@ export default function Settings() {
                 </motion.div>
               )
             })}
+          </div>
+
+          {/* Legal */}
+          <div className="mt-10 pt-6 border-t border-stone-200 dark:border-slate-700">
+            <h2 className="text-sm font-semibold text-stone-500 dark:text-slate-400 uppercase tracking-wider mb-3">
+              Legal
+            </h2>
+            <Link
+              to="/privacy-policy"
+              className="inline-flex items-center gap-2 text-sm text-stone-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+            >
+              <Shield className="w-4 h-4 text-stone-400 dark:text-slate-500" />
+              Privacy Policy
+            </Link>
           </div>
         </div>
       </ScrollArea>
