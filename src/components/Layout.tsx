@@ -27,8 +27,8 @@ export default function Layout({ children, currentPageName }: { children: React.
       {/* ── Mobile top header (hidden on md+) ─────────────────────────── */}
       <header className="md:hidden flex-shrink-0 bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center">
-            <span className="text-sm font-bold text-slate-900" style={{ fontFamily: 'monospace' }}>SF</span>
+          <div className="w-8 h-8 rounded-lg overflow-hidden bg-white">
+            <img src="/logo.png" alt="Shortform" className="w-full h-full object-contain" />
           </div>
           <span className="text-white font-semibold text-sm tracking-tight">Shortform</span>
         </Link>
@@ -54,8 +54,8 @@ export default function Layout({ children, currentPageName }: { children: React.
         <aside className="hidden md:flex w-20 bg-slate-900 flex-col items-center py-6 gap-6 border-r border-slate-800 flex-shrink-0">
           {/* Logo */}
           <Link to="/">
-            <div className="w-12 h-12 rounded-xl bg-white border border-slate-700 flex items-center justify-center mb-4">
-              <span className="text-lg font-bold text-slate-900" style={{ fontFamily: 'monospace' }}>SF</span>
+            <div className="w-12 h-12 rounded-xl overflow-hidden bg-white border border-slate-700 mb-4">
+              <img src="/logo.png" alt="Shortform" className="w-full h-full object-contain" />
             </div>
           </Link>
 
