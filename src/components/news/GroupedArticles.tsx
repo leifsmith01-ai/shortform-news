@@ -85,6 +85,7 @@ export default function GroupedArticles({ articles, groupBy, selectedKeys = [] }
           key={key}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          style={{ touchAction: 'pan-y' }}
         >
           <h2 className="text-2xl font-bold text-stone-900 mb-6 flex items-center gap-3">
             <span className="w-1 h-8 bg-slate-900 rounded-full" />

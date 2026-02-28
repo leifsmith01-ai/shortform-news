@@ -131,6 +131,7 @@ export default function Settings() {
                   key={group}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
+                  style={{ touchAction: 'pan-y' }}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-stone-700 dark:text-slate-300 uppercase tracking-wider">

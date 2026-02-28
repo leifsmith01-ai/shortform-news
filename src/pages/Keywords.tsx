@@ -469,6 +469,7 @@ export default function Keywords() {
                       <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
+                        style={{ touchAction: 'pan-y' }}
                         className="flex flex-col items-center justify-center min-h-[400px] text-center"
                       >
                         <Newspaper className="w-10 h-10 text-stone-300 dark:text-slate-600 mb-4" />

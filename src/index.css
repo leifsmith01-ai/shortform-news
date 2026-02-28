@@ -58,6 +58,10 @@
     height: 100%;
     overflow: hidden; /* Prevent body-level scroll on mobile */
   }
+  #root {
+    height: 100%;
+    overflow: hidden; /* Complete the height chain: html → body → #root → app-container */
+  }
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
