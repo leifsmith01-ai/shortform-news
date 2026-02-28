@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { SignedIn, SignedOut, RedirectToSignIn, useUser } from '@clerk/clerk-react'
@@ -6,18 +6,19 @@ import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 import Layout from './components/Layout'
 import Home from './pages/Home'
-import Finance from './pages/Finance'
-import SavedArticles from './pages/SavedArticles'
-import History from './pages/History'
-import SignInPage from './pages/SignInPage'
-import SignUpPage from './pages/SignUpPage'
-import Keywords from './pages/Keywords'
-import Personalized from './pages/Personalized'
-import Trending from './pages/Trending'
-import Settings from './pages/Settings'
-import PrivacyPolicy from './pages/PrivacyPolicy'
-import About from './pages/About'
 import { api } from './api'
+
+const Finance = lazy(() => import('./pages/Finance'))
+const SavedArticles = lazy(() => import('./pages/SavedArticles'))
+const History = lazy(() => import('./pages/History'))
+const SignInPage = lazy(() => import('./pages/SignInPage'))
+const SignUpPage = lazy(() => import('./pages/SignUpPage'))
+const Keywords = lazy(() => import('./pages/Keywords'))
+const Personalized = lazy(() => import('./pages/Personalized'))
+const Trending = lazy(() => import('./pages/Trending'))
+const Settings = lazy(() => import('./pages/Settings'))
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
+const About = lazy(() => import('./pages/About'))
 
 // Placeholder components for routes referenced in Layout
 const PlaceholderPage = ({ title }: { title: string }) => (
@@ -59,6 +60,7 @@ export default function App() {
     <ThemeProvider>
     <BrowserRouter>
       <UserInitialiser />
+      <Suspense fallback={null}>
       <Routes>
         {/* Auth routes */}
         <Route path="/sign-in/*" element={<SignInPage />} />
@@ -138,6 +140,7 @@ export default function App() {
           </ProtectedRoute>
         } />
       </Routes>
+      </Suspense>
       <Analytics />
       <SpeedInsights />
     </BrowserRouter>

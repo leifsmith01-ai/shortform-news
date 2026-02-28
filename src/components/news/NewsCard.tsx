@@ -57,7 +57,7 @@ const CATEGORY_COLORS = {
   world: 'bg-cyan-500/10 text-cyan-600 border-cyan-200',
 };
 
-export default function NewsCard({ article, index, rank }) {
+export default function NewsCard({ article, index, rank, isPriority = false }) {
   const [isSaved, setIsSaved] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -240,9 +240,10 @@ export default function NewsCard({ article, index, rank }) {
           <img
             src={article.image_url}
             alt={article.title}
-            loading="lazy"
+            loading={isPriority ? 'eager' : 'lazy'}
+            fetchPriority={isPriority ? 'high' : 'auto'}
             className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-700 ${
-              imageLoaded ? '' : 'blur-sm scale-105'
+              imageLoaded || isPriority ? '' : 'blur-sm scale-105'
             }`}
             onLoad={() => setImageLoaded(true)}
             onError={() => setImageError(true)}

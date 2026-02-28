@@ -4,6 +4,13 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Preload critical above-fold logo -->
+    <link rel="preload" href="/logo.webp" as="image" type="image/webp" />
+    <!-- Preconnect to Clerk auth to eliminate DNS + TLS from critical path -->
+    <link rel="preconnect" href="https://clerk.shortform.news" crossorigin />
+    <link rel="preconnect" href="https://clerk.accounts.dev" crossorigin />
+    <!-- Preconnect to Supabase -->
+    <link rel="preconnect" href="https://yyirvrxlkjtbbmsjkyhv.supabase.co" crossorigin />
     <meta name="description" content="Shortform - AI-powered news aggregator with smart summaries from trusted sources worldwide" />
     <meta name="keywords" content="news, aggregator, AI, summaries, Claude, breaking news" />
     <meta name="author" content="Shortform News" />

@@ -392,7 +392,7 @@ export default function Home() {
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                     {articles.map((article, index) => (
                       <React.Fragment key={index}>
-                        <NewsCard article={article} index={index} rank={index + 1} />
+                        <NewsCard article={article} index={index} rank={index + 1} isPriority={index < 3} />
                         {/* Ad after every 6th article */}
                         {(index + 1) % 6 === 0 && (
                           <div className="col-span-full">
