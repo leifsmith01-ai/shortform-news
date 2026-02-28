@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCw, Menu, Sparkles, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -368,69 +367,54 @@ export default function Home() {
         {/* Content Area */}
         <ScrollArea className="flex-1">
           <div className="p-4 lg:p-8">
-            <AnimatePresence mode="wait">
-              {loading && !hasStaleData ? (
-                // First-ever load — no previous data to show, render skeletons
-                <motion.div
-                  key="loading"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  style={{ touchAction: 'pan-y' }}
-                  className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
-                >
-                  {[...Array(6)].map((_, i) => (
-                    <LoadingCard key={i} />
-                  ))}
-                </motion.div>
-              ) : articles.length > 0 ? (
-                <motion.div
-                  key="articles"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  style={{ touchAction: 'pan-y' }}
-                >
-                  {loading && (
-                    <div className="flex items-center gap-2 text-xs text-stone-400 dark:text-slate-500 mb-4">
-                      <RefreshCw className="w-3 h-3 animate-spin" />
-                      <span>Refreshing…</span>
-                    </div>
-                  )}
-                  {groupBy && groupBy !== 'none' ? (
-                    <GroupedArticles
-                      articles={articles}
-                      groupBy={groupBy}
-                      selectedKeys={groupBy === 'country' ? selectedCountries : selectedCategories}
-                    />
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                      {articles.map((article, index) => (
-                        <React.Fragment key={index}>
-                          <NewsCard article={article} index={index} rank={index + 1} />
-                          {/* Ad after every 6th article */}
-                          {(index + 1) % 6 === 0 && (
-                            <div className="col-span-full" style={{ touchAction: 'pan-y' }}>
-                              <AdUnit
-                                slot="2844757664"
-                                format="horizontal"
-                                className="rounded-xl overflow-hidden bg-stone-100 dark:bg-slate-800 min-h-[90px]"
-                              />
-                            </div>
-                          )}
-                        </React.Fragment>
-                      ))}
-                      {/* Low coverage notification — shown after articles */}
-                      {lowCoverage.length > 0 && (
-                        <LowCoverageTile items={lowCoverage} index={articles.length} />
-                      )}
-                    </div>
-                  )}
-                </motion.div>
-              ) : (
-                <EmptyState hasFilters={hasFilters} />
-              )}
-            </AnimatePresence>
+            {loading && !hasStaleData ? (
+              // First-ever load — no previous data to show, render skeletons
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <LoadingCard key={i} />
+                ))}
+              </div>
+            ) : articles.length > 0 ? (
+              <div>
+                {loading && (
+                  <div className="flex items-center gap-2 text-xs text-stone-400 dark:text-slate-500 mb-4">
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    <span>Refreshing…</span>
+                  </div>
+                )}
+                {groupBy && groupBy !== 'none' ? (
+                  <GroupedArticles
+                    articles={articles}
+                    groupBy={groupBy}
+                    selectedKeys={groupBy === 'country' ? selectedCountries : selectedCategories}
+                  />
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {articles.map((article, index) => (
+                      <React.Fragment key={index}>
+                        <NewsCard article={article} index={index} rank={index + 1} />
+                        {/* Ad after every 6th article */}
+                        {(index + 1) % 6 === 0 && (
+                          <div className="col-span-full">
+                            <AdUnit
+                              slot="2844757664"
+                              format="horizontal"
+                              className="rounded-xl overflow-hidden bg-stone-100 dark:bg-slate-800 min-h-[90px]"
+                            />
+                          </div>
+                        )}
+                      </React.Fragment>
+                    ))}
+                    {/* Low coverage notification — shown after articles */}
+                    {lowCoverage.length > 0 && (
+                      <LowCoverageTile items={lowCoverage} index={articles.length} />
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <EmptyState hasFilters={hasFilters} />
+            )}
           </div>
         </ScrollArea>
       </main>
