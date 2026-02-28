@@ -222,7 +222,7 @@ export default function Keywords() {
       )}
 
       {isLoaded && (
-        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
           {/* Left sidebar — search input + keyword tags + monitoring controls */}
           <aside className="w-full lg:w-72 flex-shrink-0 bg-white dark:bg-slate-800 border-b lg:border-b-0 lg:border-r border-stone-200 dark:border-slate-700 flex flex-col">
 
@@ -392,7 +392,7 @@ export default function Keywords() {
           </aside>
 
           {/* Main content — article feed for selected keyword */}
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             {!selectedKeyword ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
                 <Newspaper className="w-12 h-12 text-stone-300 dark:text-slate-600 mb-4" />
