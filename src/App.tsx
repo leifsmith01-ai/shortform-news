@@ -1,4 +1,4 @@
-import { useEffect, lazy, Suspense } from 'react'
+import { createContext, useState, useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { SignedIn, SignedOut, RedirectToSignIn, useUser, useSession } from '@clerk/clerk-react'
@@ -8,6 +8,9 @@ import Layout from './components/Layout'
 import Home from './pages/Home'
 import { api } from './api'
 import { supabase } from './lib/supabaseClient'
+
+// Pages wait for this before querying Supabase so RLS (auth.jwt() ->> 'sub') works.
+export const ApiReadyContext = createContext(false)
 
 const Finance = lazy(() => import('./pages/Finance'))
 const SavedArticles = lazy(() => import('./pages/SavedArticles'))
@@ -31,37 +34,48 @@ const PlaceholderPage = ({ title }: { title: string }) => (
   </div>
 )
 
-// Initialises Supabase with the signed-in Clerk user ID and JWT
-function UserInitialiser() {
+// Initialises Supabase with the signed-in Clerk user ID and JWT.
+// The two operations are merged into one effect so that api.setUser() is only
+// called AFTER the JWT is injected into the Supabase client — this prevents
+// the race condition where pages query Supabase before RLS can authenticate them.
+function UserInitialiser({ setApiReady }: { setApiReady: (ready: boolean) => void }) {
   const { user } = useUser()
   const { session } = useSession()
 
   useEffect(() => {
-    if (user?.id) {
-      api.setUser(user.id)
-    } else {
+    if (!session || !user?.id) {
       api.clearUser()
+      setApiReady(false)
+      return
     }
-  }, [user?.id])
 
-  // Sync the Clerk JWT into the Supabase client so RLS policies (auth.jwt() ->> 'sub') work.
-  // Refreshes every 50 s since Clerk tokens expire after ~60 s.
-  useEffect(() => {
-    if (!session || !user?.id) return
     let cancelled = false
 
-    async function refreshToken() {
+    async function init() {
+      if (cancelled) return
+      const token = await session!.getToken({ template: 'supabase' })
+      if (token && !cancelled) {
+        await supabase.auth.setSession({ access_token: token, refresh_token: '' })
+        if (!cancelled) {
+          api.setUser(user!.id)
+          setApiReady(true)
+        }
+      }
+    }
+
+    init()
+
+    // Refresh every 50 s — Clerk tokens expire after ~60 s.
+    const interval = setInterval(async () => {
       if (cancelled) return
       const token = await session!.getToken({ template: 'supabase' })
       if (token && !cancelled) {
         await supabase.auth.setSession({ access_token: token, refresh_token: '' })
       }
-    }
+    }, 50_000)
 
-    refreshToken()
-    const interval = setInterval(refreshToken, 50_000)
     return () => { cancelled = true; clearInterval(interval) }
-  }, [user?.id, session])
+  }, [user?.id, session]) // setApiReady is a stable setState setter — no need in deps
 
   return null
 }
@@ -77,10 +91,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const [apiReady, setApiReady] = useState(false)
+
   return (
     <ThemeProvider>
+    <ApiReadyContext.Provider value={apiReady}>
     <BrowserRouter>
-      <UserInitialiser />
+      <UserInitialiser setApiReady={setApiReady} />
       <Suspense fallback={null}>
       <Routes>
         {/* Auth routes */}
@@ -165,6 +182,7 @@ export default function App() {
       <Analytics />
       <SpeedInsights />
     </BrowserRouter>
+    </ApiReadyContext.Provider>
     </ThemeProvider>
   )
 }
