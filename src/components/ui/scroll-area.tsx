@@ -8,16 +8,18 @@ import { cn } from "@/lib/utils"
 // been triggered (which never happens on touch/mobile — there is no hover).
 // That leaves the scroll container permanently non-scrollable on mobile.
 //
-// A native div with overflow-y:auto has no such conditional logic: the
-// browser handles touch-scroll directly, and the scrollbar is styled by the
-// global ::-webkit-scrollbar rules in index.css.
+// overflow-y:scroll (not auto) is intentional: Chrome only creates a
+// composited scroll layer for `auto` after detecting overflow, which can
+// race with a React DOM swap (e.g. skeletons → article cards). Using
+// `scroll` forces a persistent scroll layer from mount, so touch-scroll
+// is always registered before the user's first swipe.
 const ScrollArea = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, children, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("relative overflow-y-auto overscroll-contain touch-pan-y min-h-0", className)}
+    className={cn("relative overflow-y-scroll overscroll-contain touch-pan-y min-h-0", className)}
     style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
     {...props}
   >

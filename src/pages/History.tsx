@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { Clock, Calendar, Trash2 } from 'lucide-react';
 import { useCountUp } from '@/hooks/useCountUp';
 import { format } from 'date-fns';
@@ -91,12 +90,8 @@ export default function History() {
                   
                   <div className="space-y-3">
                     {items.map((item, idx) => (
-                      <motion.div
+                      <div
                         key={idx}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: idx * 0.05 }}
-                        style={{ touchAction: 'pan-y' }}
                         className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-stone-200 dark:border-slate-700 hover:shadow-md transition-shadow"
                       >
                         <div className="flex items-start justify-between gap-4">
@@ -121,34 +116,24 @@ export default function History() {
                             Read Again
                           </a>
                         </div>
-                      </motion.div>
+                      </div>
                     ))}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              style={{ touchAction: 'pan-y' }}
-              className="flex flex-col items-center justify-center h-full min-h-[400px] text-center"
-            >
-              <motion.div
-                className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6"
-                animate={{ y: [0, -8, 0] }}
-                style={{ touchAction: 'pan-y' }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              >
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
+              <div className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6">
                 <Clock className="w-10 h-10 text-stone-400 dark:text-slate-500" />
-              </motion.div>
+              </div>
               <h3 className="text-xl font-semibold text-stone-800 dark:text-stone-100 mb-2">
                 No reading history yet
               </h3>
               <p className="text-stone-500 dark:text-slate-400 max-w-sm">
                 Start reading articles and they'll appear here in your history.
               </p>
-            </motion.div>
+            </div>
           )}
         </div>
       </ScrollArea>
