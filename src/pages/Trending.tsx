@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCw, Flame, AlertCircle, TrendingUp } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -122,29 +121,15 @@ export default function Trending() {
       {/* Content */}
       <ScrollArea className="flex-1">
         <div className="p-4 lg:p-8">
-          <AnimatePresence mode="wait">
             {loading && !hasStaleData ? (
               // First-ever load — no previous data to show, render skeletons
-              <motion.div
-                key="loading"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                style={{ touchAction: 'pan-y' }}
-                className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
-              >
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {[...Array(6)].map((_, i) => (
                   <LoadingCard key={i} />
                 ))}
-              </motion.div>
+              </div>
             ) : articles.length > 0 ? (
-              <motion.div
-                key="articles"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                style={{ touchAction: 'pan-y' }}
-              >
+              <div>
                 {loading && (
                   <div className="flex items-center gap-2 text-xs text-stone-400 dark:text-slate-500 mb-4">
                     <RefreshCw className="w-3 h-3 animate-spin" />
@@ -178,15 +163,9 @@ export default function Trending() {
                     </div>
                   ))}
                 </div>
-              </motion.div>
+              </div>
             ) : !loading && !error ? (
-              <motion.div
-                key="empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                style={{ touchAction: 'pan-y' }}
-                className="flex flex-col items-center justify-center py-20 text-center"
-              >
+              <div className="flex flex-col items-center justify-center py-20 text-center">
                 <Flame className="w-12 h-12 text-stone-300 dark:text-slate-600 mb-4" />
                 <h3 className="text-lg font-semibold text-stone-500 dark:text-slate-400 mb-2">No trending articles</h3>
                 <p className="text-stone-400 dark:text-slate-500 text-sm mb-6">
@@ -195,9 +174,8 @@ export default function Trending() {
                 <Button onClick={fetchTrending} variant="outline">
                   Try Again
                 </Button>
-              </motion.div>
+              </div>
             ) : null}
-          </AnimatePresence>
         </div>
       </ScrollArea>
     </div>

@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import NewsCard from './NewsCard';
 
 const COUNTRY_NAMES: Record<string, string> = {
@@ -81,12 +80,7 @@ export default function GroupedArticles({ articles, groupBy, selectedKeys = [] }
   return (
     <div className="space-y-12">
       {Object.entries(grouped).map(([key, groupArticles]: [string, any[]]) => (
-        <motion.div
-          key={key}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          style={{ touchAction: 'pan-y' }}
-        >
+        <div key={key}>
           <h2 className="text-2xl font-bold text-stone-900 mb-6 flex items-center gap-3">
             <span className="w-1 h-8 bg-slate-900 rounded-full" />
             {getGroupName(key)}
@@ -106,7 +100,7 @@ export default function GroupedArticles({ articles, groupBy, selectedKeys = [] }
               ))}
             </div>
           )}
-        </motion.div>
+        </div>
       ))}
     </div>
   );

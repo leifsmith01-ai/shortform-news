@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCw, Menu, TrendingUp, Calendar as CalendarIcon, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -257,37 +256,18 @@ export default function Finance() {
         {/* Content Area */}
         <ScrollArea className="flex-1">
           <div className="p-4 lg:p-8">
-            <AnimatePresence mode="wait">
               {loading ? (
-                <motion.div
-                  key="loading"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  style={{ touchAction: 'pan-y' }}
-                  className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
-                >
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {[...Array(6)].map((_, i) => (
                     <LoadingCard key={i} />
                   ))}
-                </motion.div>
+                </div>
               ) : articles.length > 0 ? (
-                <motion.div
-                  key="articles"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  style={{ touchAction: 'pan-y' }}
-                >
+                <div>
                   {groupedArticles ? (
                     <div className="space-y-12">
                       {Object.entries(groupedArticles).map(([key, groupArts]) => (
-                        <motion.div
-                          key={key}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          style={{ touchAction: 'pan-y' }}
-                        >
+                        <div key={key}>
                           <h2 className="text-2xl font-bold text-stone-900 dark:text-stone-100 mb-6 flex items-center gap-3">
                             <span className="w-1 h-8 bg-emerald-600 rounded-full" />
                             {groupBy === 'market' ? (MARKET_NAMES[key] || key) : (SECTOR_NAMES[key] || key)}
@@ -300,7 +280,7 @@ export default function Finance() {
                               <FinanceCard key={index} article={article} index={index} rank={index + 1} />
                             ))}
                           </div>
-                        </motion.div>
+                        </div>
                       ))}
                     </div>
                   ) : (
@@ -310,11 +290,10 @@ export default function Finance() {
                       ))}
                     </div>
                   )}
-                </motion.div>
+                </div>
               ) : (
                 <FinanceEmptyState hasFilters={hasFilters} />
               )}
-            </AnimatePresence>
           </div>
         </ScrollArea>
       </main>
