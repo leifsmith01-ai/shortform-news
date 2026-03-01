@@ -83,6 +83,7 @@ interface FinanceArticle {
 
 export default function FinanceCard({ article, index, rank }: { article: FinanceArticle; index: number; rank: number }) {
   const [isSaved, setIsSaved] = useState(false);
+  const [savedId, setSavedId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = async (e: React.MouseEvent) => {
@@ -90,16 +91,21 @@ export default function FinanceCard({ article, index, rank }: { article: Finance
     setIsSaving(true);
 
     try {
-      if (isSaved) {
+      if (isSaved && savedId) {
+        await api.unsaveArticle(savedId);
         toast.success('Article unsaved');
         setIsSaved(false);
+        setSavedId(null);
       } else {
-        await api.saveArticle({
+        const result = await api.saveArticle({
           ...article,
           saved_date: new Date().toISOString()
         });
         toast.success('Article saved!');
         setIsSaved(true);
+        if (result && (result as Record<string, unknown>).id) {
+          setSavedId((result as Record<string, unknown>).id as string);
+        }
       }
     } catch {
       toast.error('Failed to save article');

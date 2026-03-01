@@ -1,12 +1,13 @@
 import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { ThemeProvider } from './contexts/ThemeContext'
-import { SignedIn, SignedOut, RedirectToSignIn, useUser } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, RedirectToSignIn, useUser, useSession } from '@clerk/clerk-react'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 import Layout from './components/Layout'
 import Home from './pages/Home'
 import { api } from './api'
+import { supabase } from './lib/supabaseClient'
 
 const Finance = lazy(() => import('./pages/Finance'))
 const SavedArticles = lazy(() => import('./pages/SavedArticles'))
@@ -30,9 +31,10 @@ const PlaceholderPage = ({ title }: { title: string }) => (
   </div>
 )
 
-// Initialises Supabase with the signed-in Clerk user ID
+// Initialises Supabase with the signed-in Clerk user ID and JWT
 function UserInitialiser() {
   const { user } = useUser()
+  const { session } = useSession()
 
   useEffect(() => {
     if (user?.id) {
@@ -41,6 +43,25 @@ function UserInitialiser() {
       api.clearUser()
     }
   }, [user?.id])
+
+  // Sync the Clerk JWT into the Supabase client so RLS policies (auth.jwt() ->> 'sub') work.
+  // Refreshes every 50 s since Clerk tokens expire after ~60 s.
+  useEffect(() => {
+    if (!session || !user?.id) return
+    let cancelled = false
+
+    async function refreshToken() {
+      if (cancelled) return
+      const token = await session!.getToken({ template: 'supabase' })
+      if (token && !cancelled) {
+        await supabase.auth.setSession({ access_token: token, refresh_token: '' })
+      }
+    }
+
+    refreshToken()
+    const interval = setInterval(refreshToken, 50_000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [user?.id, session])
 
   return null
 }
