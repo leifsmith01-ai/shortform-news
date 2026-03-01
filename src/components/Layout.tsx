@@ -113,7 +113,7 @@ export default function Layout({ children, currentPageName }: { children: React.
       </div>
 
       {/* ── Mobile bottom navigation (hidden on md+) ──────────────────── */}
-      <nav className="md:hidden flex-shrink-0 bg-slate-900 border-t border-slate-800 px-1 py-2 sticky bottom-0 z-50">
+      <nav className="md:hidden flex-shrink-0 bg-slate-900 border-t border-slate-800 px-1 pt-2 pb-[max(8px,env(safe-area-inset-bottom))] sticky bottom-0 z-50">
         <div className="flex justify-around items-center overflow-x-auto scrollbar-none gap-0.5">
           {navItems.map((item) => {
             const Icon = item.icon;

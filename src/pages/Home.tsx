@@ -371,7 +371,7 @@ export default function Home() {
               // First-ever load — no previous data to show, render skeletons
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {[...Array(6)].map((_, i) => (
-                  <LoadingCard key={i} />
+                  <LoadingCard key={i} index={i} />
                 ))}
               </div>
             ) : articles.length > 0 ? (
