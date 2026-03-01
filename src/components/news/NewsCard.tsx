@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { ExternalLink, Clock, Bookmark, BookmarkCheck, Share2, Twitter, Facebook, Linkedin, Link2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import api from '@/api';
 import { useUser } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
+import { ApiReadyContext } from '@/App';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,6 +66,7 @@ export default function NewsCard({ article, index, rank, isPriority = false }) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [reaction, setReaction] = useState<'up' | 'down' | null>(null);
   const [isReacting, setIsReacting] = useState(false);
+  const apiReady = useContext(ApiReadyContext);
   const { isSignedIn } = useUser();
   const navigate = useNavigate();
 
@@ -103,6 +105,10 @@ export default function NewsCard({ article, index, rank, isPriority = false }) {
   };
 
   const handleArticleClick = async () => {
+    // Only record when the Supabase connection is ready — if we're still
+    // initialising, api.addToHistory() would silently fall back to localStorage
+    // and the data would never appear on the Supabase-backed History page.
+    if (!isSignedIn || !apiReady) return;
     try {
       await api.addToHistory({
         article_title: article.title,
