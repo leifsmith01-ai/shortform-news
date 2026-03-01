@@ -15,6 +15,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import AdUnit from '@/components/AdUnit';
 import api from '@/api';
 import { sanitizeSearchQuery } from '@/lib/sanitize';
+import { mergeAndRank } from '@/lib/articleCache';
 
 const COUNTRY_NAMES: Record<string, string> = {
   // North America
@@ -170,7 +171,14 @@ export default function Home() {
 
       if (result?.articles) {
         const fetchedArticles = result.articles;
-        setArticles(fetchedArticles);
+        // Merge fresh articles into cache and get ranked results
+        const merged = mergeAndRank(fetchedArticles, {
+          countries: selectedCountries,
+          categories: selectedCategories,
+          dateRange,
+          searchQuery: searchQuery ? sanitizeSearchQuery(searchQuery) : undefined,
+        });
+        setArticles(merged);
         setHasStaleData(true);
         setLowCoverage(result.lowCoverage || []);
         setLastUpdated(new Date());
@@ -186,7 +194,7 @@ export default function Home() {
 
         const rangeLabel = {
           '24h': 'Last 24 hours', '3d': 'Last 3 days',
-          'week': 'This week', 'month': 'This month', 'all': 'All time',
+          'week': 'This week', 'month': 'This month',
         }[dateRange] ?? 'News';
         toast.custom(() => (
           <div className="flex items-center gap-3 bg-slate-900 text-white pl-4 pr-3 py-3 rounded-xl shadow-xl border border-slate-700 w-72">
@@ -237,8 +245,7 @@ export default function Home() {
     '24h': 'Last 24 Hours',
     '3d': 'Last 3 Days',
     'week': 'This Week',
-    'month': 'This Month',
-    'all': 'All Time'
+    'month': 'This Month'
   }[dateRange]), [dateRange]);
 
   return (
