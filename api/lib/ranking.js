@@ -175,6 +175,7 @@ export function keywordRelevanceScore(article, searchTerms, rawKeyword) {
  * @param {string[]|null} [opts.searchTerms] - Activates Signal 7
  * @param {string|null}   [opts.rawKeyword]  - Used for exact-phrase bonus
  * @param {boolean}  [opts.keywordMode=false] - Precision monitoring mode weights
+ * @param {number|null} [opts.rangeHours] - Hours of the requested date window (scales freshness half-life)
  * @returns {object[]} Ranked articles (one representative per cluster)
  */
 export function rankAndDeduplicateArticles(articles, {
@@ -183,6 +184,7 @@ export function rankAndDeduplicateArticles(articles, {
   searchTerms = null,
   rawKeyword = null,
   keywordMode = false,
+  rangeHours = null,
 } = {}) {
   if (articles.length === 0) return [];
 
@@ -232,10 +234,28 @@ export function rankAndDeduplicateArticles(articles, {
 
   // 4. Score each cluster
   const now = Date.now();
-  const halfLife = usePopularity ? 48 * 3_600_000 : 6 * 3_600_000;
+  // Scale freshness half-life to the requested date window so that articles
+  // from across the full window remain differentiated by recency.
+  // Target: half-life = 20% of the window, floored at 3h, capped at 120h.
+  //   24h  → 4.8h  (tight: articles lose relevance within hours)
+  //   3d   → 14.4h (moderate: yesterday's stories still competitive)
+  //   week → 33.6h (broad: stories from mid-week stay in the mix)
+  //   month→ 120h  (5-day cap: best of the month stays visible)
+  // Popularity mode (no date filter) keeps the existing 48h half-life.
+  const FRESHNESS_RATIO = 0.20;
+  const MIN_HALF_LIFE_MS = 3 * 3_600_000;    // 3h floor
+  const MAX_HALF_LIFE_MS = 120 * 3_600_000;  // 120h ceiling
+  const halfLife = (usePopularity && !rangeHours)
+    ? 48 * 3_600_000
+    : rangeHours
+      ? Math.min(Math.max(rangeHours * FRESHNESS_RATIO * 3_600_000, MIN_HALF_LIFE_MS), MAX_HALF_LIFE_MS)
+      : 6 * 3_600_000; // default: existing 6h behaviour for non-windowed queries
 
   const scored = clusters.map(cluster => {
-    cluster.sort((a, b) => b.tier - a.tier || b.depth - a.depth || b.timestamp - a.timestamp);
+    // Sort cluster members to find the best representative.
+    // Tier first, then category relevance as a tiebreaker to promote the most
+    // on-topic article, then depth and recency.
+    cluster.sort((a, b) => b.tier - a.tier || b.catRelevance - a.catRelevance || b.depth - a.depth || b.timestamp - a.timestamp);
     const best = cluster[0];
     const uniqueSources = [...new Set(cluster.map(c => c.domain))];
     const coverageCount = uniqueSources.length;
@@ -245,8 +265,12 @@ export function rankAndDeduplicateArticles(articles, {
     const ageMs     = Math.max(now - best.timestamp, 0);
     const freshness = 10 * Math.pow(2, -ageMs / halfLife);
     const depth     = best.depth * 5;
+    // Blend the representative's own category score (70%) with the cluster max (30%).
+    // Pure max caused a mismatch: a tier-3 article with low category relevance could
+    // borrow a high score from a more-relevant cluster member, inflating its ranking.
+    const repCatRelevance = best.catRelevance;
     const maxCatRelevance = Math.max(...cluster.map(c => c.catRelevance));
-    const catScore  = maxCatRelevance * 8;
+    const catScore  = (repCatRelevance * 0.7 + maxCatRelevance * 0.3) * 8;
     const bestCountryRel   = Math.max(...cluster.map(c => c.countryRel));
     const countryRelScore  = bestCountryRel === -1 ? 4 : bestCountryRel;
     const bestKwRel        = Math.max(...cluster.map(c => c.kwRelevance));
@@ -262,11 +286,16 @@ export function rankAndDeduplicateArticles(articles, {
 
   // 5. Apply time-window-dependent weights
   const hasKeywordSearch = searchTerms && searchTerms.length > 0;
+  // Weight table — effective max points = weight × signal_max:
+  //   Keyword mode: precision matters most, freshness reduced
+  //   Popularity mode: cross-source coverage + authority drive the Trending feed
+  //   Normal (home) mode: country + category relevance raised to compete fairly
+  //     with freshness (was 3.0 freshness dominating; now 2.0 to level the field)
   const W = keywordMode
     ? { freshness: 1.0, authority: 1.5, coverage: 1.5, cat: 1.0, depth: 0.5, countryRel: 3.0, kwRel: 5.0 }
     : usePopularity
       ? { freshness: 1.0, authority: 2.5, coverage: 3.0, cat: 1.5, depth: 1.0, countryRel: 2.0, kwRel: hasKeywordSearch ? 2.5 : 0 }
-      : { freshness: 3.0, authority: 1.5, coverage: 1.5, cat: 2.0, depth: 1.0, countryRel: 2.0, kwRel: hasKeywordSearch ? 2.5 : 0 };
+      : { freshness: 2.0, authority: 1.5, coverage: 1.5, cat: 2.5, depth: 1.0, countryRel: 2.5, kwRel: hasKeywordSearch ? 2.5 : 0 };
 
   for (const s of scored) {
     const { authority, coverage, freshness, depth, catScore, countryRelScore, kwRelevanceScore } = s.signals;
