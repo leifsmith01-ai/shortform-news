@@ -115,8 +115,11 @@ export function mergeAndRank(
             if (!categorySet.has(mapped)) return false
         }
 
-        // Date filter — articles outside the window are kept but ranked lower
-        // (handled in the sort below, not filtered out here)
+        // Date filter — articles outside the time window are removed
+        if (cutoff) {
+            const publishedTime = article.publishedAt ? new Date(article.publishedAt).getTime() : 0
+            if (publishedTime && publishedTime < cutoff.getTime()) return false
+        }
 
         return true
     })
@@ -133,8 +136,8 @@ export function mergeAndRank(
     // Rank: composite score = recency * source_authority * coverage
     const now = Date.now()
     filtered.sort((a, b) => {
-        const scoreA = computeRankScore(a, now, cutoff)
-        const scoreB = computeRankScore(b, now, cutoff)
+        const scoreA = computeRankScore(a, now)
+        const scoreB = computeRankScore(b, now)
         return scoreB - scoreA // highest score first
     })
 
@@ -170,25 +173,19 @@ export function clearCache() {
  * Higher = better ranking position.
  *
  * Factors:
- * - Recency: exponential decay — articles lose ranking as they age.
- *   Articles outside the selected date window get a heavy penalty but
- *   are NOT removed.
+ * - Recency: exponential decay — articles lose ranking as they age
+ *   but stay visible within the selected time window.
  * - Coverage count: articles covered by multiple sources rank higher.
  * - Country relevance score (if present).
  */
-function computeRankScore(article: Article, now: number, cutoff: Date | null): number {
+function computeRankScore(article: Article, now: number): number {
     // Base recency score (0-100)
     const publishedTime = article.publishedAt ? new Date(article.publishedAt).getTime() : now - 86400000
     const ageHours = Math.max(0, (now - publishedTime) / 3600000)
 
     // Exponential decay: half-life of 12 hours
     // score = 100 * 0.5^(ageHours/12)
-    let recencyScore = 100 * Math.pow(0.5, ageHours / 12)
-
-    // Penalty for articles outside the selected time window
-    if (cutoff && publishedTime < cutoff.getTime()) {
-        recencyScore *= 0.1 // 90% penalty — still visible but ranked very low
-    }
+    const recencyScore = 100 * Math.pow(0.5, ageHours / 12)
 
     // Coverage bonus (multi-source articles are more important)
     const coverageCount = article._coverage?.count || 1
