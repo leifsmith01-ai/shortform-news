@@ -169,7 +169,6 @@ export default function FinanceFilterSidebar({
               <SelectItem value="3d">Last 3 days</SelectItem>
               <SelectItem value="week">Last week</SelectItem>
               <SelectItem value="month">Last month</SelectItem>
-              <SelectItem value="all">All time</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -195,11 +194,10 @@ export default function FinanceFilterSidebar({
               {MARKETS.map((market) => (
                 <label
                   key={market.id}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 ${
-                    selectedMarkets.includes(market.id)
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 ${selectedMarkets.includes(market.id)
                       ? 'bg-slate-800 text-white'
                       : 'hover:bg-slate-800/50 text-slate-400'
-                  }`}
+                    }`}
                 >
                   <Checkbox
                     checked={selectedMarkets.includes(market.id)}
@@ -235,11 +233,10 @@ export default function FinanceFilterSidebar({
               {SECTORS.map((sector) => (
                 <label
                   key={sector.id}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 ${
-                    selectedSectors.includes(sector.id)
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 ${selectedSectors.includes(sector.id)
                       ? 'bg-slate-800 text-white'
                       : 'hover:bg-slate-800/50 text-slate-400'
-                  }`}
+                    }`}
                 >
                   <Checkbox
                     checked={selectedSectors.includes(sector.id)}
@@ -294,11 +291,10 @@ export default function FinanceFilterSidebar({
                       {indices.map((index) => (
                         <label
                           key={index.id}
-                          className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 ${
-                            selectedIndices.includes(index.id)
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 ${selectedIndices.includes(index.id)
                               ? 'bg-slate-800 text-white'
                               : 'hover:bg-slate-800/50 text-slate-400'
-                          }`}
+                            }`}
                         >
                           <Checkbox
                             checked={selectedIndices.includes(index.id)}

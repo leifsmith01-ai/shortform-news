@@ -88,8 +88,7 @@ export default function Finance() {
     '24h': 'Last 24 Hours',
     '3d': 'Last 3 Days',
     'week': 'This Week',
-    'month': 'This Month',
-    'all': 'All Time'
+    'month': 'This Month'
   } as Record<string, string>)[dateRange], [dateRange]);
 
   // Group articles by market or sector

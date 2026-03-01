@@ -319,8 +319,8 @@ export default function FilterSidebar({
                 key={page}
                 to={page}
                 className={`flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-center transition-colors ${active
-                    ? 'bg-white text-slate-900'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                  ? 'bg-white text-slate-900'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
                   }`}
               >
                 <Icon className="w-4 h-4 flex-shrink-0" />
@@ -360,8 +360,8 @@ export default function FilterSidebar({
                   <button
                     key={kw}
                     className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors ${i === highlightedIndex
-                        ? 'bg-slate-700 text-white'
-                        : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                      ? 'bg-slate-700 text-white'
+                      : 'text-slate-300 hover:bg-slate-700 hover:text-white'
                       }`}
                     onMouseDown={(e) => {
                       e.preventDefault();
@@ -398,7 +398,6 @@ export default function FilterSidebar({
               <SelectItem value="3d">Last 3 days</SelectItem>
               <SelectItem value="week">Last week</SelectItem>
               <SelectItem value="month">Last month</SelectItem>
-              <SelectItem value="all">All time</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -424,8 +423,8 @@ export default function FilterSidebar({
               {/* World — pinned global option above continents */}
               <label
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 ${selectedCountries.includes('world')
-                    ? 'bg-slate-800 text-white'
-                    : 'hover:bg-slate-800/50 text-slate-400'
+                  ? 'bg-slate-800 text-white'
+                  : 'hover:bg-slate-800/50 text-slate-400'
                   }`}
               >
                 <Checkbox
@@ -460,8 +459,8 @@ export default function FilterSidebar({
                         <label
                           key={country.code}
                           className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 ${selectedCountries.includes(country.code)
-                              ? 'bg-slate-800 text-white'
-                              : 'hover:bg-slate-800/50 text-slate-400'
+                            ? 'bg-slate-800 text-white'
+                            : 'hover:bg-slate-800/50 text-slate-400'
                             }`}
                         >
                           <Checkbox
@@ -503,8 +502,8 @@ export default function FilterSidebar({
                 <label
                   key={category.id}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 ${selectedCategories.includes(category.id)
-                      ? 'bg-slate-800 text-white'
-                      : 'hover:bg-slate-800/50 text-slate-400'
+                    ? 'bg-slate-800 text-white'
+                    : 'hover:bg-slate-800/50 text-slate-400'
                     }`}
                 >
                   <Checkbox
@@ -542,8 +541,8 @@ export default function FilterSidebar({
                 {/* Select All toggle */}
                 <label
                   className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 ${allSourcesSelected
-                      ? 'bg-slate-800 text-white'
-                      : 'hover:bg-slate-800/50 text-slate-400'
+                    ? 'bg-slate-800 text-white'
+                    : 'hover:bg-slate-800/50 text-slate-400'
                     }`}
                 >
                   <Checkbox
@@ -581,8 +580,8 @@ export default function FilterSidebar({
                             <label
                               key={source.domain}
                               className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 ${isSourceSelected(source.domain)
-                                  ? 'bg-slate-800 text-white'
-                                  : 'hover:bg-slate-800/50 text-slate-400'
+                                ? 'bg-slate-800 text-white'
+                                : 'hover:bg-slate-800/50 text-slate-400'
                                 }`}
                             >
                               <Checkbox
