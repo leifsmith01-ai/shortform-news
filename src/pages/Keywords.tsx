@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { Tag, Plus, X, Lock, Newspaper, Search, LogIn, Globe, CrosshairIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -353,38 +352,32 @@ export default function Keywords() {
                       <p className="text-xs text-stone-300 dark:text-slate-600 mt-1 hidden lg:block">Add one above to create your first feed.</p>
                     </div>
                   ) : (
-                    <AnimatePresence>
-                      <div className="flex flex-nowrap lg:flex-wrap gap-2 overflow-x-auto lg:overflow-x-visible pb-1 lg:pb-0">
-                        {keywords.map(kw => (
-                          <motion.span
-                            key={kw.id}
-                            layout
-                            initial={{ opacity: 0, scale: 0.85 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.85 }}
-                            onClick={() => setSelectedKeyword(kw)}
-                            className={`inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-full text-sm font-medium cursor-pointer select-none transition-colors flex-shrink-0 lg:flex-shrink ${
+                    <div className="flex flex-nowrap lg:flex-wrap gap-2 overflow-x-auto lg:overflow-x-visible pb-1 lg:pb-0">
+                      {keywords.map(kw => (
+                        <span
+                          key={kw.id}
+                          onClick={() => setSelectedKeyword(kw)}
+                          className={`inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-full text-sm font-medium cursor-pointer select-none transition-colors flex-shrink-0 lg:flex-shrink ${
+                            selectedKeyword?.id === kw.id
+                              ? 'bg-slate-900 text-white'
+                              : 'bg-stone-100 dark:bg-slate-700 text-stone-700 dark:text-slate-300 hover:bg-stone-200 dark:hover:bg-slate-600'
+                          }`}
+                        >
+                          {kw.keyword}
+                          <button
+                            onClick={e => { e.stopPropagation(); handleDelete(kw) }}
+                            className={`rounded-full p-0.5 transition-colors flex-shrink-0 ${
                               selectedKeyword?.id === kw.id
-                                ? 'bg-slate-900 text-white'
-                                : 'bg-stone-100 dark:bg-slate-700 text-stone-700 dark:text-slate-300 hover:bg-stone-200 dark:hover:bg-slate-600'
+                                ? 'hover:bg-white/20 text-slate-300 hover:text-white'
+                                : 'hover:bg-stone-300 text-stone-400 hover:text-stone-600'
                             }`}
+                            aria-label={`Remove ${kw.keyword}`}
                           >
-                            {kw.keyword}
-                            <button
-                              onClick={e => { e.stopPropagation(); handleDelete(kw) }}
-                              className={`rounded-full p-0.5 transition-colors flex-shrink-0 ${
-                                selectedKeyword?.id === kw.id
-                                  ? 'hover:bg-white/20 text-slate-300 hover:text-white'
-                                  : 'hover:bg-stone-300 text-stone-400 hover:text-stone-600'
-                              }`}
-                              aria-label={`Remove ${kw.keyword}`}
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </motion.span>
-                        ))}
-                      </div>
-                    </AnimatePresence>
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
               </ScrollArea>
@@ -466,12 +459,7 @@ export default function Keywords() {
                         {[...Array(6)].map((_, i) => <LoadingCard key={i} />)}
                       </div>
                     ) : articles.length === 0 ? (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        style={{ touchAction: 'pan-y' }}
-                        className="flex flex-col items-center justify-center min-h-[400px] text-center"
-                      >
+                      <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
                         <Newspaper className="w-10 h-10 text-stone-300 dark:text-slate-600 mb-4" />
                         <h3 className="text-lg font-semibold text-stone-700 dark:text-slate-300 mb-1">No articles found</h3>
                         <p className="text-stone-400 dark:text-slate-500 text-sm max-w-xs">
@@ -482,7 +470,7 @@ export default function Keywords() {
                             ? ' Try turning off "Headline Match Only" for broader results.'
                             : ' Try a broader term or check back later.'}
                         </p>
-                      </motion.div>
+                      </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                         {articles.map((article, index) => (

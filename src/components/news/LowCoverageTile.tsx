@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { Construction } from 'lucide-react';
 
 const COUNTRY_NAMES: Record<string, string> = {
@@ -65,13 +64,7 @@ export default function LowCoverageTile({ items, index = 0 }: LowCoverageTilePro
   if (!items || items.length === 0) return null;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05, duration: 0.4 }}
-      style={{ touchAction: 'pan-y' }}
-      className="col-span-full rounded-2xl border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-950/20 p-5"
-    >
+    <div className="col-span-full rounded-2xl border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-950/20 p-5">
       <div className="flex items-start gap-3">
         <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-800 flex items-center justify-center flex-shrink-0">
           <Construction className="w-4 h-4 text-amber-600 dark:text-amber-400" />
@@ -98,6 +91,6 @@ export default function LowCoverageTile({ items, index = 0 }: LowCoverageTilePro
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
