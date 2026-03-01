@@ -6,6 +6,7 @@ import { applyRateLimit } from './lib/rateLimit.js';
 import { validateEnv } from './lib/validateEnv.js';
 import {
   CACHE, CACHE_TTL_HOURS, CACHE_MAX_ENTRIES, KEYWORD_CACHE_TTL_HOURS,
+  RANGE_CACHE_TTL_HOURS,
   getCacheKey, getSourceFingerprint, isCacheValid, evictCacheIfNeeded,
 } from './lib/cache.js';
 import { getCache, setCache } from './lib/redisCache.js';
@@ -52,15 +53,18 @@ function getApiDailyCount(apiName) {
 }
 
 /**
- * Returns a TTL override in seconds when any primary API has consumed ≥ 80% of its
- * daily limit. Doubles the standard 12-hour TTL to reduce further API calls.
- * Returns undefined when quota is healthy (setCache uses its default TTL).
+ * Returns a TTL in seconds for a cache entry, accounting for both the requested
+ * date range (narrower windows need shorter TTL) and API quota pressure (doubles
+ * the TTL when any primary API has consumed ≥ 80% of its daily limit).
+ *
+ * @param {string|null} dateRange - e.g. '24h', '3d', 'week', 'month', 'all'
  */
-function getEffectiveCacheTTL() {
+function getEffectiveCacheTTL(dateRange) {
+  const baseTTLHours = (dateRange && RANGE_CACHE_TTL_HOURS[dateRange]) ?? CACHE_TTL_HOURS;
   const nearQuota = Object.entries(API_DAILY_LIMITS).some(
     ([api, limit]) => getApiDailyCount(api) >= limit * 0.8
   );
-  return nearQuota ? CACHE_TTL_HOURS * 2 * 3600 : undefined;
+  return nearQuota ? baseTTLHours * 2 * 3600 : baseTTLHours * 3600;
 }
 
 // Countries supported by NewsAPI free tier top-headlines endpoint
@@ -1453,7 +1457,7 @@ function categoryRelevanceScore(article, category) {
 // ── Main ranking function ────────────────────────────────────────────────
 // `searchTerms` (optional): when present, enables Signal 7 (keyword relevance)
 // which boosts articles that strongly match the user's search query.
-function rankAndDeduplicateArticles(articles, { usePopularity = false, category = null, searchTerms = null, rawKeyword = null, keywordMode = false } = {}) {
+function rankAndDeduplicateArticles(articles, { usePopularity = false, category = null, searchTerms = null, rawKeyword = null, keywordMode = false, rangeHours = null } = {}) {
   if (articles.length === 0) return [];
 
   // 1. Build IDF map — words that appear in many titles are less distinctive
@@ -1508,15 +1512,30 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
 
   // 4. Score each cluster
   const now = Date.now();
-  // Half-life for freshness decay (in ms)
-  // 24h mode: 6-hour half-life (recent articles much more valuable)
-  // Week mode: 48-hour half-life (still rewards recent but more tolerant)
-  const halfLife = usePopularity ? 48 * 3600_000 : 6 * 3600_000;
+  // Scale freshness half-life to the requested date window so articles across
+  // the full window are differentiated by recency (not all collapsed to ~0).
+  //   24h  → 4.8h  tight decay (articles stale within hours)
+  //   3d   → 14.4h moderate (yesterday's stories still competitive)
+  //   week → 33.6h broad (mid-week stories stay in the mix)
+  //   month→ 120h  capped (best of the month stays visible)
+  // Popularity mode without a date window keeps the existing 48h half-life.
+  const FRESHNESS_RATIO = 0.20;
+  const MIN_HALF_LIFE_MS = 3 * 3600_000;
+  const MAX_HALF_LIFE_MS = 120 * 3600_000;
+  const halfLife = (usePopularity && !rangeHours)
+    ? 48 * 3600_000
+    : rangeHours
+      ? Math.min(Math.max(rangeHours * FRESHNESS_RATIO * 3600_000, MIN_HALF_LIFE_MS), MAX_HALF_LIFE_MS)
+      : 6 * 3600_000;
 
   const scored = clusters.map(cluster => {
-    // Pick best representative: highest tier first, then best depth, then newest
+    // Pick best representative: highest tier first, then category relevance,
+    // then content depth, then newest. Adding catRelevance as a tiebreaker
+    // ensures the most on-topic version of a story is promoted when two articles
+    // from the same tier cover the same event (e.g., both from tier-2 sources).
     cluster.sort((a, b) =>
       b.tier - a.tier ||
+      b.catRelevance - a.catRelevance ||
       b.depth - a.depth ||
       b.timestamp - a.timestamp
     );
@@ -1542,9 +1561,15 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
     const depth = best.depth * 5;
 
     // ── Signal 5: Category Relevance (0-8) ──
-    // Highest category score in the cluster (any version of the story may match better)
+    // Blend the representative article's own category score (70%) with the cluster
+    // maximum (30%). Using pure max caused a mismatch: the representative article
+    // (chosen by tier/depth) could borrow a high category score from a different
+    // cluster member, inflating the score of an article that doesn't match well.
+    // The blend retains a small bonus for stories that have highly relevant versions
+    // while anchoring to the representative's own signal.
+    const repCatRelevance = best.catRelevance;
     const maxCatRelevance = Math.max(...cluster.map(c => c.catRelevance));
-    const catScore = maxCatRelevance * 8;
+    const catScore = (repCatRelevance * 0.7 + maxCatRelevance * 0.3) * 8;
 
     // ── Signal 6: Country Relevance (0-10) ──
     // Derived from articleCountryScore() which returns 0-10:
@@ -1590,11 +1615,16 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
   // freshness is reduced, and country relevance is boosted — this mirrors
   // professional media monitoring services like Streem and Isentia where
   // topical precision matters more than recency.
+  // Weight table — effective max points = weight × signal_max:
+  //   Keyword mode: precision matters most, freshness reduced
+  //   Popularity mode: cross-source coverage + authority drive the Trending feed
+  //   Normal (home) mode: country + category relevance raised to compete fairly
+  //     with freshness (was 3.0 freshness dominating; now 2.0 to level the field)
   const W = keywordMode
     ? { freshness: 1.0, authority: 1.5, coverage: 1.5, cat: 1.0, depth: 0.5, countryRel: 3.0, kwRel: 5.0 }
     : usePopularity
       ? { freshness: 1.0, authority: 2.5, coverage: 3.0, cat: 1.5, depth: 1.0, countryRel: 2.0, kwRel: hasKeywordSearch ? 2.5 : 0 }
-      : { freshness: 3.0, authority: 1.5, coverage: 1.5, cat: 2.0, depth: 1.0, countryRel: 2.0, kwRel: hasKeywordSearch ? 2.5 : 0 };
+      : { freshness: 2.0, authority: 1.5, coverage: 1.5, cat: 2.5, depth: 1.0, countryRel: 2.5, kwRel: hasKeywordSearch ? 2.5 : 0 };
 
   for (const s of scored) {
     const { authority, coverage, freshness, depth, catScore, countryRelScore, kwRelevanceScore } = s.signals;
@@ -3010,6 +3040,7 @@ export default async function handler(req, res) {
         searchTerms,
         rawKeyword: keyword,
         keywordMode: isKeywordMode,
+        rangeHours,
       });
 
       // ── Keyword monitoring mode: post-ranking quality filters ──────────
@@ -3197,7 +3228,7 @@ export default async function handler(req, res) {
 
     // Rank ALL articles together by authority + coverage + freshness + depth + category
     const singleCategory = categoryList.length === 1 ? categoryList[0] : null;
-    let rankedArticles = rankAndDeduplicateArticles(allArticles, { usePopularity: usePopularitySort, category: singleCategory });
+    let rankedArticles = rankAndDeduplicateArticles(allArticles, { usePopularity: usePopularitySort, category: singleCategory, rangeHours });
 
     // Post-dedup fill-back: if deduplication reduced the count below 10, add back
     // the highest-quality dedup-losers (articles from merged clusters that weren't
@@ -3221,7 +3252,9 @@ export default async function handler(req, res) {
     // The per-pair backfill widens the time window (e.g. 24h → 72h) to ensure
     // enough articles are returned. After ranking across all pairs we re-apply
     // the original date constraint so that stale articles don't appear in the
-    // "Last 24 Hours" feed. Only skip enforcement if it would leave too few results.
+    // "Last 24 Hours" feed.
+    // Threshold: for 24h queries enforce aggressively (≥5 suffices); for wider
+    // windows keep the original ≥10 floor to avoid near-empty result sets.
     let finalArticles = cleanArticles;
     if (fromDate) {
       const fromTime = fromDate.getTime();
@@ -3229,8 +3262,16 @@ export default async function handler(req, res) {
         if (!a.publishedAt) return true; // no date metadata — keep
         return new Date(a.publishedAt).getTime() >= fromTime;
       });
-      if (inWindow.length >= 10) {
+      const ENFORCE_MIN = rangeHours && rangeHours <= 24 ? 5 : 10;
+      if (inWindow.length >= ENFORCE_MIN) {
         finalArticles = inWindow;
+      } else if (inWindow.length > 0) {
+        // Some in-window articles exist but below the floor — use them and
+        // top up with the least-stale out-of-window articles to reach the floor.
+        const outside = cleanArticles
+          .filter(a => a.publishedAt && new Date(a.publishedAt).getTime() < fromTime)
+          .slice(0, ENFORCE_MIN - inWindow.length);
+        finalArticles = [...inWindow, ...outside];
       }
     }
 
@@ -3444,9 +3485,18 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
   const beforeCatFilter = formattedArticles.length;
   formattedArticles = formattedArticles.filter(a => {
     if (articleMatchesCategory(a, category)) return true;
-    if (country !== 'world') {
+    // Country-in-title bypass: allow articles that explicitly mention the country
+    // in the headline, but only if they also have at least one weak category signal.
+    // Previously any country-in-title article bypassed the category check entirely,
+    // allowing e.g. "Brazil economy" articles to appear in a sports feed.
+    if (country !== 'world' && category !== 'world') {
       const { inTitle } = articleMentionsCountry(a, country);
-      return inTitle;
+      if (!inTitle) return false;
+      const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
+      if (!catKeywords) return true; // unknown category — allow through
+      const text = `${(a.title || '')} ${(a.description || '')}`.toLowerCase();
+      return catKeywords.strong.some(kw => text.includes(kw)) ||
+             catKeywords.weak.some(kw => text.includes(kw));
     }
     return false;
   });
@@ -3459,6 +3509,12 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
   // term frequency (multiple distinct keywords), and source-country metadata
   // (with special handling for international wire services).
   const MIN_ARTICLES = 15;
+  // Minimum score to be considered "relevant" to the country.
+  // Score 1 = single weak body mention only (e.g. "US dollar" in a global piece).
+  // Score 2 = body mention + frequency bonus, or a title mention alone.
+  // Raising from >0 to >=2 drops the weakest incidental mentions while still
+  // passing clearly relevant articles with a title or multi-term body mention.
+  const MIN_COUNTRY_SCORE = 2;
   if (country !== 'world' && formattedArticles.length > 0) {
     const scored = formattedArticles.map(a => {
       // Pass category to enable the combined country+category title bonus
@@ -3467,17 +3523,24 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
       return { article: a, score };
     });
     scored.sort((a, b) => b.score - a.score);
-    const relevant = scored.filter(s => s.score > 0);
-    const filler  = scored.filter(s => s.score === 0);
+    const relevant = scored.filter(s => s.score >= MIN_COUNTRY_SCORE);
+    const marginal = scored.filter(s => s.score > 0 && s.score < MIN_COUNTRY_SCORE);
+    const filler   = scored.filter(s => s.score === 0);
 
     if (relevant.length >= MIN_ARTICLES) {
       formattedArticles = relevant.map(s => s.article);
-    } else if (relevant.length > 0) {
+    } else {
+      // Pad with marginal (weak country mention) then true filler only as last resort.
+      // Mark padding with a depressed _countryScore so ranking doesn't over-reward them.
       const needed = MIN_ARTICLES - relevant.length;
-      formattedArticles = [...relevant, ...filler.slice(0, needed)].map(s => s.article);
-      console.log(`  Country filter: ${relevant.length} relevant + ${Math.min(needed, filler.length)} filler for [${country}]`);
+      const padding = [...marginal, ...filler].slice(0, needed);
+      padding.forEach(s => { s.article._countryScore = 0.5; });
+      if (padding.length > 0) {
+        console.log(`  Country filter: ${relevant.length} relevant + ${padding.length} padding (marginal/filler) for [${country}]`);
+      }
+      formattedArticles = [...relevant, ...padding].map(s => s.article);
     }
-    console.log(`  Country filter: ${relevant.length} relevant of ${scored.length} for [${country}]`);
+    console.log(`  Country filter: ${relevant.length} relevant (score>=${MIN_COUNTRY_SCORE}) of ${scored.length} for [${country}]`);
   }
 
   // ── Post-filter source retry (Option A) ────────────────────────────────
@@ -3527,9 +3590,14 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
       // Apply same category + country filters to retry batch
       retryArticles = retryArticles.filter(a => {
         if (articleMatchesCategory(a, category)) return true;
-        if (country !== 'world') {
+        if (country !== 'world' && category !== 'world') {
           const { inTitle } = articleMentionsCountry(a, country);
-          return inTitle;
+          if (!inTitle) return false;
+          const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
+          if (!catKeywords) return true;
+          const text = `${(a.title || '')} ${(a.description || '')}`.toLowerCase();
+          return catKeywords.strong.some(kw => text.includes(kw)) ||
+                 catKeywords.weak.some(kw => text.includes(kw));
         }
         return false;
       });
@@ -3537,7 +3605,7 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
         retryArticles = retryArticles.filter(a => {
           const score = articleCountryScore(a, country, category);
           a._countryScore = score;
-          return score > 0;
+          return score >= MIN_COUNTRY_SCORE;
         });
       }
 
@@ -3550,7 +3618,12 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
 
   // ── Time-window backfill ─────────────────────────────────────────────
   if (formattedArticles.length < MIN_ARTICLES && rangeHours && rangeHours < 720) {
-    const widerHours = Math.min(rangeHours * 3, 720);
+    // For short windows (24h, 3d) only widen by 2× instead of 3× to avoid
+    // introducing articles that are clearly outside the requested timeframe.
+    // Post-ranking date enforcement will trim any stragglers, but a tighter
+    // backfill means fewer stale articles competing for the top slots.
+    const backfillMultiplier = rangeHours <= 72 ? 2 : 3;
+    const widerHours = Math.min(rangeHours * backfillMultiplier, 720);
     const widerFrom = new Date(Date.now() - widerHours * 60 * 60 * 1000);
     const widerFromISO = widerFrom.toISOString();
     console.log(`  Backfill: widening ${rangeHours}h → ${widerHours}h (have ${formattedArticles.length}, need ${MIN_ARTICLES})`);
@@ -3588,16 +3661,25 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
       // Apply same relaxed filter to backfill
       backfill = backfill.filter(a => {
         if (articleMatchesCategory(a, category)) return true;
-        if (country !== 'world') {
+        if (country !== 'world' && category !== 'world') {
           const { inTitle } = articleMentionsCountry(a, country);
-          return inTitle;
+          if (!inTitle) return false;
+          const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
+          if (!catKeywords) return true;
+          const text = `${(a.title || '')} ${(a.description || '')}`.toLowerCase();
+          return catKeywords.strong.some(kw => text.includes(kw)) ||
+                 catKeywords.weak.some(kw => text.includes(kw));
         }
         return false;
       });
       backfill = backfill.filter(a => !existingUrls.has(a.url));
 
       if (country !== 'world') {
-        backfill = backfill.filter(a => articleCountryScore(a, country, category) > 0);
+        backfill = backfill.filter(a => {
+          const score = articleCountryScore(a, country, category);
+          a._countryScore = score;
+          return score >= MIN_COUNTRY_SCORE;
+        });
       }
 
       if (backfill.length > 0) {
@@ -3615,7 +3697,8 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
   // strongly they actually mention the requested country — making cache hits rank
   // differently from fresh fetches.
   const cleanForCache = formattedArticles.map(({ _meta, ...rest }) => rest);
-  // When any API is near its daily quota, double the TTL to reduce further fetches.
-  await setCache(cacheKey, { timestamp: Date.now(), articles: cleanForCache }, getEffectiveCacheTTL());
+  // Use range-aware TTL: narrow windows (24h) expire in 1h; wider ones up to 12h.
+  // Doubles the TTL when any primary API is near its daily quota.
+  await setCache(cacheKey, { timestamp: Date.now(), articles: cleanForCache }, getEffectiveCacheTTL(dateRange));
   return cleanForCache;
 }

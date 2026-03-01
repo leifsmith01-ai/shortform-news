@@ -12,14 +12,36 @@ export const CACHE_MAX_ENTRIES = 500;    // Prevent unbounded memory growth
 export const KEYWORD_CACHE_TTL_HOURS = 1; // Keyword results — more time-sensitive
 
 /**
+ * Cache TTL in hours, keyed by dateRange string.
+ * Narrow windows refresh more frequently so users see current news.
+ *   24h  → 1h  (content changes every hour; stale results immediately visible)
+ *   3d   → 3h  (moderate churn — refresh 8× per day)
+ *   week → 6h  (half-day slots, 4 refreshes per day)
+ *   month→ 12h (stable content, twice-daily refresh)
+ *   all  → 12h (no date restriction — popularity sort, very stable)
+ */
+export const RANGE_CACHE_TTL_HOURS = {
+  '24h':   1,
+  '3d':    3,
+  'week':  6,
+  'month': 12,
+  'all':   12,
+};
+
+/**
  * Build a deterministic cache key for a country+category news request.
+ * Uses finer-grained time slots for narrow date windows so caches expire
+ * proportionally to the requested timeframe.
  */
 export function getCacheKey(country, category, dateRange, sourceFingerprint, showNonEnglish) {
   const now = new Date();
   const date = now.toISOString().split('T')[0];
-  const slot = now.getUTCHours() < 12 ? 'am' : 'pm';
+  const hour = now.getUTCHours();
   const sf = sourceFingerprint || 'all';
   const lang = showNonEnglish ? 'all' : 'en';
+  // Compute slot granularity from TTL: a 1h TTL → 24 slots/day, 6h → 2 slots/day
+  const ttlHours = RANGE_CACHE_TTL_HOURS[dateRange] ?? CACHE_TTL_HOURS;
+  const slot = `h${Math.floor(hour / ttlHours)}`;
   return `${date}-${slot}-${country}-${category}-${dateRange || '24h'}-${sf}-${lang}`;
 }
 
@@ -40,11 +62,23 @@ export function getSourceFingerprint(userSources) {
 /**
  * Returns true if a cache entry is still within its TTL.
  * Keyword cache entries (key starts with 'kw-') use KEYWORD_CACHE_TTL_HOURS.
+ * Regular entries parse the dateRange segment from the key to use range-aware TTL.
  */
 export function isCacheValid(cacheEntry, key) {
   if (!cacheEntry) return false;
   const ageInHours = (Date.now() - cacheEntry.timestamp) / (1000 * 60 * 60);
-  const ttl = key?.startsWith('kw-') ? KEYWORD_CACHE_TTL_HOURS : CACHE_TTL_HOURS;
+  let ttl = CACHE_TTL_HOURS;
+  if (key?.startsWith('kw-')) {
+    ttl = KEYWORD_CACHE_TTL_HOURS;
+  } else if (key) {
+    // Key format: "{date}-{slot}-{country}-{category}-{dateRange}-{sf}-{lang}"
+    // dateRange is the 5th segment (index 4)
+    const segments = key.split('-');
+    const dateRangeSeg = segments[4];
+    if (dateRangeSeg && RANGE_CACHE_TTL_HOURS[dateRangeSeg] !== undefined) {
+      ttl = RANGE_CACHE_TTL_HOURS[dateRangeSeg];
+    }
+  }
   return ageInHours < ttl;
 }
 
