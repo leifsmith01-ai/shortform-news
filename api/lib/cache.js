@@ -7,42 +7,21 @@
 
 export const CACHE = {};
 
-export const CACHE_TTL_HOURS = 12;       // Regular news — refresh twice a day
-export const CACHE_MAX_ENTRIES = 500;    // Prevent unbounded memory growth
-export const KEYWORD_CACHE_TTL_HOURS = 1; // Keyword results — more time-sensitive
-
-/**
- * Cache TTL in hours, keyed by dateRange string.
- * Narrow windows refresh more frequently so users see current news.
- *   24h  → 6h  (4 refreshes per day — balances freshness vs API quota pressure)
- *   3d   → 3h  (moderate churn — 8 refreshes per day)
- *   week → 6h  (half-day slots, 4 refreshes per day)
- *   month→ 12h (stable content, twice-daily refresh)
- *   all  → 12h (no date restriction — popularity sort, very stable)
- */
-export const RANGE_CACHE_TTL_HOURS = {
-  '24h':   6,
-  '3d':    3,
-  'week':  6,
-  'month': 12,
-  'all':   12,
-};
+export const CACHE_TTL_HOURS = 720;             // 30 days — articles accumulate for up to a month
+export const CACHE_MAX_ENTRIES = 500;            // Prevent unbounded memory growth
+export const KEYWORD_CACHE_TTL_HOURS = 1;        // Keyword results — more time-sensitive
+export const REFRESH_INTERVAL_HOURS = 6;         // Only fetch new articles every 6 hours
+export const MAX_ARTICLE_AGE_HOURS = 720;        // Evict articles older than 30 days
 
 /**
  * Build a deterministic cache key for a country+category news request.
- * Uses finer-grained time slots for narrow date windows so caches expire
- * proportionally to the requested timeframe.
+ * NOTE: dateRange is NOT part of the key — all timeframes share one pool.
  */
 export function getCacheKey(country, category, dateRange, sourceFingerprint, showNonEnglish) {
-  const now = new Date();
-  const date = now.toISOString().split('T')[0];
-  const hour = now.getUTCHours();
   const sf = sourceFingerprint || 'all';
   const lang = showNonEnglish ? 'all' : 'en';
-  // Compute slot granularity from TTL: a 6h TTL → 4 slots/day (h0..h3), 12h → 2 slots/day
-  const ttlHours = RANGE_CACHE_TTL_HOURS[dateRange] ?? CACHE_TTL_HOURS;
-  const slot = `h${Math.floor(hour / ttlHours)}`;
-  return `${date}-${slot}-${country}-${category}-${dateRange || '24h'}-${sf}-${lang}`;
+  // dateRange parameter kept in signature for backward compat but ignored in key
+  return `pool-${country}-${category}-${sf}-${lang}`;
 }
 
 /**
@@ -62,24 +41,59 @@ export function getSourceFingerprint(userSources) {
 /**
  * Returns true if a cache entry is still within its TTL.
  * Keyword cache entries (key starts with 'kw-') use KEYWORD_CACHE_TTL_HOURS.
- * Regular entries parse the dateRange segment from the key to use range-aware TTL.
  */
 export function isCacheValid(cacheEntry, key) {
   if (!cacheEntry) return false;
   const ageInHours = (Date.now() - cacheEntry.timestamp) / (1000 * 60 * 60);
-  let ttl = CACHE_TTL_HOURS;
-  if (key?.startsWith('kw-')) {
-    ttl = KEYWORD_CACHE_TTL_HOURS;
-  } else if (key) {
-    // Key format: "{date}-{slot}-{country}-{category}-{dateRange}-{sf}-{lang}"
-    // dateRange is the 5th segment (index 4)
-    const segments = key.split('-');
-    const dateRangeSeg = segments[4];
-    if (dateRangeSeg && RANGE_CACHE_TTL_HOURS[dateRangeSeg] !== undefined) {
-      ttl = RANGE_CACHE_TTL_HOURS[dateRangeSeg];
-    }
-  }
+  const ttl = key?.startsWith('kw-') ? KEYWORD_CACHE_TTL_HOURS : CACHE_TTL_HOURS;
   return ageInHours < ttl;
+}
+
+/**
+ * Returns true if the cache entry needs a refresh (new articles should be fetched).
+ * A refresh is needed when lastFetchedAt is older than REFRESH_INTERVAL_HOURS.
+ * The cache entry itself remains valid — we just merge new articles into it.
+ */
+export function isRefreshNeeded(cacheEntry) {
+  if (!cacheEntry) return true;
+  const lastFetched = cacheEntry.lastFetchedAt || cacheEntry.timestamp || 0;
+  const ageInHours = (Date.now() - lastFetched) / (1000 * 60 * 60);
+  return ageInHours >= REFRESH_INTERVAL_HOURS;
+}
+
+/**
+ * Merge fresh articles into an existing cached pool, deduplicating by URL.
+ * Newer versions of an article (by publishedAt) replace older ones.
+ * Articles older than MAX_ARTICLE_AGE_HOURS are evicted.
+ */
+export function mergeArticles(existingArticles, freshArticles) {
+  const byUrl = new Map();
+  const cutoff = Date.now() - MAX_ARTICLE_AGE_HOURS * 60 * 60 * 1000;
+
+  // Index existing articles by URL
+  for (const article of existingArticles) {
+    if (!article.url) continue;
+    const pubTime = article.publishedAt ? new Date(article.publishedAt).getTime() : Date.now();
+    if (pubTime >= cutoff) {
+      byUrl.set(article.url, article);
+    }
+    // Articles older than 30 days are naturally evicted by not adding them
+  }
+
+  // Merge fresh articles (overwrite existing unless existing has summary and fresh doesn't)
+  for (const article of freshArticles) {
+    if (!article.url) continue;
+    const existing = byUrl.get(article.url);
+    if (existing) {
+      // Preserve AI summaries from cached version if fresh doesn't have them
+      if (existing.summary_points?.length && !article.summary_points?.length) {
+        article.summary_points = existing.summary_points;
+      }
+    }
+    byUrl.set(article.url, article);
+  }
+
+  return Array.from(byUrl.values());
 }
 
 /**

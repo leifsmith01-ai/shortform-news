@@ -1,13 +1,13 @@
 // api/news.js - Vercel Serverless Function
 // Sources: NewsAPI (primary) → WorldNewsAPI → NewsData.io → The Guardian (fallback)
-// Cache: 12-hour TTL (articles refresh twice a day)
+// Cache: 30-day article pool with 6-hour refresh interval
 
 import { applyRateLimit } from './lib/rateLimit.js';
 import { validateEnv } from './lib/validateEnv.js';
 import {
   CACHE, CACHE_TTL_HOURS, CACHE_MAX_ENTRIES, KEYWORD_CACHE_TTL_HOURS,
-  RANGE_CACHE_TTL_HOURS,
   getCacheKey, getSourceFingerprint, isCacheValid, evictCacheIfNeeded,
+  isRefreshNeeded, mergeArticles,
 } from './lib/cache.js';
 import { getCache, setCache } from './lib/redisCache.js';
 // articleFilter.js and ranking.js provide the canonical, tested implementations
@@ -31,11 +31,11 @@ const API_TIMEOUT_MS = 8000;
 // they degrade gracefully (best-effort, not guaranteed cross-instance).
 // Override daily limits via env vars to match your subscription tier.
 const API_DAILY_LIMITS = {
-  newsapi:   parseInt(process.env.NEWS_API_DAILY_LIMIT   || '100',  10),
-  worldnews: parseInt(process.env.WORLDNEWS_DAILY_LIMIT  || '500',  10),
-  newsdata:  parseInt(process.env.NEWSDATA_DAILY_LIMIT   || '200',  10),
-  guardian:  parseInt(process.env.GUARDIAN_DAILY_LIMIT   || '5000', 10),
-  gnews:     parseInt(process.env.GNEWS_DAILY_LIMIT      || '100',  10),
+  newsapi: parseInt(process.env.NEWS_API_DAILY_LIMIT || '100', 10),
+  worldnews: parseInt(process.env.WORLDNEWS_DAILY_LIMIT || '500', 10),
+  newsdata: parseInt(process.env.NEWSDATA_DAILY_LIMIT || '200', 10),
+  guardian: parseInt(process.env.GUARDIAN_DAILY_LIMIT || '5000', 10),
+  gnews: parseInt(process.env.GNEWS_DAILY_LIMIT || '100', 10),
 };
 const API_DAILY_COUNTERS = {};
 
@@ -53,18 +53,14 @@ function getApiDailyCount(apiName) {
 }
 
 /**
- * Returns a TTL in seconds for a cache entry, accounting for both the requested
- * date range (narrower windows need shorter TTL) and API quota pressure (doubles
- * the TTL when any primary API has consumed ≥ 80% of its daily limit).
- *
- * @param {string|null} dateRange - e.g. '24h', '3d', 'week', 'month', 'all'
+ * Returns a TTL in seconds for a cache entry.
+ * Doubles the TTL when any primary API has consumed >= 80% of its daily limit.
  */
-function getEffectiveCacheTTL(dateRange) {
-  const baseTTLHours = (dateRange && RANGE_CACHE_TTL_HOURS[dateRange]) ?? CACHE_TTL_HOURS;
+function getEffectiveCacheTTL() {
   const nearQuota = Object.entries(API_DAILY_LIMITS).some(
     ([api, limit]) => getApiDailyCount(api) >= limit * 0.8
   );
-  return nearQuota ? baseTTLHours * 2 * 3600 : baseTTLHours * 3600;
+  return nearQuota ? CACHE_TTL_HOURS * 2 * 3600 : undefined;
 }
 
 // Countries supported by NewsAPI free tier top-headlines endpoint
@@ -139,151 +135,151 @@ const COUNTRY_NAMES = {
 // Each entry: { domain, sourceId (NewsAPI ID, nullable), name, group }
 const ALL_TRUSTED_SOURCES = [
   // ── General / Wire ────────────────────────────────────────────────────────
-  { domain: 'reuters.com',        sourceId: 'reuters',              name: 'Reuters',               group: 'general' },
-  { domain: 'bbc.co.uk',          sourceId: 'bbc-news',             name: 'BBC News',              group: 'general' },
-  { domain: 'bbc.com',            sourceId: null,                   name: 'BBC (intl)',             group: 'general' },
-  { domain: 'apnews.com',         sourceId: 'associated-press',     name: 'Associated Press',      group: 'general' },
-  { domain: 'theguardian.com',    sourceId: 'the-guardian-uk',      name: 'The Guardian',          group: 'general' },
-  { domain: 'abc.net.au',         sourceId: 'abc-news-au',          name: 'ABC Australia',         group: 'general' },
-  { domain: 'nytimes.com',        sourceId: 'the-new-york-times',   name: 'New York Times',        group: 'general' },
-  { domain: 'washingtonpost.com', sourceId: 'the-washington-post',  name: 'Washington Post',       group: 'general' },
-  { domain: 'aljazeera.com',      sourceId: 'al-jazeera-english',   name: 'Al Jazeera',            group: 'general' },
-  { domain: 'npr.org',            sourceId: null,                   name: 'NPR',                   group: 'general' },
-  { domain: 'cnn.com',            sourceId: 'cnn',                  name: 'CNN',                   group: 'general' },
-  { domain: 'abcnews.go.com',     sourceId: 'abc-news',             name: 'ABC News',              group: 'general' },
-  { domain: 'cbsnews.com',        sourceId: 'cbs-news',             name: 'CBS News',              group: 'general' },
-  { domain: 'nbcnews.com',        sourceId: 'nbc-news',             name: 'NBC News',              group: 'general' },
-  { domain: 'pbs.org',            sourceId: null,                   name: 'PBS',                   group: 'general' },
-  { domain: 'theconversation.com',sourceId: null,                   name: 'The Conversation',      group: 'general' },
-  { domain: 'axios.com',          sourceId: null,                   name: 'Axios',                 group: 'general' },
-  { domain: 'theatlantic.com',    sourceId: 'the-atlantic',         name: 'The Atlantic',          group: 'general' },
-  { domain: 'time.com',           sourceId: 'time',                 name: 'Time',                  group: 'general' },
-  { domain: 'usatoday.com',       sourceId: 'usa-today',            name: 'USA Today',             group: 'general' },
+  { domain: 'reuters.com', sourceId: 'reuters', name: 'Reuters', group: 'general' },
+  { domain: 'bbc.co.uk', sourceId: 'bbc-news', name: 'BBC News', group: 'general' },
+  { domain: 'bbc.com', sourceId: null, name: 'BBC (intl)', group: 'general' },
+  { domain: 'apnews.com', sourceId: 'associated-press', name: 'Associated Press', group: 'general' },
+  { domain: 'theguardian.com', sourceId: 'the-guardian-uk', name: 'The Guardian', group: 'general' },
+  { domain: 'abc.net.au', sourceId: 'abc-news-au', name: 'ABC Australia', group: 'general' },
+  { domain: 'nytimes.com', sourceId: 'the-new-york-times', name: 'New York Times', group: 'general' },
+  { domain: 'washingtonpost.com', sourceId: 'the-washington-post', name: 'Washington Post', group: 'general' },
+  { domain: 'aljazeera.com', sourceId: 'al-jazeera-english', name: 'Al Jazeera', group: 'general' },
+  { domain: 'npr.org', sourceId: null, name: 'NPR', group: 'general' },
+  { domain: 'cnn.com', sourceId: 'cnn', name: 'CNN', group: 'general' },
+  { domain: 'abcnews.go.com', sourceId: 'abc-news', name: 'ABC News', group: 'general' },
+  { domain: 'cbsnews.com', sourceId: 'cbs-news', name: 'CBS News', group: 'general' },
+  { domain: 'nbcnews.com', sourceId: 'nbc-news', name: 'NBC News', group: 'general' },
+  { domain: 'pbs.org', sourceId: null, name: 'PBS', group: 'general' },
+  { domain: 'theconversation.com', sourceId: null, name: 'The Conversation', group: 'general' },
+  { domain: 'axios.com', sourceId: null, name: 'Axios', group: 'general' },
+  { domain: 'theatlantic.com', sourceId: 'the-atlantic', name: 'The Atlantic', group: 'general' },
+  { domain: 'time.com', sourceId: 'time', name: 'Time', group: 'general' },
+  { domain: 'usatoday.com', sourceId: 'usa-today', name: 'USA Today', group: 'general' },
   // ── Regional ──────────────────────────────────────────────────────────────
-  { domain: 'smh.com.au',                    sourceId: null,                 name: 'Sydney Morning Herald',     group: 'regional' },
-  { domain: 'theaustralian.com.au',           sourceId: null,                 name: 'The Australian',            group: 'regional' },
-  { domain: 'france24.com',                   sourceId: null,                 name: 'France 24',                 group: 'regional' },
-  { domain: 'dw.com',                         sourceId: null,                 name: 'Deutsche Welle',            group: 'regional' },
-  { domain: 'scmp.com',                       sourceId: null,                 name: 'South China Morning Post',  group: 'regional' },
-  { domain: 'timesofindia.indiatimes.com',    sourceId: 'the-times-of-india', name: 'Times of India',           group: 'regional' },
-  { domain: 'thehindu.com',                   sourceId: 'the-hindu',          name: 'The Hindu',                group: 'regional' },
-  { domain: 'japantimes.co.jp',               sourceId: null,                 name: 'Japan Times',              group: 'regional' },
-  { domain: 'straitstimes.com',               sourceId: null,                 name: 'Straits Times',            group: 'regional' },
-  { domain: 'caixinglobal.com',               sourceId: null,                 name: 'Caixin Global',            group: 'regional' },
-  { domain: 'asia.nikkei.com',               sourceId: null,                 name: 'Nikkei Asia',              group: 'regional' },
+  { domain: 'smh.com.au', sourceId: null, name: 'Sydney Morning Herald', group: 'regional' },
+  { domain: 'theaustralian.com.au', sourceId: null, name: 'The Australian', group: 'regional' },
+  { domain: 'france24.com', sourceId: null, name: 'France 24', group: 'regional' },
+  { domain: 'dw.com', sourceId: null, name: 'Deutsche Welle', group: 'regional' },
+  { domain: 'scmp.com', sourceId: null, name: 'South China Morning Post', group: 'regional' },
+  { domain: 'timesofindia.indiatimes.com', sourceId: 'the-times-of-india', name: 'Times of India', group: 'regional' },
+  { domain: 'thehindu.com', sourceId: 'the-hindu', name: 'The Hindu', group: 'regional' },
+  { domain: 'japantimes.co.jp', sourceId: null, name: 'Japan Times', group: 'regional' },
+  { domain: 'straitstimes.com', sourceId: null, name: 'Straits Times', group: 'regional' },
+  { domain: 'caixinglobal.com', sourceId: null, name: 'Caixin Global', group: 'regional' },
+  { domain: 'asia.nikkei.com', sourceId: null, name: 'Nikkei Asia', group: 'regional' },
   // ── Regional (supplemental — underserved countries) ──────────────────────
   // Canada (national outlets improve coverage when NewsAPI trusted-domains filter is active)
-  { domain: 'cbc.ca',                         sourceId: null,                 name: 'CBC News',                 group: 'regional' },
-  { domain: 'globeandmail.com',               sourceId: null,                 name: 'The Globe and Mail',       group: 'regional' },
-  { domain: 'nationalpost.com',               sourceId: null,                 name: 'National Post',            group: 'regional' },
-  { domain: 'thestar.com',                    sourceId: null,                 name: 'Toronto Star',             group: 'regional' },
+  { domain: 'cbc.ca', sourceId: null, name: 'CBC News', group: 'regional' },
+  { domain: 'globeandmail.com', sourceId: null, name: 'The Globe and Mail', group: 'regional' },
+  { domain: 'nationalpost.com', sourceId: null, name: 'National Post', group: 'regional' },
+  { domain: 'thestar.com', sourceId: null, name: 'Toronto Star', group: 'regional' },
   // New Zealand
-  { domain: 'rnz.co.nz',                      sourceId: null,                 name: 'Radio New Zealand',        group: 'regional' },
-  { domain: 'nzherald.co.nz',                 sourceId: null,                 name: 'NZ Herald',                group: 'regional' },
+  { domain: 'rnz.co.nz', sourceId: null, name: 'Radio New Zealand', group: 'regional' },
+  { domain: 'nzherald.co.nz', sourceId: null, name: 'NZ Herald', group: 'regional' },
   // Ireland
-  { domain: 'irishtimes.com',                 sourceId: null,                 name: 'Irish Times',              group: 'regional' },
-  { domain: 'rte.ie',                         sourceId: null,                 name: 'RTÉ News',                 group: 'regional' },
+  { domain: 'irishtimes.com', sourceId: null, name: 'Irish Times', group: 'regional' },
+  { domain: 'rte.ie', sourceId: null, name: 'RTÉ News', group: 'regional' },
   // European English-language (supplements DW for non-English-dominant EU countries)
-  { domain: 'thelocal.com',                   sourceId: null,                 name: 'The Local Europe',         group: 'regional' },
-  { domain: 'swissinfo.ch',                   sourceId: null,                 name: 'SWI swissinfo.ch',         group: 'regional' },
-  { domain: 'dutchnews.nl',                   sourceId: null,                 name: 'DutchNews.nl',             group: 'regional' },
-  { domain: 'polandin.com',                   sourceId: null,                 name: 'Poland In',                group: 'regional' },
-  { domain: 'politico.eu',                    sourceId: null,                 name: 'Politico Europe',          group: 'regional' },
+  { domain: 'thelocal.com', sourceId: null, name: 'The Local Europe', group: 'regional' },
+  { domain: 'swissinfo.ch', sourceId: null, name: 'SWI swissinfo.ch', group: 'regional' },
+  { domain: 'dutchnews.nl', sourceId: null, name: 'DutchNews.nl', group: 'regional' },
+  { domain: 'polandin.com', sourceId: null, name: 'Poland In', group: 'regional' },
+  { domain: 'politico.eu', sourceId: null, name: 'Politico Europe', group: 'regional' },
   // Latin America
-  { domain: 'brazilianreport.com',            sourceId: null,                 name: 'The Brazilian Report',     group: 'regional' },
-  { domain: 'mercopress.com',                 sourceId: null,                 name: 'MercoPress',               group: 'regional' },
-  { domain: 'batimes.com.ar',                 sourceId: null,                 name: 'Buenos Aires Times',       group: 'regional' },
-  { domain: 'mexiconewsdaily.com',            sourceId: null,                 name: 'Mexico News Daily',        group: 'regional' },
+  { domain: 'brazilianreport.com', sourceId: null, name: 'The Brazilian Report', group: 'regional' },
+  { domain: 'mercopress.com', sourceId: null, name: 'MercoPress', group: 'regional' },
+  { domain: 'batimes.com.ar', sourceId: null, name: 'Buenos Aires Times', group: 'regional' },
+  { domain: 'mexiconewsdaily.com', sourceId: null, name: 'Mexico News Daily', group: 'regional' },
   // Africa
-  { domain: 'dailymaverick.co.za',            sourceId: null,                 name: 'Daily Maverick',           group: 'regional' },
-  { domain: 'businessday.ng',                 sourceId: null,                 name: 'BusinessDay Nigeria',      group: 'regional' },
-  { domain: 'nation.africa',                  sourceId: null,                 name: 'Nation Africa',            group: 'regional' },
-  { domain: 'africanews.com',                 sourceId: null,                 name: 'Africanews',               group: 'regional' },
+  { domain: 'dailymaverick.co.za', sourceId: null, name: 'Daily Maverick', group: 'regional' },
+  { domain: 'businessday.ng', sourceId: null, name: 'BusinessDay Nigeria', group: 'regional' },
+  { domain: 'nation.africa', sourceId: null, name: 'Nation Africa', group: 'regional' },
+  { domain: 'africanews.com', sourceId: null, name: 'Africanews', group: 'regional' },
   // Middle East (supplements Al Jazeera)
-  { domain: 'arabnews.com',                   sourceId: null,                 name: 'Arab News',                group: 'regional' },
-  { domain: 'thenationalnews.com',            sourceId: null,                 name: 'The National',             group: 'regional' },
-  { domain: 'timesofisrael.com',              sourceId: null,                 name: 'Times of Israel',          group: 'regional' },
-  { domain: 'middleeasteye.net',              sourceId: null,                 name: 'Middle East Eye',          group: 'regional' },
+  { domain: 'arabnews.com', sourceId: null, name: 'Arab News', group: 'regional' },
+  { domain: 'thenationalnews.com', sourceId: null, name: 'The National', group: 'regional' },
+  { domain: 'timesofisrael.com', sourceId: null, name: 'Times of Israel', group: 'regional' },
+  { domain: 'middleeasteye.net', sourceId: null, name: 'Middle East Eye', group: 'regional' },
   // Korea
-  { domain: 'koreaherald.com',                sourceId: null,                 name: 'Korea Herald',             group: 'regional' },
+  { domain: 'koreaherald.com', sourceId: null, name: 'Korea Herald', group: 'regional' },
   // Southeast Asia (supplements Straits Times)
-  { domain: 'channelnewsasia.com',            sourceId: null,                 name: 'Channel NewsAsia',         group: 'regional' },
-  { domain: 'bangkokpost.com',                sourceId: null,                 name: 'Bangkok Post',             group: 'regional' },
-  { domain: 'jakartaglobe.id',                sourceId: null,                 name: 'Jakarta Globe',            group: 'regional' },
-  { domain: 'inquirer.net',                   sourceId: null,                 name: 'Philippine Daily Inquirer',group: 'regional' },
-  { domain: 'rappler.com',                    sourceId: null,                 name: 'Rappler',                  group: 'regional' },
+  { domain: 'channelnewsasia.com', sourceId: null, name: 'Channel NewsAsia', group: 'regional' },
+  { domain: 'bangkokpost.com', sourceId: null, name: 'Bangkok Post', group: 'regional' },
+  { domain: 'jakartaglobe.id', sourceId: null, name: 'Jakarta Globe', group: 'regional' },
+  { domain: 'inquirer.net', sourceId: null, name: 'Philippine Daily Inquirer', group: 'regional' },
+  { domain: 'rappler.com', sourceId: null, name: 'Rappler', group: 'regional' },
   // Eastern Europe
-  { domain: 'kyivindependent.com',            sourceId: null,                 name: 'Kyiv Independent',         group: 'regional' },
-  { domain: 'notesfrompoland.com',            sourceId: null,                 name: 'Notes from Poland',        group: 'regional' },
-  { domain: 'meduza.io',                      sourceId: null,                 name: 'Meduza',                   group: 'regional' },
-  { domain: 'independent.co.uk',              sourceId: 'the-independent',    name: 'The Independent',          group: 'regional' },
+  { domain: 'kyivindependent.com', sourceId: null, name: 'Kyiv Independent', group: 'regional' },
+  { domain: 'notesfrompoland.com', sourceId: null, name: 'Notes from Poland', group: 'regional' },
+  { domain: 'meduza.io', sourceId: null, name: 'Meduza', group: 'regional' },
+  { domain: 'independent.co.uk', sourceId: 'the-independent', name: 'The Independent', group: 'regional' },
   // ── Business & Finance ────────────────────────────────────────────────────
-  { domain: 'politico.com',  sourceId: 'politico',               name: 'Politico',              group: 'business' },
-  { domain: 'economist.com', sourceId: null,                     name: 'The Economist',         group: 'business' },
-  { domain: 'ft.com',        sourceId: null,                     name: 'Financial Times',       group: 'business' },
-  { domain: 'bloomberg.com', sourceId: 'bloomberg',              name: 'Bloomberg',             group: 'business' },
-  { domain: 'wsj.com',       sourceId: 'the-wall-street-journal', name: 'Wall Street Journal',  group: 'business' },
-  { domain: 'cnbc.com',      sourceId: 'cnbc',                   name: 'CNBC',                  group: 'business' },
-  { domain: 'forbes.com',    sourceId: 'forbes',                 name: 'Forbes',                group: 'business' },
-  { domain: 'fortune.com',   sourceId: null,                     name: 'Fortune',               group: 'business' },
+  { domain: 'politico.com', sourceId: 'politico', name: 'Politico', group: 'business' },
+  { domain: 'economist.com', sourceId: null, name: 'The Economist', group: 'business' },
+  { domain: 'ft.com', sourceId: null, name: 'Financial Times', group: 'business' },
+  { domain: 'bloomberg.com', sourceId: 'bloomberg', name: 'Bloomberg', group: 'business' },
+  { domain: 'wsj.com', sourceId: 'the-wall-street-journal', name: 'Wall Street Journal', group: 'business' },
+  { domain: 'cnbc.com', sourceId: 'cnbc', name: 'CNBC', group: 'business' },
+  { domain: 'forbes.com', sourceId: 'forbes', name: 'Forbes', group: 'business' },
+  { domain: 'fortune.com', sourceId: null, name: 'Fortune', group: 'business' },
   // ── Technology ────────────────────────────────────────────────────────────
-  { domain: 'arstechnica.com',      sourceId: 'ars-technica',  name: 'Ars Technica',          group: 'technology' },
-  { domain: 'wired.com',           sourceId: 'wired',         name: 'Wired',                 group: 'technology' },
-  { domain: 'techcrunch.com',      sourceId: 'techcrunch',    name: 'TechCrunch',            group: 'technology' },
-  { domain: 'theverge.com',        sourceId: 'the-verge',     name: 'The Verge',             group: 'technology' },
-  { domain: 'engadget.com',        sourceId: 'engadget',      name: 'Engadget',              group: 'technology' },
-  { domain: 'thenextweb.com',      sourceId: 'the-next-web',  name: 'The Next Web',          group: 'technology' },
-  { domain: 'technologyreview.com',sourceId: null,            name: 'MIT Technology Review', group: 'technology' },
-  { domain: 'venturebeat.com',     sourceId: 'venture-beat', name: 'VentureBeat',           group: 'technology' },
-  { domain: 'zdnet.com',           sourceId: 'zdnet',         name: 'ZDNet',                 group: 'technology' },
+  { domain: 'arstechnica.com', sourceId: 'ars-technica', name: 'Ars Technica', group: 'technology' },
+  { domain: 'wired.com', sourceId: 'wired', name: 'Wired', group: 'technology' },
+  { domain: 'techcrunch.com', sourceId: 'techcrunch', name: 'TechCrunch', group: 'technology' },
+  { domain: 'theverge.com', sourceId: 'the-verge', name: 'The Verge', group: 'technology' },
+  { domain: 'engadget.com', sourceId: 'engadget', name: 'Engadget', group: 'technology' },
+  { domain: 'thenextweb.com', sourceId: 'the-next-web', name: 'The Next Web', group: 'technology' },
+  { domain: 'technologyreview.com', sourceId: null, name: 'MIT Technology Review', group: 'technology' },
+  { domain: 'venturebeat.com', sourceId: 'venture-beat', name: 'VentureBeat', group: 'technology' },
+  { domain: 'zdnet.com', sourceId: 'zdnet', name: 'ZDNet', group: 'technology' },
   // ── Science ───────────────────────────────────────────────────────────────
-  { domain: 'nationalgeographic.com', sourceId: 'national-geographic', name: 'National Geographic',   group: 'science' },
-  { domain: 'newscientist.com',       sourceId: 'new-scientist',      name: 'New Scientist',         group: 'science' },
-  { domain: 'scientificamerican.com', sourceId: null,                 name: 'Scientific American',   group: 'science' },
-  { domain: 'nature.com',             sourceId: null,                 name: 'Nature',                group: 'science' },
-  { domain: 'statnews.com',           sourceId: null,                 name: 'STAT News',             group: 'science' },
+  { domain: 'nationalgeographic.com', sourceId: 'national-geographic', name: 'National Geographic', group: 'science' },
+  { domain: 'newscientist.com', sourceId: 'new-scientist', name: 'New Scientist', group: 'science' },
+  { domain: 'scientificamerican.com', sourceId: null, name: 'Scientific American', group: 'science' },
+  { domain: 'nature.com', sourceId: null, name: 'Nature', group: 'science' },
+  { domain: 'statnews.com', sourceId: null, name: 'STAT News', group: 'science' },
   // ── Sports ────────────────────────────────────────────────────────────────
-  { domain: 'espn.com',           sourceId: 'espn',              name: 'ESPN',              group: 'sports' },
-  { domain: 'theathletic.com',    sourceId: null,                name: 'The Athletic',      group: 'sports' },
-  { domain: 'si.com',             sourceId: null,                name: 'Sports Illustrated', group: 'sports' },
-  { domain: 'skysports.com',      sourceId: null,                name: 'Sky Sports',        group: 'sports' },
-  { domain: 'bleacherreport.com', sourceId: 'bleacher-report',   name: 'Bleacher Report',   group: 'sports' },
+  { domain: 'espn.com', sourceId: 'espn', name: 'ESPN', group: 'sports' },
+  { domain: 'theathletic.com', sourceId: null, name: 'The Athletic', group: 'sports' },
+  { domain: 'si.com', sourceId: null, name: 'Sports Illustrated', group: 'sports' },
+  { domain: 'skysports.com', sourceId: null, name: 'Sky Sports', group: 'sports' },
+  { domain: 'bleacherreport.com', sourceId: 'bleacher-report', name: 'Bleacher Report', group: 'sports' },
   // ── Gaming ────────────────────────────────────────────────────────────────
-  { domain: 'ign.com',              sourceId: 'ign',     name: 'IGN',                group: 'gaming' },
-  { domain: 'polygon.com',          sourceId: 'polygon', name: 'Polygon',            group: 'gaming' },
-  { domain: 'eurogamer.net',        sourceId: null,      name: 'Eurogamer',          group: 'gaming' },
-  { domain: 'pcgamer.com',          sourceId: null,      name: 'PC Gamer',           group: 'gaming' },
-  { domain: 'kotaku.com',           sourceId: null,      name: 'Kotaku',             group: 'gaming' },
-  { domain: 'gamespot.com',         sourceId: null,      name: 'GameSpot',           group: 'gaming' },
-  { domain: 'rockpapershotgun.com', sourceId: null,      name: 'Rock Paper Shotgun', group: 'gaming' },
+  { domain: 'ign.com', sourceId: 'ign', name: 'IGN', group: 'gaming' },
+  { domain: 'polygon.com', sourceId: 'polygon', name: 'Polygon', group: 'gaming' },
+  { domain: 'eurogamer.net', sourceId: null, name: 'Eurogamer', group: 'gaming' },
+  { domain: 'pcgamer.com', sourceId: null, name: 'PC Gamer', group: 'gaming' },
+  { domain: 'kotaku.com', sourceId: null, name: 'Kotaku', group: 'gaming' },
+  { domain: 'gamespot.com', sourceId: null, name: 'GameSpot', group: 'gaming' },
+  { domain: 'rockpapershotgun.com', sourceId: null, name: 'Rock Paper Shotgun', group: 'gaming' },
   // ── Film & TV ─────────────────────────────────────────────────────────────
-  { domain: 'variety.com',           sourceId: null,                   name: 'Variety',               group: 'film' },
-  { domain: 'hollywoodreporter.com', sourceId: null,                   name: 'Hollywood Reporter',    group: 'film' },
-  { domain: 'deadline.com',          sourceId: null,                   name: 'Deadline',              group: 'film' },
-  { domain: 'ew.com',                sourceId: 'entertainment-weekly', name: 'Entertainment Weekly',  group: 'film' },
-  { domain: 'indiewire.com',         sourceId: null,                   name: 'IndieWire',             group: 'film' },
-  { domain: 'vulture.com',           sourceId: null,                   name: 'Vulture',               group: 'film' },
-  { domain: 'buzzfeed.com',          sourceId: 'buzzfeed',             name: 'BuzzFeed',              group: 'tv' },
+  { domain: 'variety.com', sourceId: null, name: 'Variety', group: 'film' },
+  { domain: 'hollywoodreporter.com', sourceId: null, name: 'Hollywood Reporter', group: 'film' },
+  { domain: 'deadline.com', sourceId: null, name: 'Deadline', group: 'film' },
+  { domain: 'ew.com', sourceId: 'entertainment-weekly', name: 'Entertainment Weekly', group: 'film' },
+  { domain: 'indiewire.com', sourceId: null, name: 'IndieWire', group: 'film' },
+  { domain: 'vulture.com', sourceId: null, name: 'Vulture', group: 'film' },
+  { domain: 'buzzfeed.com', sourceId: 'buzzfeed', name: 'BuzzFeed', group: 'tv' },
   // ── Middle East (additional) ──────────────────────────────────────────────
-  { domain: 'dailysabah.com',        sourceId: null,                   name: 'Daily Sabah',              group: 'regional' },
+  { domain: 'dailysabah.com', sourceId: null, name: 'Daily Sabah', group: 'regional' },
   // ── Asia (additional) ─────────────────────────────────────────────────────
-  { domain: 'nhk.or.jp',            sourceId: null,                   name: 'NHK World',                group: 'regional' },
-  { domain: 'dawn.com',             sourceId: null,                   name: 'Dawn (Pakistan)',           group: 'regional' },
-  { domain: 'thedailystar.net',     sourceId: null,                   name: 'The Daily Star (BD)',       group: 'regional' },
-  { domain: 'vietnamnews.vn',       sourceId: null,                   name: 'Vietnam News',             group: 'regional' },
+  { domain: 'nhk.or.jp', sourceId: null, name: 'NHK World', group: 'regional' },
+  { domain: 'dawn.com', sourceId: null, name: 'Dawn (Pakistan)', group: 'regional' },
+  { domain: 'thedailystar.net', sourceId: null, name: 'The Daily Star (BD)', group: 'regional' },
+  { domain: 'vietnamnews.vn', sourceId: null, name: 'Vietnam News', group: 'regional' },
   // ── Africa (additional) ───────────────────────────────────────────────────
-  { domain: 'theeastafrican.co.ke', sourceId: null,                   name: 'The East African',         group: 'regional' },
+  { domain: 'theeastafrican.co.ke', sourceId: null, name: 'The East African', group: 'regional' },
   // ── Europe (additional) ───────────────────────────────────────────────────
-  { domain: 'thelocal.de',          sourceId: null,                   name: 'The Local (Germany)',       group: 'regional' },
-  { domain: 'thelocal.fr',          sourceId: null,                   name: 'The Local (France)',        group: 'regional' },
-  { domain: 'thelocal.es',          sourceId: null,                   name: 'The Local (Spain)',         group: 'regional' },
-  { domain: 'thelocal.se',          sourceId: null,                   name: 'The Local (Sweden)',        group: 'regional' },
-  { domain: 'thelocal.it',          sourceId: null,                   name: 'The Local (Italy)',         group: 'regional' },
-  { domain: 'thelocal.no',          sourceId: null,                   name: 'The Local (Norway)',        group: 'regional' },
-  { domain: 'euractiv.com',         sourceId: null,                   name: 'Euractiv',                  group: 'regional' },
+  { domain: 'thelocal.de', sourceId: null, name: 'The Local (Germany)', group: 'regional' },
+  { domain: 'thelocal.fr', sourceId: null, name: 'The Local (France)', group: 'regional' },
+  { domain: 'thelocal.es', sourceId: null, name: 'The Local (Spain)', group: 'regional' },
+  { domain: 'thelocal.se', sourceId: null, name: 'The Local (Sweden)', group: 'regional' },
+  { domain: 'thelocal.it', sourceId: null, name: 'The Local (Italy)', group: 'regional' },
+  { domain: 'thelocal.no', sourceId: null, name: 'The Local (Norway)', group: 'regional' },
+  { domain: 'euractiv.com', sourceId: null, name: 'Euractiv', group: 'regional' },
   // ── Americas (additional) ─────────────────────────────────────────────────
-  { domain: 'ticotimes.net',        sourceId: null,                   name: 'Tico Times',               group: 'regional' },
-  { domain: 'colombiareports.com',  sourceId: null,                   name: 'Colombia Reports',         group: 'regional' },
+  { domain: 'ticotimes.net', sourceId: null, name: 'Tico Times', group: 'regional' },
+  { domain: 'colombiareports.com', sourceId: null, name: 'Colombia Reports', group: 'regional' },
 ];
 
 // Build domain and source-ID strings, optionally filtered by a user-supplied domain list
@@ -425,56 +421,56 @@ const COUNTRY_RELEVANCE_KEYWORDS = {
 // adding an entry here improves query precision for that country.
 const COUNTRY_DEMONYMS = {
   // ── North America ──
-  us: 'American',   ca: 'Canadian',    mx: 'Mexican',      cu: 'Cuban',
-  jm: 'Jamaican',   cr: 'Costa Rican', pa: 'Panamanian',   do: 'Dominican',
+  us: 'American', ca: 'Canadian', mx: 'Mexican', cu: 'Cuban',
+  jm: 'Jamaican', cr: 'Costa Rican', pa: 'Panamanian', do: 'Dominican',
   gt: 'Guatemalan', hn: 'Honduran',
   // ── South America ──
-  br: 'Brazilian',  ar: 'Argentine',   cl: 'Chilean',      co: 'Colombian',
-  pe: 'Peruvian',   ve: 'Venezuelan',  ec: 'Ecuadorian',   uy: 'Uruguayan',
+  br: 'Brazilian', ar: 'Argentine', cl: 'Chilean', co: 'Colombian',
+  pe: 'Peruvian', ve: 'Venezuelan', ec: 'Ecuadorian', uy: 'Uruguayan',
   py: 'Paraguayan', bo: 'Bolivian',
   // ── Europe ──
-  gb: 'British',    de: 'German',      fr: 'French',       it: 'Italian',
-  es: 'Spanish',    nl: 'Dutch',       se: 'Swedish',      no: 'Norwegian',
-  pl: 'Polish',     ch: 'Swiss',       be: 'Belgian',      at: 'Austrian',
-  ie: 'Irish',      pt: 'Portuguese',  dk: 'Danish',       fi: 'Finnish',
-  gr: 'Greek',      cz: 'Czech',       ro: 'Romanian',     hu: 'Hungarian',
-  ua: 'Ukrainian',  rs: 'Serbian',     hr: 'Croatian',     bg: 'Bulgarian',
-  sk: 'Slovak',     lt: 'Lithuanian',  lv: 'Latvian',      ee: 'Estonian',
-  is: 'Icelandic',  lu: 'Luxembourgish', si: 'Slovenian',  ru: 'Russian',
+  gb: 'British', de: 'German', fr: 'French', it: 'Italian',
+  es: 'Spanish', nl: 'Dutch', se: 'Swedish', no: 'Norwegian',
+  pl: 'Polish', ch: 'Swiss', be: 'Belgian', at: 'Austrian',
+  ie: 'Irish', pt: 'Portuguese', dk: 'Danish', fi: 'Finnish',
+  gr: 'Greek', cz: 'Czech', ro: 'Romanian', hu: 'Hungarian',
+  ua: 'Ukrainian', rs: 'Serbian', hr: 'Croatian', bg: 'Bulgarian',
+  sk: 'Slovak', lt: 'Lithuanian', lv: 'Latvian', ee: 'Estonian',
+  is: 'Icelandic', lu: 'Luxembourgish', si: 'Slovenian', ru: 'Russian',
   // ── Asia ──
-  cn: 'Chinese',    jp: 'Japanese',    in: 'Indian',       kr: 'South Korean',
-  sg: 'Singaporean', hk: 'Hong Kong', tw: 'Taiwanese',    id: 'Indonesian',
-  th: 'Thai',       my: 'Malaysian',   ph: 'Philippine',   vn: 'Vietnamese',
-  pk: 'Pakistani',  bd: 'Bangladeshi', lk: 'Sri Lankan',   mm: 'Myanmar',
-  kh: 'Cambodian',  np: 'Nepalese',
+  cn: 'Chinese', jp: 'Japanese', in: 'Indian', kr: 'South Korean',
+  sg: 'Singaporean', hk: 'Hong Kong', tw: 'Taiwanese', id: 'Indonesian',
+  th: 'Thai', my: 'Malaysian', ph: 'Philippine', vn: 'Vietnamese',
+  pk: 'Pakistani', bd: 'Bangladeshi', lk: 'Sri Lankan', mm: 'Myanmar',
+  kh: 'Cambodian', np: 'Nepalese',
   // ── Oceania ──
-  au: 'Australian', nz: 'New Zealand', fj: 'Fijian',       pg: 'Papua New Guinean',
+  au: 'Australian', nz: 'New Zealand', fj: 'Fijian', pg: 'Papua New Guinean',
   // ── Middle East ──
-  il: 'Israeli',    ps: 'Palestinian', ae: 'Emirati',      sa: 'Saudi',
-  tr: 'Turkish',    qa: 'Qatari',      kw: 'Kuwaiti',      bh: 'Bahraini',
-  om: 'Omani',      jo: 'Jordanian',   lb: 'Lebanese',     iq: 'Iraqi',
+  il: 'Israeli', ps: 'Palestinian', ae: 'Emirati', sa: 'Saudi',
+  tr: 'Turkish', qa: 'Qatari', kw: 'Kuwaiti', bh: 'Bahraini',
+  om: 'Omani', jo: 'Jordanian', lb: 'Lebanese', iq: 'Iraqi',
   ir: 'Iranian',
   // ── Africa ──
-  za: 'South African', ng: 'Nigerian', eg: 'Egyptian',     ke: 'Kenyan',
-  ma: 'Moroccan',   gh: 'Ghanaian',    et: 'Ethiopian',    tz: 'Tanzanian',
-  ug: 'Ugandan',    sn: 'Senegalese',  ci: 'Ivorian',      cm: 'Cameroonian',
-  dz: 'Algerian',   tn: 'Tunisian',    rw: 'Rwandan',
+  za: 'South African', ng: 'Nigerian', eg: 'Egyptian', ke: 'Kenyan',
+  ma: 'Moroccan', gh: 'Ghanaian', et: 'Ethiopian', tz: 'Tanzanian',
+  ug: 'Ugandan', sn: 'Senegalese', ci: 'Ivorian', cm: 'Cameroonian',
+  dz: 'Algerian', tn: 'Tunisian', rw: 'Rwandan',
 };
 
 // Short category noun phrases used to build national-relevance queries.
 // Each entry produces queries like "Australian economy" or "Indian election".
 // These are paired with country demonyms, so keep them as common nouns/phrases.
 const CATEGORY_QUERY_NOUNS = {
-  politics:   ['politics', 'government', 'election', 'parliament', 'prime minister', 'legislation', 'policy'],
-  world:      ['foreign policy', 'diplomacy', 'trade deal', 'international relations', 'summit'],
-  business:   ['economy', 'market', 'industry', 'trade', 'central bank', 'stocks', 'finance'],
+  politics: ['politics', 'government', 'election', 'parliament', 'prime minister', 'legislation', 'policy'],
+  world: ['foreign policy', 'diplomacy', 'trade deal', 'international relations', 'summit'],
+  business: ['economy', 'market', 'industry', 'trade', 'central bank', 'stocks', 'finance'],
   technology: ['tech', 'startup', 'innovation', 'digital', 'AI', 'software', 'cybersecurity'],
-  science:    ['research', 'science', 'discovery', 'climate', 'space', 'laboratory', 'environment'],
-  health:     ['health', 'hospital', 'healthcare', 'medical', 'disease', 'public health'],
-  sports:     ['sport', 'team', 'league', 'championship', 'football', 'cricket', 'athlete'],
-  gaming:     ['gaming', 'video game', 'esports', 'game industry'],
-  film:       ['film', 'movie', 'cinema', 'box office', 'film industry'],
-  tv:         ['television', 'TV', 'streaming', 'TV series', 'broadcast'],
+  science: ['research', 'science', 'discovery', 'climate', 'space', 'laboratory', 'environment'],
+  health: ['health', 'hospital', 'healthcare', 'medical', 'disease', 'public health'],
+  sports: ['sport', 'team', 'league', 'championship', 'football', 'cricket', 'athlete'],
+  gaming: ['gaming', 'video game', 'esports', 'game industry'],
+  film: ['film', 'movie', 'cinema', 'box office', 'film industry'],
+  tv: ['television', 'TV', 'streaming', 'TV series', 'broadcast'],
 };
 
 // Category relevance keywords — used in post-fetch filtering to verify articles
@@ -688,7 +684,7 @@ function articleMentionsCountry(article, country) {
   const fullText = `${text} ${content}`;
 
   const inTitle = terms.some(term => title.includes(term));
-  const inText  = terms.some(term => text.includes(term));
+  const inText = terms.some(term => text.includes(term));
 
   // Count how many distinct terms match across title + description + content.
   // More distinct matches = stronger relevance (e.g. "Australia" + "Sydney" + "Australian").
@@ -781,16 +777,16 @@ function buildNationalQuery(country, category) {
 
 // Map app categories to Guardian API sections
 const GUARDIAN_SECTION_MAP = {
-  technology:    'technology',
-  business:      'business',
-  science:       'science',
-  health:        'society',
-  sports:        'sport',
-  gaming:        'games',
-  film:          'film',
-  tv:            'tv-and-radio',
-  politics:      'politics',
-  world:         'world'
+  technology: 'technology',
+  business: 'business',
+  science: 'science',
+  health: 'society',
+  sports: 'sport',
+  gaming: 'games',
+  film: 'film',
+  tv: 'tv-and-radio',
+  politics: 'politics',
+  world: 'world'
 };
 
 // Guardian native country sections
@@ -802,30 +798,30 @@ const GUARDIAN_COUNTRY_SECTIONS = {
 
 // Map app categories to WorldNewsAPI topics
 const WORLD_NEWS_TOPIC_MAP = {
-  technology:    'technology',
-  business:      'business',
-  science:       'science',
-  health:        'health',
-  sports:        'sports',
-  gaming:        'entertainment',
-  film:          'entertainment',
-  tv:            'entertainment',
-  politics:      'politics',
-  world:         'politics'  // closest match
+  technology: 'technology',
+  business: 'business',
+  science: 'science',
+  health: 'health',
+  sports: 'sports',
+  gaming: 'entertainment',
+  film: 'entertainment',
+  tv: 'entertainment',
+  politics: 'politics',
+  world: 'politics'  // closest match
 };
 
 // Map app categories to NewsData.io categories
 const NEWS_DATA_CATEGORY_MAP = {
-  technology:    'technology',
-  business:      'business',
-  science:       'science',
-  health:        'health',
-  sports:        'sports',
-  gaming:        'entertainment',
-  film:          'entertainment',
-  tv:            'entertainment',
-  politics:      'politics',
-  world:         'world'
+  technology: 'technology',
+  business: 'business',
+  science: 'science',
+  health: 'health',
+  sports: 'sports',
+  gaming: 'entertainment',
+  film: 'entertainment',
+  tv: 'entertainment',
+  politics: 'politics',
+  world: 'world'
 };
 
 // Countries considered part of the Asia-Pacific region for RSS feed targeting.
@@ -1249,16 +1245,16 @@ const ENGLISH_PRIMARY_COUNTRIES = new Set(['us', 'gb', 'au', 'ca', 'nz', 'ie']);
 // Map app categories to GNews API categories
 // GNews categories: general, world, nation, business, technology, entertainment, sports, science, health
 const GNEWS_CATEGORY_MAP = {
-  technology:    'technology',
-  business:      'business',
-  science:       'science',
-  health:        'health',
-  sports:        'sports',
-  gaming:        'entertainment',
-  film:          'entertainment',
-  tv:            'entertainment',
-  politics:      'nation',   // 'nation' covers national politics better than 'general'
-  world:         'world',
+  technology: 'technology',
+  business: 'business',
+  science: 'science',
+  health: 'health',
+  sports: 'sports',
+  gaming: 'entertainment',
+  film: 'entertainment',
+  tv: 'entertainment',
+  politics: 'nation',   // 'nation' covers national politics better than 'general'
+  world: 'world',
 };
 
 // Fetch with a timeout — wraps any fetch() call with an AbortController
@@ -1322,7 +1318,7 @@ const SOURCE_AUTHORITY_TIER = {
 function getSourceDomain(article) {
   try {
     if (article.url) return new URL(article.url).hostname.replace(/^www\./, '');
-  } catch {}
+  } catch { }
   return '';
 }
 
@@ -1629,12 +1625,12 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
   for (const s of scored) {
     const { authority, coverage, freshness, depth, catScore, countryRelScore, kwRelevanceScore } = s.signals;
     s.totalScore =
-      authority        * W.authority +
-      coverage         * W.coverage +
-      freshness        * W.freshness +
-      depth            * W.depth +
-      catScore         * W.cat +
-      countryRelScore  * W.countryRel +
+      authority * W.authority +
+      coverage * W.coverage +
+      freshness * W.freshness +
+      depth * W.depth +
+      catScore * W.cat +
+      countryRelScore * W.countryRel +
       kwRelevanceScore * W.kwRel;
   }
 
@@ -1669,17 +1665,17 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
 // Search-query templates for categories that use /v2/everything (more targeted than top-headlines).
 // All 10 categories now have custom queries for better precision than generic top-headlines.
 const EVERYTHING_QUERY_MAP = {
-  politics:   '(politics OR government OR election OR parliament OR president OR minister OR policy OR legislation)',
-  world:      '(international OR diplomacy OR foreign OR global OR "trade deal" OR summit OR "United Nations")',
-  business:   '(economy OR "stock market" OR finance OR business OR GDP OR inflation OR earnings OR merger OR IPO)',
+  politics: '(politics OR government OR election OR parliament OR president OR minister OR policy OR legislation)',
+  world: '(international OR diplomacy OR foreign OR global OR "trade deal" OR summit OR "United Nations")',
+  business: '(economy OR "stock market" OR finance OR business OR GDP OR inflation OR earnings OR merger OR IPO)',
   technology: '(technology OR software OR AI OR "artificial intelligence" OR cybersecurity OR semiconductor OR startup OR "machine learning")',
-  science:    '(science OR research OR NASA OR climate OR discovery OR "space exploration" OR biology OR physics OR environment)',
-  health:     '(health OR medical OR hospital OR disease OR vaccine OR pandemic OR "public health" OR "clinical trial" OR healthcare)',
-  sports:     '(sports OR championship OR tournament OR Olympics OR FIFA OR "Premier League" OR athlete OR "World Cup")',
-  gaming:     '(gaming OR "video game" OR esports OR console OR PlayStation OR Xbox OR Nintendo)',
-  film:       '(film OR movie OR cinema OR "box office" OR director OR Oscar OR screenplay OR "film festival")',
-  tv:         '(television OR "TV series" OR streaming OR "TV show" OR showrunner OR Netflix OR HBO OR Emmy)',
-  trending:   '(politics OR technology OR business OR science OR health OR sports OR economy OR election OR climate OR entertainment)',
+  science: '(science OR research OR NASA OR climate OR discovery OR "space exploration" OR biology OR physics OR environment)',
+  health: '(health OR medical OR hospital OR disease OR vaccine OR pandemic OR "public health" OR "clinical trial" OR healthcare)',
+  sports: '(sports OR championship OR tournament OR Olympics OR FIFA OR "Premier League" OR athlete OR "World Cup")',
+  gaming: '(gaming OR "video game" OR esports OR console OR PlayStation OR Xbox OR Nintendo)',
+  film: '(film OR movie OR cinema OR "box office" OR director OR Oscar OR screenplay OR "film festival")',
+  tv: '(television OR "TV series" OR streaming OR "TV show" OR showrunner OR Netflix OR HBO OR Emmy)',
+  trending: '(politics OR technology OR business OR science OR health OR sports OR economy OR election OR climate OR entertainment)',
 };
 
 // Helper: fetch from NewsAPI (primary - ~55 countries)
@@ -1746,15 +1742,15 @@ async function fetchFromNewsAPI(country, category, apiKey, activeDomains, active
 // Broader than EVERYTHING_QUERY_MAP (no OR/quotes syntax) since WorldNewsAPI uses simpler text matching.
 const WORLD_NEWS_QUERY_TERMS = {
   technology: 'technology software AI cybersecurity startup semiconductor',
-  business:   'business economy stock market finance GDP earnings',
-  science:    'science research discovery NASA climate environment',
-  health:     'health medical hospital disease vaccine healthcare',
-  sports:     'sports championship tournament athlete league football',
-  gaming:     'gaming video game esports PlayStation Xbox Nintendo',
-  film:       'film movie cinema box office director Oscar',
-  tv:         'television TV series streaming Netflix HBO Emmy',
-  politics:   'politics government election parliament legislation policy',
-  world:      'international diplomacy foreign summit United Nations',
+  business: 'business economy stock market finance GDP earnings',
+  science: 'science research discovery NASA climate environment',
+  health: 'health medical hospital disease vaccine healthcare',
+  sports: 'sports championship tournament athlete league football',
+  gaming: 'gaming video game esports PlayStation Xbox Nintendo',
+  film: 'film movie cinema box office director Oscar',
+  tv: 'television TV series streaming Netflix HBO Emmy',
+  politics: 'politics government election parliament legislation policy',
+  world: 'international diplomacy foreign summit United Nations',
 };
 
 // Helper: fetch from WorldNewsAPI (secondary - broad country coverage)
@@ -1884,9 +1880,9 @@ async function fetchFromGuardian(country, category, apiKey, opts = {}) {
 async function fetchFromGNews(country, category, apiKey, opts = {}) {
   const gnewsCategory = GNEWS_CATEGORY_MAP[category] || 'general';
   const params = new URLSearchParams({
-    max:     '20',
-    token:   apiKey,
-    sortby:  opts.sortByPopularity ? 'relevance' : 'publishedAt',
+    max: '20',
+    token: apiKey,
+    sortby: opts.sortByPopularity ? 'relevance' : 'publishedAt',
   });
   if (!opts.showNonEnglish) params.set('lang', 'en');
   if (opts.from) params.set('from', opts.from); // ISO 8601, e.g. 2024-01-01T00:00:00Z
@@ -1933,10 +1929,10 @@ function parseRSSFeed(xml) {
     };
 
     const title = get('title');
-    const link  = get('link') || getAtomLink();
+    const link = get('link') || getAtomLink();
     // description/summary/content — prefer longer of description vs summary
-    const desc    = get('description') || '';
-    const summary = get('summary')     || '';
+    const desc = get('description') || '';
+    const summary = get('summary') || '';
     const description = desc.length >= summary.length ? desc : summary;
     const pubDate = get('pubDate') || get('published') || get('updated') || get('dc:date');
 
@@ -1967,7 +1963,7 @@ async function fetchRSSFeed(url) {
   const response = await fetchWithTimeout(url, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (compatible; RSS reader)',
-      'Accept':     'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
+      'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
     },
   });
   if (!response.ok) throw new Error(`RSS ${response.status}: ${url}`);
@@ -1991,86 +1987,86 @@ async function fetchRSSFeed(url) {
 
 // Shared expansion arrays — referenced by multiple alias keys to avoid duplication
 const _EXP = {
-  MMA:      ['MMA', 'UFC', 'Bellator', '"mixed martial arts"'],
-  NBA:      ['NBA', 'basketball', '"National Basketball Association"'],
-  NFL:      ['NFL', '"American football"', '"National Football League"'],
-  MLB:      ['MLB', 'baseball', '"Major League Baseball"'],
-  NHL:      ['NHL', 'hockey', '"National Hockey League"'],
-  F1:       ['F1', '"Formula 1"', '"Formula One"', '"Grand Prix"'],
-  EPL:      ['"Premier League"', 'EPL', '"English Premier League"'],
-  FIFA:     ['FIFA', 'football', 'soccer', '"World Cup"'],
-  TENNIS:   ['tennis', 'ATP', 'WTA', 'Wimbledon', '"US Open"', '"French Open"', '"Australian Open"'],
-  WWE:      ['WWE', '"World Wrestling Entertainment"', 'wrestling', 'AEW'],
-  PGA:      ['PGA', 'golf', '"PGA Tour"', '"Masters Tournament"'],
+  MMA: ['MMA', 'UFC', 'Bellator', '"mixed martial arts"'],
+  NBA: ['NBA', 'basketball', '"National Basketball Association"'],
+  NFL: ['NFL', '"American football"', '"National Football League"'],
+  MLB: ['MLB', 'baseball', '"Major League Baseball"'],
+  NHL: ['NHL', 'hockey', '"National Hockey League"'],
+  F1: ['F1', '"Formula 1"', '"Formula One"', '"Grand Prix"'],
+  EPL: ['"Premier League"', 'EPL', '"English Premier League"'],
+  FIFA: ['FIFA', 'football', 'soccer', '"World Cup"'],
+  TENNIS: ['tennis', 'ATP', 'WTA', 'Wimbledon', '"US Open"', '"French Open"', '"Australian Open"'],
+  WWE: ['WWE', '"World Wrestling Entertainment"', 'wrestling', 'AEW'],
+  PGA: ['PGA', 'golf', '"PGA Tour"', '"Masters Tournament"'],
   OLYMPICS: ['Olympics', '"Olympic Games"', '"Summer Games"', '"Winter Games"'],
-  CRYPTO:   ['crypto', 'cryptocurrency', 'bitcoin', 'ethereum', 'blockchain'],
-  BITCOIN:  ['bitcoin', 'cryptocurrency', 'crypto', 'BTC'],
-  CHATGPT:  ['ChatGPT', 'OpenAI', '"GPT-4"', '"large language model"'],
-  EV:       ['"electric vehicle"', '"electric car"', 'Tesla', 'EV'],
-  NATO:     ['NATO', '"North Atlantic Treaty"', '"Alliance"'],
-  WHO:      ['WHO', '"World Health Organization"', '"World Health Organisation"'],
-  UN:       ['UN', '"United Nations"', '"Security Council"', '"General Assembly"'],
+  CRYPTO: ['crypto', 'cryptocurrency', 'bitcoin', 'ethereum', 'blockchain'],
+  BITCOIN: ['bitcoin', 'cryptocurrency', 'crypto', 'BTC'],
+  CHATGPT: ['ChatGPT', 'OpenAI', '"GPT-4"', '"large language model"'],
+  EV: ['"electric vehicle"', '"electric car"', 'Tesla', 'EV'],
+  NATO: ['NATO', '"North Atlantic Treaty"', '"Alliance"'],
+  WHO: ['WHO', '"World Health Organization"', '"World Health Organisation"'],
+  UN: ['UN', '"United Nations"', '"Security Council"', '"General Assembly"'],
 };
 
 const KEYWORD_EXPANSION_MAP = {
   // ── Combat sports ───────────────────────────────────────────────────────
-  'mma':                _EXP.MMA,
-  'ufc':                _EXP.MMA,
-  'bellator':           _EXP.MMA,
+  'mma': _EXP.MMA,
+  'ufc': _EXP.MMA,
+  'bellator': _EXP.MMA,
   'mixed martial arts': _EXP.MMA,
   // ── Basketball ──────────────────────────────────────────────────────────
-  'nba':                _EXP.NBA,
-  'basketball':         _EXP.NBA,
+  'nba': _EXP.NBA,
+  'basketball': _EXP.NBA,
   // ── American football ────────────────────────────────────────────────────
-  'nfl':                _EXP.NFL,
+  'nfl': _EXP.NFL,
   // ── Baseball ─────────────────────────────────────────────────────────────
-  'mlb':                _EXP.MLB,
-  'baseball':           _EXP.MLB,
+  'mlb': _EXP.MLB,
+  'baseball': _EXP.MLB,
   // ── Ice hockey ──────────────────────────────────────────────────────────
-  'nhl':                _EXP.NHL,
-  'hockey':             _EXP.NHL,
-  'ice hockey':         _EXP.NHL,
+  'nhl': _EXP.NHL,
+  'hockey': _EXP.NHL,
+  'ice hockey': _EXP.NHL,
   // ── Formula 1 ───────────────────────────────────────────────────────────
-  'f1':                 _EXP.F1,
-  'formula 1':          _EXP.F1,
-  'formula one':        _EXP.F1,
-  'formula1':           _EXP.F1,
+  'f1': _EXP.F1,
+  'formula 1': _EXP.F1,
+  'formula one': _EXP.F1,
+  'formula1': _EXP.F1,
   // ── Soccer / Football ───────────────────────────────────────────────────
-  'premier league':     _EXP.EPL,
-  'epl':                _EXP.EPL,
-  'fifa':               _EXP.FIFA,
-  'world cup':          _EXP.FIFA,
+  'premier league': _EXP.EPL,
+  'epl': _EXP.EPL,
+  'fifa': _EXP.FIFA,
+  'world cup': _EXP.FIFA,
   // ── Tennis ──────────────────────────────────────────────────────────────
-  'tennis':             _EXP.TENNIS,
-  'atp':                _EXP.TENNIS,
-  'wta':                _EXP.TENNIS,
-  'wimbledon':          _EXP.TENNIS,
+  'tennis': _EXP.TENNIS,
+  'atp': _EXP.TENNIS,
+  'wta': _EXP.TENNIS,
+  'wimbledon': _EXP.TENNIS,
   // ── Wrestling ───────────────────────────────────────────────────────────
-  'wwe':                _EXP.WWE,
-  'wrestling':          _EXP.WWE,
-  'aew':                _EXP.WWE,
+  'wwe': _EXP.WWE,
+  'wrestling': _EXP.WWE,
+  'aew': _EXP.WWE,
   // ── Golf ────────────────────────────────────────────────────────────────
-  'pga':                _EXP.PGA,
-  'golf':               _EXP.PGA,
+  'pga': _EXP.PGA,
+  'golf': _EXP.PGA,
   // ── Olympics ────────────────────────────────────────────────────────────
-  'olympics':           _EXP.OLYMPICS,
-  'olympic games':      _EXP.OLYMPICS,
+  'olympics': _EXP.OLYMPICS,
+  'olympic games': _EXP.OLYMPICS,
   // ── Crypto ──────────────────────────────────────────────────────────────
-  'crypto':             _EXP.CRYPTO,
-  'cryptocurrency':     _EXP.CRYPTO,
-  'bitcoin':            _EXP.BITCOIN,
-  'btc':                _EXP.BITCOIN,
+  'crypto': _EXP.CRYPTO,
+  'cryptocurrency': _EXP.CRYPTO,
+  'bitcoin': _EXP.BITCOIN,
+  'btc': _EXP.BITCOIN,
   // ── AI / Tech ───────────────────────────────────────────────────────────
-  'chatgpt':            _EXP.CHATGPT,
-  'openai':             _EXP.CHATGPT,
+  'chatgpt': _EXP.CHATGPT,
+  'openai': _EXP.CHATGPT,
   // ── Electric vehicles ───────────────────────────────────────────────────
-  'ev':                 _EXP.EV,
-  'electric vehicle':   _EXP.EV,
-  'electric car':       _EXP.EV,
+  'ev': _EXP.EV,
+  'electric vehicle': _EXP.EV,
+  'electric car': _EXP.EV,
   // ── International organisations ─────────────────────────────────────────
-  'nato':               _EXP.NATO,
-  'who':                _EXP.WHO,
-  'united nations':     _EXP.UN,
+  'nato': _EXP.NATO,
+  'who': _EXP.WHO,
+  'united nations': _EXP.UN,
 };
 
 // Build the actual query string to send to APIs.
@@ -2224,11 +2220,11 @@ function stemWord(word) {
   if (word.length < 5) return word;
   const rules = [
     [/ational$/, 'ate'], [/tional$/, 'tion'], [/ations?$/, 'ate'],
-    [/izing$/, 'ize'],   [/ising$/, 'ise'],   [/ness$/, ''],
-    [/ment$/, ''],       [/ings?$/, ''],       [/edly$/, ''],
-    [/ingly$/, ''],      [/ated?$/, ''],       [/iers?$/, 'y'],
-    [/ies$/, 'y'],       [/ers?$/, ''],        [/ed$/, ''],
-    [/ly$/, ''],         [/es$/, ''],          [/s$/, ''],
+    [/izing$/, 'ize'], [/ising$/, 'ise'], [/ness$/, ''],
+    [/ment$/, ''], [/ings?$/, ''], [/edly$/, ''],
+    [/ingly$/, ''], [/ated?$/, ''], [/iers?$/, 'y'],
+    [/ies$/, 'y'], [/ers?$/, ''], [/ed$/, ''],
+    [/ly$/, ''], [/es$/, ''], [/s$/, ''],
   ];
   for (const [pattern, replacement] of rules) {
     const result = word.replace(pattern, replacement);
@@ -2258,7 +2254,7 @@ function keywordRelevanceScore(article, searchTerms, rawKeyword) {
   if (rawKeyword) {
     const phrase = rawKeyword.trim().toLowerCase();
     if (phrase.includes(' ') && !/\b(and|or|not)\b/i.test(phrase)) {
-      if (title.includes(phrase))     score += 5;
+      if (title.includes(phrase)) score += 5;
       else if (desc.includes(phrase)) score += 2.5;
     }
   }
@@ -2268,14 +2264,14 @@ function keywordRelevanceScore(article, searchTerms, rawKeyword) {
     if (t.length < 2) continue;
     const tStem = stemWord(t);
 
-    const inTitle   = title.includes(t)   || (tStem !== t && title.includes(tStem));
-    const inDesc    = desc.includes(t)    || (tStem !== t && desc.includes(tStem));
+    const inTitle = title.includes(t) || (tStem !== t && title.includes(tStem));
+    const inDesc = desc.includes(t) || (tStem !== t && desc.includes(tStem));
     const inContent = content.includes(t) || (tStem !== t && content.includes(tStem));
 
     // Cumulative: each field that contains the term contributes independently.
     // Title is worth most (3), desc adds signal (1), content adds a small bump (0.5).
-    if (inTitle)   score += 3;
-    if (inDesc)    score += 1;
+    if (inTitle) score += 3;
+    if (inDesc) score += 1;
     if (inContent) score += 0.5;
   }
 
@@ -2477,7 +2473,7 @@ async function generateSummary(article, llmKeys) {
   const content = prepareArticleContent(article);
   const providers = [
     llmKeys.gemini && (() => summarizeWithGemini(content, llmKeys.gemini)),
-    llmKeys.groq   && (() => summarizeWithGroq(content, llmKeys.groq)),
+    llmKeys.groq && (() => summarizeWithGroq(content, llmKeys.groq)),
     llmKeys.openai && (() => summarizeWithOpenAI(content, llmKeys.openai)),
     llmKeys.cohere && (() => summarizeWithCohere(content, llmKeys.cohere)),
   ].filter(Boolean);
@@ -2564,19 +2560,19 @@ const INTERNATIONAL_SOURCES = new Set([
 // NOTE: International sources are still mapped here (needed for non-country queries),
 // but the country scoring logic treats them differently — see articleCountryScore().
 const DOMAIN_TO_COUNTRY = {
-  'reuters.com': 'gb',   'bbc.co.uk': 'gb',     'bbc.com': 'gb',
-  'theguardian.com': 'gb', 'ft.com': 'gb',       'economist.com': 'gb',
-  'nytimes.com': 'us',   'washingtonpost.com': 'us', 'cnn.com': 'us',
-  'abcnews.go.com': 'us', 'cbsnews.com': 'us',   'nbcnews.com': 'us',
-  'npr.org': 'us',       'pbs.org': 'us',        'politico.com': 'us',
-  'wsj.com': 'us',       'bloomberg.com': 'us',  'apnews.com': 'us',
-  'arstechnica.com': 'us', 'wired.com': 'us',    'techcrunch.com': 'us',
-  'theverge.com': 'us',  'engadget.com': 'us',   'espn.com': 'us',
-  'ign.com': 'us',       'polygon.com': 'us',    'ew.com': 'us',
+  'reuters.com': 'gb', 'bbc.co.uk': 'gb', 'bbc.com': 'gb',
+  'theguardian.com': 'gb', 'ft.com': 'gb', 'economist.com': 'gb',
+  'nytimes.com': 'us', 'washingtonpost.com': 'us', 'cnn.com': 'us',
+  'abcnews.go.com': 'us', 'cbsnews.com': 'us', 'nbcnews.com': 'us',
+  'npr.org': 'us', 'pbs.org': 'us', 'politico.com': 'us',
+  'wsj.com': 'us', 'bloomberg.com': 'us', 'apnews.com': 'us',
+  'arstechnica.com': 'us', 'wired.com': 'us', 'techcrunch.com': 'us',
+  'theverge.com': 'us', 'engadget.com': 'us', 'espn.com': 'us',
+  'ign.com': 'us', 'polygon.com': 'us', 'ew.com': 'us',
   'buzzfeed.com': 'us',
-  'abc.net.au': 'au',    'smh.com.au': 'au',     'theaustralian.com.au': 'au',
-  'aljazeera.com': 'qa', 'france24.com': 'fr',   'dw.com': 'de',
-  'scmp.com': 'hk',      'thenextweb.com': 'nl',
+  'abc.net.au': 'au', 'smh.com.au': 'au', 'theaustralian.com.au': 'au',
+  'aljazeera.com': 'qa', 'france24.com': 'fr', 'dw.com': 'de',
+  'scmp.com': 'hk', 'thenextweb.com': 'nl',
   'timesofindia.indiatimes.com': 'in', 'thehindu.com': 'in',
   'japantimes.co.jp': 'jp', 'straitstimes.com': 'sg',
   'theconversation.com': 'au',
@@ -2612,7 +2608,7 @@ function inferCountryFromUrl(url) {
         return TLD_TO_COUNTRY[tld];
       }
     }
-  } catch {}
+  } catch { }
   return null;
 }
 
@@ -2812,8 +2808,8 @@ export default async function handler(req, res) {
   const { valid: envValid } = validateEnv(res, {
     required: ['NEWS_API_KEY'],
     optional: ['GUARDIAN_API_KEY', 'WORLD_NEWS_API_KEY', 'NEWS_DATA_API_KEY', 'GNEWS_API_KEY',
-               'GEMINI_API_KEY', 'GROQ_API_KEY', 'OPENAI_API_KEY', 'COHERE_API_KEY',
-               'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'],
+      'GEMINI_API_KEY', 'GROQ_API_KEY', 'OPENAI_API_KEY', 'COHERE_API_KEY',
+      'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'],
   });
   if (!envValid) return;
 
@@ -2842,18 +2838,18 @@ export default async function handler(req, res) {
   // This surfaces the biggest stories rather than just the latest.
   const usePopularitySort = !rangeHours || rangeHours > 24;
 
-  const NEWS_API_KEY       = process.env.VITE_NEWS_API_KEY    || process.env.NEWS_API_KEY;
-  const GUARDIAN_API_KEY   = process.env.GUARDIAN_API_KEY     || null;
-  const WORLD_NEWS_API_KEY = process.env.WORLD_NEWS_API_KEY   || null;
-  const NEWS_DATA_API_KEY  = process.env.NEWS_DATA_API_KEY    || null;
-  const GNEWS_API_KEY      = process.env.GNEWS_API_KEY        || null;
-  const SUPABASE_URL       = process.env.SUPABASE_URL            || process.env.VITE_SUPABASE_URL       || null;
-  const SUPABASE_KEY       = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || null;
+  const NEWS_API_KEY = process.env.VITE_NEWS_API_KEY || process.env.NEWS_API_KEY;
+  const GUARDIAN_API_KEY = process.env.GUARDIAN_API_KEY || null;
+  const WORLD_NEWS_API_KEY = process.env.WORLD_NEWS_API_KEY || null;
+  const NEWS_DATA_API_KEY = process.env.NEWS_DATA_API_KEY || null;
+  const GNEWS_API_KEY = process.env.GNEWS_API_KEY || null;
+  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || null;
+  const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || null;
 
   // LLM summarisation — collect all configured keys; generateSummary tries them in order
   const LLM_KEYS = {
     gemini: process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || null,
-    groq:   process.env.GROQ_API_KEY   || null,
+    groq: process.env.GROQ_API_KEY || null,
     openai: process.env.OPENAI_API_KEY || null,
     cohere: process.env.COHERE_API_KEY || null,
   };
@@ -3182,7 +3178,7 @@ export default async function handler(req, res) {
     }
   }
 
-  const countryList  = Array.isArray(countries)  ? countries  : [countries  || 'us'];
+  const countryList = Array.isArray(countries) ? countries : [countries || 'us'];
   const categoryList = Array.isArray(categories) ? categories : [categories || 'technology'];
   const sourceFingerprint = getSourceFingerprint(userSources);
 
@@ -3319,8 +3315,10 @@ async function fetchCountryCategoryPair(country, category, ctx) {
   const cacheKey = getCacheKey(country, category, dateRange, sourceFingerprint, showNonEnglish);
 
   const cachedEntry = await getCache(cacheKey);
-  if (cachedEntry) {
-    console.log(`Cache HIT: ${cacheKey}`);
+
+  // If cache is valid AND no refresh is needed, return cached articles directly
+  if (cachedEntry && !isRefreshNeeded(cachedEntry)) {
+    console.log(`Cache HIT (fresh): ${cacheKey}`);
     return cachedEntry.articles;
   }
 
@@ -3330,8 +3328,11 @@ async function fetchCountryCategoryPair(country, category, ctx) {
     return IN_FLIGHT_REQUESTS.get(cacheKey);
   }
 
-  console.log(`Cache MISS: ${cacheKey} — fetching fresh data`);
-  const promise = _doFetchPair(cacheKey, country, category, ctx);
+  const reason = cachedEntry ? 'refresh needed' : 'cache miss';
+  console.log(`Cache ${reason}: ${cacheKey} — fetching fresh data`);
+  // Pass existing cached articles so _doFetchPair can merge into them
+  const existingArticles = cachedEntry ? cachedEntry.articles : [];
+  const promise = _doFetchPair(cacheKey, country, category, ctx, existingArticles);
   IN_FLIGHT_REQUESTS.set(cacheKey, promise);
   promise.finally(() => IN_FLIGHT_REQUESTS.delete(cacheKey));
   return promise;
@@ -3339,7 +3340,7 @@ async function fetchCountryCategoryPair(country, category, ctx) {
 
 // Inner implementation — all API cascade logic lives here. Registered in
 // IN_FLIGHT_REQUESTS so concurrent requests for the same key share one result.
-async function _doFetchPair(cacheKey, country, category, ctx) {
+async function _doFetchPair(cacheKey, country, category, ctx, existingArticles = []) {
   const {
     NEWS_API_KEY, WORLD_NEWS_API_KEY, NEWS_DATA_API_KEY, GUARDIAN_API_KEY, GNEWS_API_KEY,
     activeDomains, activeSourceIds, fromISO, fromDateOnly, usePopularitySort,
@@ -3387,21 +3388,21 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
   const [newsApiRaw, worldNewsRaw, gNewsRaw, newsDataRaw] = await Promise.all([
     (country === 'world' || NEWS_API_SUPPORTED_COUNTRIES.has(country))
       ? fetchFromNewsAPI(country, category, NEWS_API_KEY, activeDomains, activeSourceIds, { from: fromISO, sortByPopularity: usePopularitySort, skipDomains, showNonEnglish: effectiveShowNonEnglish })
-          .catch(err => { console.error('  NewsAPI failed:', err.message); return []; })
+        .catch(err => { console.error('  NewsAPI failed:', err.message); return []; })
       : Promise.resolve([]),
     (!skipSecondaryAPIs && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country)))
       ? fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
-          .catch(err => { console.error('  WorldNewsAPI failed:', err.message); return []; })
+        .catch(err => { console.error('  WorldNewsAPI failed:', err.message); return []; })
       : Promise.resolve([]),
     (!skipSecondaryAPIs && GNEWS_API_KEY)
       ? fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
-          .catch(err => { console.error('  GNews failed:', err.message); return []; })
+        .catch(err => { console.error('  GNews failed:', err.message); return []; })
       : Promise.resolve([]),
     // NewsData.io in the parallel pass — broadest country coverage (100+), bolsters
     // article volume especially for non-English and underserved markets.
     (NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country)))
       ? fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly, showNonEnglish: effectiveShowNonEnglish })
-          .catch(err => { console.error('  NewsData failed:', err.message); return []; })
+        .catch(err => { console.error('  NewsData failed:', err.message); return []; })
       : Promise.resolve([]),
   ]);
 
@@ -3507,7 +3508,7 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
       if (!catKeywords) return true; // unknown category — allow through
       const text = `${(a.title || '')} ${(a.description || '')}`.toLowerCase();
       return catKeywords.strong.some(kw => text.includes(kw)) ||
-             catKeywords.weak.some(kw => text.includes(kw));
+        catKeywords.weak.some(kw => text.includes(kw));
     }
     return false;
   });
@@ -3549,7 +3550,7 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
     scored.sort((a, b) => b.score - a.score);
     const relevant = scored.filter(s => s.score >= MIN_COUNTRY_SCORE);
     const marginal = scored.filter(s => s.score > 0 && s.score < MIN_COUNTRY_SCORE);
-    const filler   = scored.filter(s => s.score === 0);
+    const filler = scored.filter(s => s.score === 0);
 
     if (relevant.length >= MIN_ARTICLES) {
       formattedArticles = relevant.map(s => s.article);
@@ -3621,7 +3622,7 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
           if (!catKeywords) return true;
           const text = `${(a.title || '')} ${(a.description || '')}`.toLowerCase();
           return catKeywords.strong.some(kw => text.includes(kw)) ||
-                 catKeywords.weak.some(kw => text.includes(kw));
+            catKeywords.weak.some(kw => text.includes(kw));
         }
         return false;
       });
@@ -3697,7 +3698,7 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
           if (!catKeywords) return true;
           const text = `${(a.title || '')} ${(a.description || '')}`.toLowerCase();
           return catKeywords.strong.some(kw => text.includes(kw)) ||
-                 catKeywords.weak.some(kw => text.includes(kw));
+            catKeywords.weak.some(kw => text.includes(kw));
         }
         return false;
       });
@@ -3793,8 +3794,11 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
   // strongly they actually mention the requested country — making cache hits rank
   // differently from fresh fetches.
   const cleanForCache = formattedArticles.map(({ _meta, ...rest }) => rest);
-  // Use range-aware TTL: narrow windows (24h) expire in 1h; wider ones up to 12h.
-  // Doubles the TTL when any primary API is near its daily quota.
-  await setCache(cacheKey, { timestamp: Date.now(), articles: cleanForCache }, getEffectiveCacheTTL(dateRange));
-  return cleanForCache;
+
+  // Merge fresh articles into existing cached pool (accumulate, don't replace)
+  const mergedPool = mergeArticles(existingArticles, cleanForCache);
+
+  // When any API is near its daily quota, double the TTL to reduce further fetches.
+  await setCache(cacheKey, { timestamp: Date.now(), lastFetchedAt: Date.now(), articles: mergedPool }, getEffectiveCacheTTL());
+  return mergedPool;
 }
