@@ -58,11 +58,31 @@
   body {
     height: 100%;
     margin: 0;
-    overflow: hidden;
   }
 
-  #root {
-    height: 100%;
+  /* On mobile: allow body to scroll naturally */
+  @media (max-width: 767px) {
+
+    html,
+    body,
+    #root {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+
+  /* On desktop: lock body scroll, use nested scroll containers */
+  @media (min-width: 768px) {
+
+    html,
+    body {
+      overflow: hidden;
+    }
+
+    #root {
+      height: 100%;
+      overflow: hidden;
+    }
   }
 
   body {
@@ -146,7 +166,14 @@
    (address bar) showing/hiding, which causes 100vh to reflow and
    makes the layout jump or appear stuck while scrolling.            */
 .app-container {
-  height: 100vh;
-  /* Fallback for browsers without dvh support */
-  height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+@media (min-width: 768px) {
+  .app-container {
+    height: 100vh;
+    height: 100dvh;
+    min-height: auto;
+  }
 }
