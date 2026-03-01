@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useContext, useState, useEffect, useCallback } from 'react'
 import { Tag, Plus, X, Lock, Newspaper, Search, LogIn, Globe, CrosshairIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +18,7 @@ import { useUser } from '@clerk/clerk-react'
 import { Link } from 'react-router-dom'
 import { sanitizeKeyword, isValidKeyword } from '@/lib/sanitize'
 import type { Article } from '@/types/article'
+import { ApiReadyContext } from '@/App'
 
 interface Keyword {
   id: string
@@ -63,6 +64,7 @@ function loadPersistedStrict(): boolean {
 }
 
 export default function Keywords() {
+  const apiReady = useContext(ApiReadyContext)
   const { isSignedIn, isLoaded } = useUser()
   const [keywords, setKeywords] = useState<Keyword[]>([])
   const [selectedKeyword, setSelectedKeyword] = useState<Keyword | null>(null)
@@ -89,9 +91,12 @@ export default function Keywords() {
     try { localStorage.setItem(STORAGE_KEY_STRICT, String(strictMode)) } catch { }
   }, [strictMode])
 
-  // Load saved keywords on mount (sign-in required)
+  // Load saved keywords — wait for Supabase JWT to be ready before querying.
+  // Using isLoaded/isSignedIn alone caused a race: the effect fired before
+  // UserInitialiser had finished the async JWT fetch, so api.supabase was null
+  // and the call threw "Must be signed in", silently failing with a toast error.
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) return
+    if (!apiReady || !isSignedIn) return
     setIsLoadingKeywords(true)
     api.getKeywords()
       .then(kws => {
@@ -100,7 +105,7 @@ export default function Keywords() {
       })
       .catch(() => toast.error('Failed to load keywords'))
       .finally(() => setIsLoadingKeywords(false))
-  }, [isLoaded, isSignedIn])
+  }, [apiReady, isSignedIn])
 
   // Fetch articles whenever selected keyword, date range, region, or strict mode changes.
   // Uses mode: 'keyword' to activate dedicated monitoring-grade relevance logic
