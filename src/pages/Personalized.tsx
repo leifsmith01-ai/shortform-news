@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
 import { Sparkles, BookOpen } from 'lucide-react'
 import { useCountUp } from '@/hooks/useCountUp'
 import { Link } from 'react-router-dom'
@@ -195,20 +194,10 @@ export default function Personalized() {
               ))}
             </div>
           ) : noHistory ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              style={{ touchAction: 'pan-y' }}
-              className="flex flex-col items-center justify-center h-full min-h-[500px] text-center px-6"
-            >
-              <motion.div
-                className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6"
-                animate={{ y: [0, -8, 0] }}
-                style={{ touchAction: 'pan-y' }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              >
+            <div className="flex flex-col items-center justify-center h-full min-h-[500px] text-center px-6">
+              <div className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6">
                 <BookOpen className="w-10 h-10 text-stone-400 dark:text-slate-500" />
-              </motion.div>
+              </div>
               <h3 className="text-2xl font-semibold text-stone-900 dark:text-stone-100 mb-2">
                 Nothing to personalise yet
               </h3>
@@ -218,18 +207,13 @@ export default function Personalized() {
               <Button asChild className="bg-slate-900 hover:bg-slate-800 h-11 px-8">
                 <Link to="/">Browse articles</Link>
               </Button>
-            </motion.div>
+            </div>
           ) : articles.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              style={{ touchAction: 'pan-y' }}
-              className="flex flex-col items-center justify-center h-full min-h-[400px] text-center"
-            >
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
               <Sparkles className="w-10 h-10 text-stone-300 dark:text-slate-600 mb-4" />
               <p className="text-stone-500 dark:text-slate-400">No articles found for your top interests right now.</p>
               <p className="text-stone-400 dark:text-slate-500 text-sm mt-1">Try again later or read more articles to refine your feed.</p>
-            </motion.div>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {articles.map((article, index) => (

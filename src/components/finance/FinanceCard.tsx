@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
 import { ExternalLink, Clock, Bookmark, BookmarkCheck, Share2, Twitter, Facebook, Linkedin, Link2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -147,10 +146,7 @@ export default function FinanceCard({ article, index, rank }: { article: Finance
   const sentimentBg = article.sentiment === 'bullish' ? 'bg-emerald-50 border-emerald-200' : article.sentiment === 'bearish' ? 'bg-red-50 border-red-200' : 'bg-stone-50 border-stone-200';
 
   return (
-    <motion.article
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1, duration: 0.4 }}
+    <article
       className="group bg-white rounded-2xl border border-stone-200 overflow-hidden hover:shadow-xl hover:shadow-stone-200/50 transition-all duration-500 hover:-translate-y-1 relative"
     >
       {/* Ranking Badge */}
@@ -303,6 +299,6 @@ export default function FinanceCard({ article, index, rank }: { article: Finance
           <ExternalLink className="w-3.5 h-3.5 group-hover/link:translate-x-0.5 transition-transform" />
         </a>
       </div>
-    </motion.article>
+    </article>
   );
 }

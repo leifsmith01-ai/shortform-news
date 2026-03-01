@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { Bookmark, Trash2, Filter } from 'lucide-react';
 import { useCountUp } from '@/hooks/useCountUp';
 import { Button } from "@/components/ui/button";
@@ -120,27 +119,17 @@ export default function SavedArticles() {
               ))}
             </div>
           ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              style={{ touchAction: 'pan-y' }}
-              className="flex flex-col items-center justify-center h-full min-h-[400px] text-center"
-            >
-              <motion.div
-                className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6"
-                animate={{ y: [0, -8, 0] }}
-                style={{ touchAction: 'pan-y' }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              >
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
+              <div className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6">
                 <Bookmark className="w-10 h-10 text-stone-400 dark:text-slate-500" />
-              </motion.div>
+              </div>
               <h3 className="text-xl font-semibold text-stone-800 dark:text-stone-100 mb-2">
                 No saved articles yet
               </h3>
               <p className="text-stone-500 dark:text-slate-400 max-w-sm">
                 Articles you bookmark will appear here for easy access later.
               </p>
-            </motion.div>
+            </div>
           )}
         </div>
       </ScrollArea>
