@@ -108,7 +108,7 @@ export default function Layout({ children, currentPageName }: { children: React.
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 min-h-0 overflow-hidden h-full" style={{ touchAction: 'pan-y' }}>
+        <main className="flex-1 min-h-0 overflow-hidden h-full">
           {children}
         </main>
       </div>
