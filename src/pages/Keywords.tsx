@@ -83,10 +83,10 @@ export default function Keywords() {
 
   // Persist preferences when they change
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY_REGION, region) } catch {}
+    try { localStorage.setItem(STORAGE_KEY_REGION, region) } catch { }
   }, [region])
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY_STRICT, String(strictMode)) } catch {}
+    try { localStorage.setItem(STORAGE_KEY_STRICT, String(strictMode)) } catch { }
   }, [strictMode])
 
   // Load saved keywords on mount (sign-in required)
@@ -221,7 +221,7 @@ export default function Keywords() {
       )}
 
       {isLoaded && (
-        <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
           {/* Left sidebar — search input + keyword tags + monitoring controls */}
           <aside className="w-full lg:w-72 flex-shrink-0 bg-white dark:bg-slate-800 border-b lg:border-b-0 lg:border-r border-stone-200 dark:border-slate-700 flex flex-col">
 
@@ -297,19 +297,17 @@ export default function Keywords() {
                 {/* Strict headline-match toggle */}
                 <button
                   onClick={() => setStrictMode(prev => !prev)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                    strictMode
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${strictMode
                       ? 'bg-slate-900 text-white dark:bg-slate-600'
                       : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-600'
-                  }`}
+                    }`}
                 >
                   <CrosshairIcon className="w-3.5 h-3.5 flex-shrink-0" />
                   <span className="flex-1 text-left">Headline Match Only</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                    strictMode
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${strictMode
                       ? 'bg-white/20 text-white'
                       : 'bg-stone-200 dark:bg-slate-600 text-stone-500 dark:text-slate-400'
-                  }`}>
+                    }`}>
                     {strictMode ? 'ON' : 'OFF'}
                   </span>
                 </button>
@@ -322,7 +320,7 @@ export default function Keywords() {
             )}
 
             {/* Keyword tags — horizontal scroll on mobile, wrapped list on desktop */}
-            <div className="lg:flex-1 lg:overflow-hidden">
+            <div className="lg:flex-1">
               <ScrollArea className="h-full">
                 <div className="p-3 lg:p-4">
                   {!isSignedIn ? (
@@ -357,20 +355,18 @@ export default function Keywords() {
                         <span
                           key={kw.id}
                           onClick={() => setSelectedKeyword(kw)}
-                          className={`inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-full text-sm font-medium cursor-pointer select-none transition-colors flex-shrink-0 lg:flex-shrink ${
-                            selectedKeyword?.id === kw.id
+                          className={`inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-full text-sm font-medium cursor-pointer select-none transition-colors flex-shrink-0 lg:flex-shrink ${selectedKeyword?.id === kw.id
                               ? 'bg-slate-900 text-white'
                               : 'bg-stone-100 dark:bg-slate-700 text-stone-700 dark:text-slate-300 hover:bg-stone-200 dark:hover:bg-slate-600'
-                          }`}
+                            }`}
                         >
                           {kw.keyword}
                           <button
                             onClick={e => { e.stopPropagation(); handleDelete(kw) }}
-                            className={`rounded-full p-0.5 transition-colors flex-shrink-0 ${
-                              selectedKeyword?.id === kw.id
+                            className={`rounded-full p-0.5 transition-colors flex-shrink-0 ${selectedKeyword?.id === kw.id
                                 ? 'hover:bg-white/20 text-slate-300 hover:text-white'
                                 : 'hover:bg-stone-300 text-stone-400 hover:text-stone-600'
-                            }`}
+                              }`}
                             aria-label={`Remove ${kw.keyword}`}
                           >
                             <X className="w-3 h-3" />
@@ -385,7 +381,7 @@ export default function Keywords() {
           </aside>
 
           {/* Main content — article feed for selected keyword */}
-          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div className="flex-1 min-h-0 flex flex-col">
             {!selectedKeyword ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
                 <Newspaper className="w-12 h-12 text-stone-300 dark:text-slate-600 mb-4" />
@@ -434,11 +430,10 @@ export default function Keywords() {
                         <button
                           key={range}
                           onClick={() => setDateRange(range)}
-                          className={`px-2.5 py-1 text-xs rounded-full font-medium transition-colors ${
-                            dateRange === range
+                          className={`px-2.5 py-1 text-xs rounded-full font-medium transition-colors ${dateRange === range
                               ? 'bg-slate-900 text-white'
                               : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-600'
-                          }`}
+                            }`}
                         >
                           {range === '24h' ? '24h' : range === '3d' ? '3 days' : '1 week'}
                         </button>

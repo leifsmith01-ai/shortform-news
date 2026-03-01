@@ -134,7 +134,7 @@ export default function Finance() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <main className="flex-1 min-h-0 flex flex-col">
         {/* Header */}
         <header className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-4 lg:px-8 py-4 flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -256,44 +256,44 @@ export default function Finance() {
         {/* Content Area */}
         <ScrollArea className="flex-1">
           <div className="p-4 lg:p-8">
-              {loading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {[...Array(6)].map((_, i) => (
-                    <LoadingCard key={i} />
-                  ))}
-                </div>
-              ) : articles.length > 0 ? (
-                <div>
-                  {groupedArticles ? (
-                    <div className="space-y-12">
-                      {Object.entries(groupedArticles).map(([key, groupArts]) => (
-                        <div key={key}>
-                          <h2 className="text-2xl font-bold text-stone-900 dark:text-stone-100 mb-6 flex items-center gap-3">
-                            <span className="w-1 h-8 bg-emerald-600 rounded-full" />
-                            {groupBy === 'market' ? (MARKET_NAMES[key] || key) : (SECTOR_NAMES[key] || key)}
-                            <span className="text-sm font-normal text-stone-400 dark:text-slate-500">
-                              ({(groupArts as unknown[]).length} {(groupArts as unknown[]).length === 1 ? 'article' : 'articles'})
-                            </span>
-                          </h2>
-                          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                            {(groupArts as { title: string; source: string; image_url: string; market: string; sector: string; region: string; url: string; time_ago: string; views: number; summary_points: string[]; sentiment: 'bullish' | 'bearish' | 'neutral'; ticker?: string; price_change?: number }[]).map((article, index) => (
-                              <FinanceCard key={index} article={article} index={index} rank={index + 1} />
-                            ))}
-                          </div>
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <LoadingCard key={i} />
+                ))}
+              </div>
+            ) : articles.length > 0 ? (
+              <div>
+                {groupedArticles ? (
+                  <div className="space-y-12">
+                    {Object.entries(groupedArticles).map(([key, groupArts]) => (
+                      <div key={key}>
+                        <h2 className="text-2xl font-bold text-stone-900 dark:text-stone-100 mb-6 flex items-center gap-3">
+                          <span className="w-1 h-8 bg-emerald-600 rounded-full" />
+                          {groupBy === 'market' ? (MARKET_NAMES[key] || key) : (SECTOR_NAMES[key] || key)}
+                          <span className="text-sm font-normal text-stone-400 dark:text-slate-500">
+                            ({(groupArts as unknown[]).length} {(groupArts as unknown[]).length === 1 ? 'article' : 'articles'})
+                          </span>
+                        </h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                          {(groupArts as { title: string; source: string; image_url: string; market: string; sector: string; region: string; url: string; time_ago: string; views: number; summary_points: string[]; sentiment: 'bullish' | 'bearish' | 'neutral'; ticker?: string; price_change?: number }[]).map((article, index) => (
+                            <FinanceCard key={index} article={article} index={index} rank={index + 1} />
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                      {(articles as { title: string; source: string; image_url: string; market: string; sector: string; region: string; url: string; time_ago: string; views: number; summary_points: string[]; sentiment: 'bullish' | 'bearish' | 'neutral'; ticker?: string; price_change?: number }[]).map((article, index) => (
-                        <FinanceCard key={index} article={article} index={index} rank={index + 1} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <FinanceEmptyState hasFilters={hasFilters} />
-              )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {(articles as { title: string; source: string; image_url: string; market: string; sector: string; region: string; url: string; time_ago: string; views: number; summary_points: string[]; sentiment: 'bullish' | 'bearish' | 'neutral'; ticker?: string; price_change?: number }[]).map((article, index) => (
+                      <FinanceCard key={index} article={article} index={index} rank={index + 1} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <FinanceEmptyState hasFilters={hasFilters} />
+            )}
           </div>
         </ScrollArea>
       </main>

@@ -79,7 +79,7 @@ function getStoredList(key: string, fallback: string[]): string[] {
         return parsed;
       }
     }
-  } catch {}
+  } catch { }
   return fallback;
 }
 
@@ -93,7 +93,7 @@ export default function Home() {
     if (!isSignedIn) { setSavedKeywords([]); return; }
     api.getKeywords()
       .then(kws => setSavedKeywords(kws.map((k: { keyword: string }) => k.keyword)))
-      .catch(() => {});
+      .catch(() => { });
   }, [isSignedIn]);
 
   const [selectedCountries, setSelectedCountries] = useState<string[]>(() =>
@@ -108,7 +108,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState('24h');
   const [articles, setArticles] = useState([]);
-  const [lowCoverage, setLowCoverage] = useState<{country: string; category: string; count: number}[]>([]);
+  const [lowCoverage, setLowCoverage] = useState<{ country: string; category: string; count: number }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   // Stale-while-revalidate: keeps the last successful fetch visible while a new one runs.
@@ -261,7 +261,7 @@ export default function Home() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <main className="flex-1 min-h-0 flex flex-col">
         {/* Header */}
         <header className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-4 lg:px-8 py-4 flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -296,7 +296,7 @@ export default function Home() {
                   {dateRangeLabel}
                 </h1>
                 <p className="text-sm text-stone-500 dark:text-slate-400 hidden sm:block">
-                  {hasFilters 
+                  {hasFilters
                     ? `${articles.length} articles${searchQuery ? ` matching "${searchQuery}"` : ''}`
                     : 'Select filters to view news'
                   }
@@ -310,7 +310,7 @@ export default function Home() {
                   Updated {lastUpdated.toLocaleTimeString()}
                 </span>
               )}
-              
+
               {(selectedCountries.length > 1 || selectedCategories.length > 1) && articles.length > 0 && (
                 <div className="flex flex-col items-end gap-1">
                   <span className="text-[10px] text-stone-400 uppercase tracking-wider hidden sm:block">Group by</span>
@@ -331,9 +331,9 @@ export default function Home() {
                   </ToggleGroup>
                 </div>
               )}
-              
-              <Button 
-                variant="outline" 
+
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={fetchNews}
                 disabled={loading || !hasFilters}

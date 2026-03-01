@@ -7,16 +7,16 @@ export default function Layout({ children, currentPageName }: { children: React.
   const location = useLocation();
 
   const navItems = [
-    { name: 'Home',     icon: Home,       page: '/' },
-    { name: 'Trending', icon: Flame,      page: '/trending' },
-    { name: 'Finance',  icon: TrendingUp, page: '/finance' },
-    { name: 'For You',  icon: Sparkles,   page: '/personalized' },
-    { name: 'Keywords', icon: Tag,        page: '/keywords' },
-    { name: 'Saved',    icon: Bookmark,   page: '/saved' },
-    { name: 'History',  icon: Clock,      page: '/history' },
-    { name: 'Settings', icon: Settings,   page: '/settings' },
-    { name: 'About',    icon: Info,        page: '/about' },
-    { name: 'Privacy',  icon: Shield,      page: '/privacy-policy' },
+    { name: 'Home', icon: Home, page: '/' },
+    { name: 'Trending', icon: Flame, page: '/trending' },
+    { name: 'Finance', icon: TrendingUp, page: '/finance' },
+    { name: 'For You', icon: Sparkles, page: '/personalized' },
+    { name: 'Keywords', icon: Tag, page: '/keywords' },
+    { name: 'Saved', icon: Bookmark, page: '/saved' },
+    { name: 'History', icon: Clock, page: '/history' },
+    { name: 'Settings', icon: Settings, page: '/settings' },
+    { name: 'About', icon: Info, page: '/about' },
+    { name: 'Privacy', icon: Shield, page: '/privacy-policy' },
   ];
 
   const isActive = (page: string) =>
@@ -68,11 +68,10 @@ export default function Layout({ children, currentPageName }: { children: React.
                 <div key={item.page} className="relative group/navitem">
                   <Link
                     to={item.page}
-                    className={`relative w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
-                      isActive(item.page)
+                    className={`relative w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${isActive(item.page)
                         ? 'text-slate-900'
                         : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                    }`}
+                      }`}
                   >
                     {isActive(item.page) && (
                       <span className="absolute inset-0 bg-white rounded-xl" />
@@ -108,7 +107,7 @@ export default function Layout({ children, currentPageName }: { children: React.
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 min-h-0 overflow-hidden h-full">
+        <main className="flex-1 min-h-0 h-full">
           {children}
         </main>
       </div>
@@ -123,11 +122,10 @@ export default function Layout({ children, currentPageName }: { children: React.
               <Link
                 key={item.page}
                 to={item.page}
-                className={`relative flex flex-col items-center gap-1 min-w-[52px] px-1.5 py-2 rounded-xl transition-colors ${
-                  active
+                className={`relative flex flex-col items-center gap-1 min-w-[52px] px-1.5 py-2 rounded-xl transition-colors ${active
                     ? 'text-white'
                     : 'text-slate-500 hover:text-slate-300 active:bg-white/10'
-                }`}
+                  }`}
               >
                 {active && (
                   <span className="absolute inset-0 bg-white/15 rounded-xl" />
