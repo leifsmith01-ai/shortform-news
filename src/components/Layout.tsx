@@ -107,13 +107,13 @@ export default function Layout({ children, currentPageName }: { children: React.
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 min-h-0 h-full">
+        <main className="flex-1 min-h-0 h-full pb-16 md:pb-0">
           {children}
         </main>
       </div>
 
       {/* ── Mobile bottom navigation (hidden on md+) ──────────────────── */}
-      <nav className="md:hidden flex-shrink-0 bg-slate-900 border-t border-slate-800 px-1 pt-2 pb-[max(8px,env(safe-area-inset-bottom))] sticky bottom-0 z-50">
+      <nav className="md:hidden flex-shrink-0 bg-slate-900 border-t border-slate-800 px-1 pt-2 pb-[max(8px,env(safe-area-inset-bottom))] fixed bottom-0 inset-x-0 z-50">
         <div className="flex justify-around items-center overflow-x-auto scrollbar-none gap-0.5">
           {navItems.map((item) => {
             const Icon = item.icon;
