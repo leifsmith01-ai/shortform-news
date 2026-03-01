@@ -26,7 +26,7 @@ export default function Layout({ children, currentPageName }: { children: React.
     <div className="app-container flex flex-col md:flex-row">
 
       {/* ── Mobile top header (hidden on md+) ─────────────────────────── */}
-      <header className="md:hidden flex-shrink-0 bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between">
+      <header className="md:hidden flex-shrink-0 bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between sticky top-0 z-50">
         <Link to="/" className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-lg overflow-hidden">
             <img src="/logo.webp" alt="Shortform" fetchPriority="high" className="w-full h-full object-contain" />
@@ -69,8 +69,8 @@ export default function Layout({ children, currentPageName }: { children: React.
                   <Link
                     to={item.page}
                     className={`relative w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${isActive(item.page)
-                        ? 'text-slate-900'
-                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      ? 'text-slate-900'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                       }`}
                   >
                     {isActive(item.page) && (
@@ -113,7 +113,7 @@ export default function Layout({ children, currentPageName }: { children: React.
       </div>
 
       {/* ── Mobile bottom navigation (hidden on md+) ──────────────────── */}
-      <nav className="md:hidden flex-shrink-0 bg-slate-900 border-t border-slate-800 px-1 py-2">
+      <nav className="md:hidden flex-shrink-0 bg-slate-900 border-t border-slate-800 px-1 py-2 sticky bottom-0 z-50">
         <div className="flex justify-around items-center overflow-x-auto scrollbar-none gap-0.5">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -123,8 +123,8 @@ export default function Layout({ children, currentPageName }: { children: React.
                 key={item.page}
                 to={item.page}
                 className={`relative flex flex-col items-center gap-1 min-w-[52px] px-1.5 py-2 rounded-xl transition-colors ${active
-                    ? 'text-white'
-                    : 'text-slate-500 hover:text-slate-300 active:bg-white/10'
+                  ? 'text-white'
+                  : 'text-slate-500 hover:text-slate-300 active:bg-white/10'
                   }`}
               >
                 {active && (

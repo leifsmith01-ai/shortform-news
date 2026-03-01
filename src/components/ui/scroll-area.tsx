@@ -1,22 +1,26 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
-// Plain native-overflow scroll container — intentionally minimal.
+// Scroll container that adapts between mobile and desktop.
 //
-// We do NOT use Radix ScrollAreaPrimitive (overflow-y:hidden on mobile)
-// and we do NOT use any JS scroll manipulation (programmatic scrollTop
-// changes kill active touch-scroll gestures on Chrome mobile).
+// On DESKTOP (md+): Acts as a nested scroll container with overflow-y:auto
+// inside the sidebar + content flex layout.
 //
-// The ONLY job of this component is a div with overflow-y:auto and
-// the correct flex/height constraints so the browser handles scrolling
-// natively on every platform.
+// On MOBILE: Renders as a plain div WITHOUT overflow — the body itself
+// is the scroll container. This avoids the Chrome mobile compositor bug
+// where nested overflow containers don't register touch-scroll after
+// dynamic content changes.
 const ScrollArea = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, children, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("relative overflow-y-auto min-h-0", className)}
+    className={cn(
+      "relative min-h-0",
+      "md:overflow-y-auto",
+      className
+    )}
     {...props}
   >
     {children}
