@@ -14,14 +14,14 @@ export const KEYWORD_CACHE_TTL_HOURS = 1; // Keyword results — more time-sensi
 /**
  * Cache TTL in hours, keyed by dateRange string.
  * Narrow windows refresh more frequently so users see current news.
- *   24h  → 1h  (content changes every hour; stale results immediately visible)
- *   3d   → 3h  (moderate churn — refresh 8× per day)
+ *   24h  → 6h  (4 refreshes per day — balances freshness vs API quota pressure)
+ *   3d   → 3h  (moderate churn — 8 refreshes per day)
  *   week → 6h  (half-day slots, 4 refreshes per day)
  *   month→ 12h (stable content, twice-daily refresh)
  *   all  → 12h (no date restriction — popularity sort, very stable)
  */
 export const RANGE_CACHE_TTL_HOURS = {
-  '24h':   1,
+  '24h':   6,
   '3d':    3,
   'week':  6,
   'month': 12,
@@ -39,7 +39,7 @@ export function getCacheKey(country, category, dateRange, sourceFingerprint, sho
   const hour = now.getUTCHours();
   const sf = sourceFingerprint || 'all';
   const lang = showNonEnglish ? 'all' : 'en';
-  // Compute slot granularity from TTL: a 1h TTL → 24 slots/day, 6h → 2 slots/day
+  // Compute slot granularity from TTL: a 6h TTL → 4 slots/day (h0..h3), 12h → 2 slots/day
   const ttlHours = RANGE_CACHE_TTL_HOURS[dateRange] ?? CACHE_TTL_HOURS;
   const slot = `h${Math.floor(hour / ttlHours)}`;
   return `${date}-${slot}-${country}-${category}-${dateRange || '24h'}-${sf}-${lang}`;

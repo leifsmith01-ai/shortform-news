@@ -3481,8 +3481,19 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
     }
   }
 
+  // ── Relevance filter constants ────────────────────────────────────────
+  // Defined here (before the category filter) so both the category rescue pass
+  // and the country filter section can reference them.
+  const MIN_ARTICLES = 15;
+  const MIN_COUNTRY_SCORE = 2;
+  // Below this threshold, the category rescue pass and retry/backfill use relaxed
+  // rules to recover articles that would otherwise be dropped for underserved pairs.
+  const LOW_COVERAGE_FLOOR = 8;
+
   // ── Category relevance filter ────────────────────────────────────────
   const beforeCatFilter = formattedArticles.length;
+  // Snapshot pre-filter list so we can run a rescue pass below if coverage is thin.
+  const preFilterArticles = formattedArticles;
   formattedArticles = formattedArticles.filter(a => {
     if (articleMatchesCategory(a, category)) return true;
     // Country-in-title bypass: allow articles that explicitly mention the country
@@ -3504,17 +3515,30 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
     console.log(`  Category filter: kept ${formattedArticles.length}/${beforeCatFilter} for [${category}]`);
   }
 
+  // ── Category rescue pass (low-coverage safety net) ────────────────────
+  // If the strict category filter left very few articles, recover articles that
+  // mention the country in the headline — the old bypass behaviour, but only for
+  // truly underserved pairs. This handles cases where domain-specific vocabulary
+  // (e.g. "malaria eradication programme" for health, or local political terms)
+  // doesn't match our generic keyword lists.
+  if (formattedArticles.length < LOW_COVERAGE_FLOOR && country !== 'world' && category !== 'world') {
+    const alreadyKept = new Set(formattedArticles.map(a => a.url).filter(Boolean));
+    const rescued = preFilterArticles.filter(a => {
+      if (a.url && alreadyKept.has(a.url)) return false;
+      const { inTitle } = articleMentionsCountry(a, country);
+      return inTitle; // country in title is enough when we're starved for coverage
+    });
+    if (rescued.length > 0) {
+      formattedArticles = [...formattedArticles, ...rescued];
+      console.log(`  Category rescue: added ${rescued.length} country-in-title articles (low-coverage pair)`);
+    }
+  }
+
   // ── Country relevance filter (multi-signal) ─────────────────────────
   // Uses articleCountryScore() which considers title mentions, body mentions,
   // term frequency (multiple distinct keywords), and source-country metadata
   // (with special handling for international wire services).
-  const MIN_ARTICLES = 15;
-  // Minimum score to be considered "relevant" to the country.
-  // Score 1 = single weak body mention only (e.g. "US dollar" in a global piece).
-  // Score 2 = body mention + frequency bonus, or a title mention alone.
-  // Raising from >0 to >=2 drops the weakest incidental mentions while still
-  // passing clearly relevant articles with a title or multi-term body mention.
-  const MIN_COUNTRY_SCORE = 2;
+  // (MIN_ARTICLES, MIN_COUNTRY_SCORE, LOW_COVERAGE_FLOOR defined above)
   if (country !== 'world' && formattedArticles.length > 0) {
     const scored = formattedArticles.map(a => {
       // Pass category to enable the combined country+category title bonus
@@ -3602,10 +3626,15 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
         return false;
       });
       if (country !== 'world') {
+        // If already well below the floor, relax to score >= 1 so that score-1
+        // articles (single weak body mention) are included as last-resort coverage.
+        const retryScoreThreshold = formattedArticles.length < LOW_COVERAGE_FLOOR
+          ? 1
+          : MIN_COUNTRY_SCORE;
         retryArticles = retryArticles.filter(a => {
           const score = articleCountryScore(a, country, category);
           a._countryScore = score;
-          return score >= MIN_COUNTRY_SCORE;
+          return score >= retryScoreThreshold;
         });
       }
 
@@ -3675,10 +3704,14 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
       backfill = backfill.filter(a => !existingUrls.has(a.url));
 
       if (country !== 'world') {
+        // Same relaxation as the retry path: use score >= 1 when coverage is thin.
+        const backfillScoreThreshold = formattedArticles.length < LOW_COVERAGE_FLOOR
+          ? 1
+          : MIN_COUNTRY_SCORE;
         backfill = backfill.filter(a => {
           const score = articleCountryScore(a, country, category);
           a._countryScore = score;
-          return score >= MIN_COUNTRY_SCORE;
+          return score >= backfillScoreThreshold;
         });
       }
 
@@ -3688,6 +3721,69 @@ async function _doFetchPair(cacheKey, country, category, ctx) {
       }
     } catch (err) {
       console.error(`  Backfill fetch failed:`, err.message);
+    }
+
+    // ── Second-stage backfill (last resort for very short windows) ──────
+    // If after the 2× backfill we still have fewer than 5 articles in a
+    // 24h or 3d window, widen once more to 3× (e.g. 24h → 72h) so that
+    // genuinely underserved country+category pairs have a final safety net.
+    // This does NOT fire for well-served pairs (they already have enough).
+    const MIN_PAIR_RESULT = 5;
+    if (formattedArticles.length < MIN_PAIR_RESULT && rangeHours && rangeHours <= 72) {
+      const widerHours2 = Math.min(rangeHours * 3, 168); // cap at 7 days
+      const widerFrom2 = new Date(Date.now() - widerHours2 * 60 * 60 * 1000);
+      const widerFromISO2 = widerFrom2.toISOString();
+      console.log(`  Backfill stage-2: widening to ${widerHours2}h (have ${formattedArticles.length})`);
+      try {
+        const existingUrls2 = new Set(formattedArticles.map(a => a.url));
+        const backfillPromises2 = [];
+        if (country === 'world' || NEWS_API_SUPPORTED_COUNTRIES.has(country)) {
+          backfillPromises2.push(
+            fetchFromNewsAPI(country, category, NEWS_API_KEY, activeDomains, activeSourceIds, { from: widerFromISO2, sortByPopularity: true })
+              .then(raw => raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com').map(a => formatNewsAPIArticle(a, country, category)))
+              .catch(() => [])
+          );
+        }
+        if (GUARDIAN_API_KEY) {
+          backfillPromises2.push(
+            fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: widerFromISO2.split('T')[0] })
+              .then(r => r.map(r => formatGuardianArticle(r, country, category)))
+              .catch(() => [])
+          );
+        }
+        if (GNEWS_API_KEY) {
+          backfillPromises2.push(
+            fetchFromGNews(country, category, GNEWS_API_KEY, { from: widerFromISO2, sortByPopularity: true })
+              .then(raw => raw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category)))
+              .catch(() => [])
+          );
+        }
+        const backfillResults2 = await Promise.all(backfillPromises2);
+        let backfill2 = backfillResults2.flat().filter(a => !existingUrls2.has(a.url));
+        // Apply category filter — use the country-in-title bypass since we're desperate
+        backfill2 = backfill2.filter(a => {
+          if (articleMatchesCategory(a, category)) return true;
+          if (country !== 'world') {
+            const { inTitle } = articleMentionsCountry(a, country);
+            return inTitle; // old bypass: country in title is enough at this stage
+          }
+          return false;
+        });
+        // Apply minimum score >= 1 (already the relaxed threshold for low coverage)
+        if (country !== 'world') {
+          backfill2 = backfill2.filter(a => {
+            const score = articleCountryScore(a, country, category);
+            a._countryScore = score;
+            return score >= 1;
+          });
+        }
+        if (backfill2.length > 0) {
+          formattedArticles.push(...backfill2);
+          console.log(`  Backfill stage-2: added ${backfill2.length} articles (total ${formattedArticles.length})`);
+        }
+      } catch (err) {
+        console.error(`  Backfill stage-2 failed:`, err.message);
+      }
     }
   }
 
