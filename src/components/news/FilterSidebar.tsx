@@ -21,13 +21,13 @@ import {
 import { TRUSTED_SOURCES, SOURCE_GROUPS, ALL_SOURCE_DOMAINS } from '@/lib/sources';
 
 const NAV_LINKS = [
-  { name: 'Trending',  icon: Flame,      page: '/trending' },
-  { name: 'Finance',   icon: TrendingUp, page: '/finance' },
-  { name: 'Keywords',  icon: Tag,        page: '/keywords' },
-  { name: 'For You',   icon: Sparkles,   page: '/personalized' },
-  { name: 'Saved',     icon: Bookmark,   page: '/saved' },
-  { name: 'History',   icon: Clock,      page: '/history' },
-  { name: 'Settings',  icon: Settings,   page: '/settings' },
+  { name: 'Trending', icon: Flame, page: '/trending' },
+  { name: 'Finance', icon: TrendingUp, page: '/finance' },
+  { name: 'Keywords', icon: Tag, page: '/keywords' },
+  { name: 'For You', icon: Sparkles, page: '/personalized' },
+  { name: 'Saved', icon: Bookmark, page: '/saved' },
+  { name: 'History', icon: Clock, page: '/history' },
+  { name: 'Settings', icon: Settings, page: '/settings' },
 ];
 
 const COUNTRIES_BY_CONTINENT = {
@@ -253,8 +253,8 @@ export default function FilterSidebar({
   });
 
   const toggleCountry = (code) => {
-    setSelectedCountries(prev => 
-      prev.includes(code) 
+    setSelectedCountries(prev =>
+      prev.includes(code)
         ? prev.filter(c => c !== code)
         : [...prev, code]
     );
@@ -318,11 +318,10 @@ export default function FilterSidebar({
               <Link
                 key={page}
                 to={page}
-                className={`flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-center transition-colors ${
-                  active
+                className={`flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-center transition-colors ${active
                     ? 'bg-white text-slate-900'
                     : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
-                }`}
+                  }`}
               >
                 <Icon className="w-4 h-4 flex-shrink-0" />
                 <span className="text-[10px] font-medium leading-tight">{name}</span>
@@ -332,7 +331,7 @@ export default function FilterSidebar({
         </div>
       </div>
 
-      <ScrollArea className="flex-1 px-4 py-6">
+      <ScrollArea className="flex-1 px-4 py-6 overflow-y-auto">
         {/* Search Section */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-3">
@@ -360,11 +359,10 @@ export default function FilterSidebar({
                 {suggestions.map((kw, i) => (
                   <button
                     key={kw}
-                    className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors ${
-                      i === highlightedIndex
+                    className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors ${i === highlightedIndex
                         ? 'bg-slate-700 text-white'
                         : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                    }`}
+                      }`}
                     onMouseDown={(e) => {
                       e.preventDefault();
                       setSearchQuery(kw);
@@ -425,11 +423,10 @@ export default function FilterSidebar({
             >
               {/* World — pinned global option above continents */}
               <label
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 ${
-                  selectedCountries.includes('world')
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 ${selectedCountries.includes('world')
                     ? 'bg-slate-800 text-white'
                     : 'hover:bg-slate-800/50 text-slate-400'
-                }`}
+                  }`}
               >
                 <Checkbox
                   checked={selectedCountries.includes('world')}
@@ -441,7 +438,7 @@ export default function FilterSidebar({
               </label>
               <div className="h-px bg-slate-800 my-2" />
               {Object.entries(COUNTRIES_BY_CONTINENT).map(([continent, countries]) => (
-                <Collapsible 
+                <Collapsible
                   key={continent}
                   open={continentStates[continent]}
                   onOpenChange={(open) => setContinentStates(prev => ({ ...prev, [continent]: open }))}
@@ -462,11 +459,10 @@ export default function FilterSidebar({
                       {countries.map((country) => (
                         <label
                           key={country.code}
-                          className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 ${
-                            selectedCountries.includes(country.code)
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 ${selectedCountries.includes(country.code)
                               ? 'bg-slate-800 text-white'
                               : 'hover:bg-slate-800/50 text-slate-400'
-                          }`}
+                            }`}
                         >
                           <Checkbox
                             checked={selectedCountries.includes(country.code)}
@@ -498,7 +494,7 @@ export default function FilterSidebar({
             <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${categoriesOpen ? 'rotate-180' : ''}`} />
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <motion.div 
+            <motion.div
               className="space-y-1"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -506,11 +502,10 @@ export default function FilterSidebar({
               {CATEGORIES.map((category) => (
                 <label
                   key={category.id}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 ${
-                    selectedCategories.includes(category.id)
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 ${selectedCategories.includes(category.id)
                       ? 'bg-slate-800 text-white'
                       : 'hover:bg-slate-800/50 text-slate-400'
-                  }`}
+                    }`}
                 >
                   <Checkbox
                     checked={selectedCategories.includes(category.id)}
@@ -546,11 +541,10 @@ export default function FilterSidebar({
               >
                 {/* Select All toggle */}
                 <label
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 ${
-                    allSourcesSelected
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 ${allSourcesSelected
                       ? 'bg-slate-800 text-white'
                       : 'hover:bg-slate-800/50 text-slate-400'
-                  }`}
+                    }`}
                 >
                   <Checkbox
                     checked={allSourcesSelected}
@@ -586,11 +580,10 @@ export default function FilterSidebar({
                           {groupSources.map(source => (
                             <label
                               key={source.domain}
-                              className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 ${
-                                isSourceSelected(source.domain)
+                              className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 ${isSourceSelected(source.domain)
                                   ? 'bg-slate-800 text-white'
                                   : 'hover:bg-slate-800/50 text-slate-400'
-                              }`}
+                                }`}
                             >
                               <Checkbox
                                 checked={isSourceSelected(source.domain)}
