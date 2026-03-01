@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { Bookmark, Trash2, Filter } from 'lucide-react';
+import { ApiReadyContext } from '@/App';
 import { useCountUp } from '@/hooks/useCountUp';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -10,13 +11,18 @@ import api from '@/api';
 import { toast } from 'sonner';
 
 export default function SavedArticles() {
+  const apiReady = useContext(ApiReadyContext);
   const [savedArticles, setSavedArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState('all');
 
   useEffect(() => {
+    if (!apiReady) {
+      setLoading(true);
+      return;
+    }
     loadSavedArticles();
-  }, []);
+  }, [apiReady]);
 
   const loadSavedArticles = async () => {
     setLoading(true);

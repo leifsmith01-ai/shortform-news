@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { Clock, Calendar, Trash2 } from 'lucide-react';
 import { useCountUp } from '@/hooks/useCountUp';
 import { format } from 'date-fns';
@@ -6,21 +6,22 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import api from '@/api';
 import { toast } from 'sonner';
-import { useUser } from '@clerk/clerk-react';
+import { ApiReadyContext } from '@/App';
 
 export default function History() {
+  const apiReady = useContext(ApiReadyContext);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { user, isLoaded: userLoaded } = useUser();
 
-  // Re-run when the Clerk user finishes loading (fixes race condition on mobile where
-  // History mounts before UserInitialiser has had a chance to call api.setUser())
+  // Wait until UserInitialiser has set the JWT in the Supabase client AND called
+  // api.setUser() — only then will RLS policies pass and return the user's rows.
   useEffect(() => {
-    if (!userLoaded) return;
-    // Safety net: ensure api has the user set even if UserInitialiser fires late
-    if (user?.id) api.setUser(user.id);
+    if (!apiReady) {
+      setLoading(true);
+      return;
+    }
     loadHistory();
-  }, [userLoaded, user?.id]);
+  }, [apiReady]);
 
   const loadHistory = async () => {
     setLoading(true);
