@@ -151,7 +151,7 @@ const CATEGORIES = [
   { id: 'health-tech-science', name: 'Health, Tech and Science', icon: '🧬' },
   { id: 'business', name: 'Business', icon: '📈' },
   { id: 'sports', name: 'Sports', icon: '⚽' },
-  { id: 'entertainment', name: 'Entertainment (gaming, film and tv)', icon: '🎬' },
+  { id: 'entertainment', name: 'Entertainment (Music, film, tv and gaming)', icon: '🎬' },
   { id: 'politics', name: 'Politics', icon: '🏛️' },
 ];
 

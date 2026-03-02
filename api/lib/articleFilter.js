@@ -69,9 +69,10 @@ export const CATEGORY_QUERY_NOUNS = {
   science:    ['research', 'science', 'discovery', 'climate', 'space', 'laboratory', 'environment'],
   health:     ['health', 'hospital', 'healthcare', 'medical', 'disease', 'public health'],
   sports:     ['sport', 'team', 'league', 'championship', 'football', 'cricket', 'athlete'],
-  gaming:     ['gaming', 'video game', 'esports', 'game industry'],
+  gaming:     ['gaming', 'video game', 'esports', 'game industry', 'game developer', 'game release', 'mobile game'],
   film:       ['film', 'movie', 'cinema', 'box office', 'film industry'],
   tv:         ['television', 'TV', 'streaming', 'TV series', 'broadcast'],
+  music:      ['music', 'album', 'music festival', 'artist', 'chart', 'song', 'concert'],
 };
 
 // ── Category relevance keywords ────────────────────────────────────────────
@@ -199,11 +200,12 @@ export const CATEGORY_RELEVANCE_KEYWORDS = {
       'box office', 'screenplay', 'hollywood', 'blockbuster',
       'oscar', 'academy award', 'golden globe', 'bafta',
       'film festival', 'cannes', 'sundance', 'tribeca',
-      'cinematograph', 'film director',
+      'cinematograph', 'film director', 'rotten tomatoes', 'film review',
+      'movie franchise', 'movie review',
     ],
     weak: [
-      'film', 'movie', 'cinema', 'director', 'actor', 'actress',
-      'premiere', 'sequel', 'franchise', 'animation', 'documentary',
+      'film', 'movie', 'cinema', 'actor', 'actress',
+      'premiere', 'animation', 'documentary',
       'trailer', 'film critic', 'casting',
     ],
   },
@@ -212,13 +214,28 @@ export const CATEGORY_RELEVANCE_KEYWORDS = {
       'tv show', 'tv series', 'showrunner', 'series finale',
       'primetime', 'cable network', 'reality tv', 'talk show',
       'miniseries', 'anthology series', 'sitcom', 'drama series',
-      'late night', 'television show',
+      'late night', 'television show', 'netflix', 'hbo', 'disney+',
+      'apple tv+', 'amazon prime video', 'peacock', 'paramount+',
+      'binge-watch', 'limited series', 'docuseries',
     ],
     weak: [
-      'television', 'netflix', 'hbo', 'disney+', 'episode',
+      'television', 'episode',
       'renewal', 'cancell', 'streaming service', 'season premiere',
-      'season finale', 'reboot', 'spinoff', 'broadcast',
+      'season finale', 'reboot', 'spinoff',
       'emmys', 'emmy',
+    ],
+  },
+  music: {
+    strong: [
+      'grammy', 'grammy award', 'brit award', 'mercury prize', 'vma', 'mtv award',
+      'album release', 'record label', 'music festival', 'music video', 'world tour',
+      'coachella', 'glastonbury', 'lollapalooza', 'south by southwest', 'sxsw',
+      'billboard chart', 'music producer', 'debut album', 'platinum record',
+    ],
+    weak: [
+      'music', 'song', 'singer', 'band', 'album', 'concert', 'rapper',
+      'hip-hop', 'pop star', 'musician', 'new single', 'lead single',
+      'music industry', 'record deal', 'music streaming', 'tour dates',
     ],
   },
 };

@@ -254,14 +254,25 @@ const ALL_TRUSTED_SOURCES = [
   { domain: 'kotaku.com', sourceId: null, name: 'Kotaku', group: 'gaming' },
   { domain: 'gamespot.com', sourceId: null, name: 'GameSpot', group: 'gaming' },
   { domain: 'rockpapershotgun.com', sourceId: null, name: 'Rock Paper Shotgun', group: 'gaming' },
+  { domain: 'gamesradar.com', sourceId: null, name: 'GamesRadar', group: 'gaming' },
+  { domain: 'vg247.com', sourceId: null, name: 'VG247', group: 'gaming' },
+  { domain: 'dualshockers.com', sourceId: null, name: 'DualShockers', group: 'gaming' },
   // ── Film & TV ─────────────────────────────────────────────────────────────
   { domain: 'variety.com', sourceId: null, name: 'Variety', group: 'film' },
   { domain: 'hollywoodreporter.com', sourceId: null, name: 'Hollywood Reporter', group: 'film' },
   { domain: 'deadline.com', sourceId: null, name: 'Deadline', group: 'film' },
   { domain: 'ew.com', sourceId: 'entertainment-weekly', name: 'Entertainment Weekly', group: 'film' },
   { domain: 'indiewire.com', sourceId: null, name: 'IndieWire', group: 'film' },
-  { domain: 'vulture.com', sourceId: null, name: 'Vulture', group: 'film' },
+  { domain: 'vulture.com', sourceId: null, name: 'Vulture', group: 'tv' },
+  { domain: 'tvline.com', sourceId: null, name: 'TVLine', group: 'tv' },
+  { domain: 'collider.com', sourceId: null, name: 'Collider', group: 'tv' },
   { domain: 'buzzfeed.com', sourceId: 'buzzfeed', name: 'BuzzFeed', group: 'tv' },
+  // ── Music ─────────────────────────────────────────────────────────────────
+  { domain: 'rollingstone.com', sourceId: null, name: 'Rolling Stone', group: 'music' },
+  { domain: 'billboard.com', sourceId: null, name: 'Billboard', group: 'music' },
+  { domain: 'pitchfork.com', sourceId: null, name: 'Pitchfork', group: 'music' },
+  { domain: 'nme.com', sourceId: null, name: 'NME', group: 'music' },
+  { domain: 'consequence.net', sourceId: null, name: 'Consequence of Sound', group: 'music' },
   // ── Middle East (additional) ──────────────────────────────────────────────
   { domain: 'dailysabah.com', sourceId: null, name: 'Daily Sabah', group: 'regional' },
   // ── Asia (additional) ─────────────────────────────────────────────────────
@@ -470,9 +481,10 @@ const CATEGORY_QUERY_NOUNS = {
   science: ['research', 'science', 'discovery', 'climate', 'space', 'laboratory', 'environment'],
   health: ['health', 'hospital', 'healthcare', 'medical', 'disease', 'public health'],
   sports: ['sport', 'team', 'league', 'championship', 'football', 'cricket', 'athlete'],
-  gaming: ['gaming', 'video game', 'esports', 'game industry'],
+  gaming: ['gaming', 'video game', 'esports', 'game industry', 'game developer', 'game release', 'mobile game'],
   film: ['film', 'movie', 'cinema', 'box office', 'film industry'],
   tv: ['television', 'TV', 'streaming', 'TV series', 'broadcast'],
+  music: ['music', 'album', 'music festival', 'artist', 'chart', 'song', 'concert'],
 };
 
 // Category relevance keywords — used in post-fetch filtering to verify articles
@@ -609,11 +621,12 @@ const CATEGORY_RELEVANCE_KEYWORDS = {
       'box office', 'screenplay', 'hollywood', 'blockbuster',
       'oscar', 'academy award', 'golden globe', 'bafta',
       'film festival', 'cannes', 'sundance', 'tribeca',
-      'cinematograph', 'film director',
+      'cinematograph', 'film director', 'rotten tomatoes', 'film review',
+      'movie franchise', 'movie review',
     ],
     weak: [
-      'film', 'movie', 'cinema', 'director', 'actor', 'actress',
-      'premiere', 'sequel', 'franchise', 'animation', 'documentary',
+      'film', 'movie', 'cinema', 'actor', 'actress',
+      'premiere', 'animation', 'documentary',
       'trailer', 'film critic', 'casting',
     ],
   },
@@ -622,13 +635,28 @@ const CATEGORY_RELEVANCE_KEYWORDS = {
       'tv show', 'tv series', 'showrunner', 'series finale',
       'primetime', 'cable network', 'reality tv', 'talk show',
       'miniseries', 'anthology series', 'sitcom', 'drama series',
-      'late night', 'television show',
+      'late night', 'television show', 'netflix', 'hbo', 'disney+',
+      'apple tv+', 'amazon prime video', 'peacock', 'paramount+',
+      'binge-watch', 'limited series', 'docuseries',
     ],
     weak: [
-      'television', 'netflix', 'hbo', 'disney+', 'episode',
+      'television', 'episode',
       'renewal', 'cancell', 'streaming service', 'season premiere',
-      'season finale', 'reboot', 'spinoff', 'broadcast',
+      'season finale', 'reboot', 'spinoff',
       'emmys', 'emmy',
+    ],
+  },
+  music: {
+    strong: [
+      'grammy', 'grammy award', 'brit award', 'mercury prize', 'vma', 'mtv award',
+      'album release', 'record label', 'music festival', 'music video', 'world tour',
+      'coachella', 'glastonbury', 'lollapalooza', 'south by southwest', 'sxsw',
+      'billboard chart', 'music producer', 'debut album', 'platinum record',
+    ],
+    weak: [
+      'music', 'song', 'singer', 'band', 'album', 'concert', 'rapper',
+      'hip-hop', 'pop star', 'musician', 'new single', 'lead single',
+      'music industry', 'record deal', 'music streaming', 'tour dates',
     ],
   },
 };
@@ -787,6 +815,7 @@ const GUARDIAN_SECTION_MAP = {
   gaming: 'games',
   film: 'film',
   tv: 'tv-and-radio',
+  music: 'music',
   politics: 'politics',
   world: 'world'
 };
@@ -808,6 +837,7 @@ const WORLD_NEWS_TOPIC_MAP = {
   gaming: 'entertainment',
   film: 'entertainment',
   tv: 'entertainment',
+  music: 'entertainment',
   politics: 'politics',
   world: 'politics'  // closest match
 };
@@ -822,6 +852,7 @@ const NEWS_DATA_CATEGORY_MAP = {
   gaming: 'entertainment',
   film: 'entertainment',
   tv: 'entertainment',
+  music: 'entertainment',
   politics: 'politics',
   world: 'world'
 };
@@ -1371,6 +1402,7 @@ const GNEWS_CATEGORY_MAP = {
   gaming: 'entertainment',
   film: 'entertainment',
   tv: 'entertainment',
+  music: 'entertainment',
   politics: 'nation',   // 'nation' covers national politics better than 'general'
   world: 'world',
 };
@@ -1790,9 +1822,10 @@ const EVERYTHING_QUERY_MAP = {
   science: '(science OR research OR NASA OR climate OR discovery OR "space exploration" OR biology OR physics OR environment)',
   health: '(health OR medical OR hospital OR disease OR vaccine OR pandemic OR "public health" OR "clinical trial" OR healthcare)',
   sports: '(sports OR championship OR tournament OR Olympics OR FIFA OR "Premier League" OR athlete OR "World Cup")',
-  gaming: '(gaming OR "video game" OR esports OR console OR PlayStation OR Xbox OR Nintendo)',
-  film: '(film OR movie OR cinema OR "box office" OR director OR Oscar OR screenplay OR "film festival")',
-  tv: '(television OR "TV series" OR streaming OR "TV show" OR showrunner OR Netflix OR HBO OR Emmy)',
+  gaming: '(gaming OR "video game" OR esports OR console OR PlayStation OR Xbox OR Nintendo OR "mobile game")',
+  film: '(film OR movie OR cinema OR "box office" OR Oscar OR screenplay OR "film festival" OR "film review")',
+  tv: '(television OR "TV series" OR "TV show" OR showrunner OR Netflix OR HBO OR Emmy OR "streaming series")',
+  music: '(music OR album OR "music festival" OR Grammy OR "record label" OR concert OR "music video" OR tour)',
   trending: '(politics OR technology OR business OR science OR health OR sports OR economy OR election OR climate OR entertainment)',
 };
 
@@ -1864,9 +1897,10 @@ const WORLD_NEWS_QUERY_TERMS = {
   science: 'science research discovery NASA climate environment',
   health: 'health medical hospital disease vaccine healthcare',
   sports: 'sports championship tournament athlete league football',
-  gaming: 'gaming video game esports PlayStation Xbox Nintendo',
-  film: 'film movie cinema box office director Oscar',
-  tv: 'television TV series streaming Netflix HBO Emmy',
+  gaming: 'gaming video game esports PlayStation Xbox Nintendo mobile game',
+  film: 'film movie cinema box office Oscar screenplay',
+  tv: 'television TV series Netflix HBO Emmy showrunner',
+  music: 'music album artist Grammy concert tour record label',
   politics: 'politics government election parliament legislation policy',
   world: 'international diplomacy foreign summit United Nations',
 };
@@ -2024,8 +2058,8 @@ async function fetchFromMediaStack(country, category, apiKey, opts = {}) {
   const MEDIASTACK_CATEGORY_MAP = {
     business: 'business', technology: 'technology', sports: 'sports',
     science: 'science', health: 'health', gaming: 'entertainment',
-    film: 'entertainment', tv: 'entertainment', politics: 'general',
-    world: 'general',
+    film: 'entertainment', tv: 'entertainment', music: 'entertainment',
+    politics: 'general', world: 'general',
   };
   const params = new URLSearchParams({
     access_key: apiKey,
@@ -2073,8 +2107,8 @@ async function fetchFromCurrentsAPI(country, category, apiKey, opts = {}) {
   const CURRENTS_CATEGORY_MAP = {
     business: 'business', technology: 'technology', sports: 'sports',
     science: 'science', health: 'health', gaming: 'entertainment',
-    film: 'entertainment', tv: 'entertainment', politics: 'politics',
-    world: 'world news',
+    film: 'entertainment', tv: 'entertainment', music: 'entertainment',
+    politics: 'politics', world: 'world news',
   };
   const params = new URLSearchParams({
     apiKey,
