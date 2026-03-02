@@ -208,6 +208,7 @@ function mapCategory(cat: string): string {
         'film': 'entertainment',
         'tv': 'entertainment',
         'gaming': 'entertainment',
+        'music': 'entertainment',
     }
     return mapping[cat] || cat
 }

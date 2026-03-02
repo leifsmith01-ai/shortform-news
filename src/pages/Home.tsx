@@ -52,7 +52,7 @@ const COUNTRY_NAMES: Record<string, string> = {
 
 const CATEGORY_NAMES = {
   'health-tech-science': 'Health, Tech and Science', business: 'Business',
-  sports: 'Sports', entertainment: 'Entertainment (gaming, film and tv)',
+  sports: 'Sports', entertainment: 'Entertainment (Music, film, tv and gaming)',
   politics: 'Politics', world: 'World'
 };
 
@@ -64,6 +64,7 @@ const CATEGORY_MIGRATIONS: Record<string, string[]> = {
   gaming: ['entertainment'],
   film: ['entertainment'],
   tv: ['entertainment'],
+  music: ['entertainment'],
 };
 
 function getStoredList(key: string, fallback: string[]): string[] {

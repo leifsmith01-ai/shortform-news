@@ -36,6 +36,11 @@ const SOURCE_AUTHORITY_TIER = {
   // Non-English RSS feeds — native-language outlets
   'lemonde.fr': 2, 'elpais.com': 2, 'spiegel.de': 2,
   'ansa.it': 2, 'yna.co.kr': 2, 'nos.nl': 2, 'nhk.or.jp': 2,
+  // Entertainment specialists
+  'rollingstone.com': 2, 'billboard.com': 2,
+  'pitchfork.com': 1, 'nme.com': 1, 'consequence.net': 1,
+  'gamesradar.com': 1, 'vg247.com': 1, 'dualshockers.com': 1,
+  'tvline.com': 1, 'collider.com': 1,
   // Tier 1 — quality regionals
   'brazilianreport.com': 1, 'batimes.com.ar': 1, 'mexiconewsdaily.com': 1,
   'businessday.ng': 1, 'nation.africa': 1, 'africanews.com': 1,

@@ -54,6 +54,7 @@ const CATEGORY_COLORS = {
   gaming: 'bg-violet-500/10 text-violet-600 border-violet-200',
   film: 'bg-pink-500/10 text-pink-600 border-pink-200',
   tv: 'bg-fuchsia-500/10 text-fuchsia-600 border-fuchsia-200',
+  music: 'bg-yellow-500/10 text-yellow-600 border-yellow-200',
   politics: 'bg-slate-500/10 text-slate-600 border-slate-200',
   world: 'bg-cyan-500/10 text-cyan-600 border-cyan-200',
 };
