@@ -17,9 +17,12 @@ import { CATEGORY_RELEVANCE_KEYWORDS, getSourceDomain } from './articleFilter.js
 const SOURCE_AUTHORITY_TIER = {
   // Tier 3 — wire services & top international
   'reuters.com': 3, 'apnews.com': 3, 'bbc.co.uk': 3, 'bbc.com': 3,
-  'nytimes.com': 3, 'theguardian.com': 3, 'washingtonpost.com': 3,
+  'nytimes.com': 3, 'washingtonpost.com': 3,
   'economist.com': 3, 'ft.com': 3, 'bloomberg.com': 3,
   // Tier 2 — strong nationals & specialists
+  // NOTE: theguardian.com moved from Tier 3 → Tier 2 to reduce over-representation
+  // in ranking. Guardian is excellent editorial journalism but not a wire service.
+  'theguardian.com': 2,
   'cnn.com': 2, 'npr.org': 2, 'abc.net.au': 2, 'aljazeera.com': 2,
   'wsj.com': 2, 'politico.com': 2, 'abcnews.go.com': 2, 'cbsnews.com': 2,
   'nbcnews.com': 2, 'pbs.org': 2, 'france24.com': 2, 'dw.com': 2,
@@ -30,11 +33,18 @@ const SOURCE_AUTHORITY_TIER = {
   'dailymaverick.co.za': 2, 'koreaherald.com': 2, 'channelnewsasia.com': 2,
   'kyivindependent.com': 2, 'timesofisrael.com': 2, 'arabnews.com': 2,
   'thenationalnews.com': 2, 'bangkokpost.com': 2, 'mercopress.com': 2,
+  // Non-English RSS feeds — native-language outlets
+  'lemonde.fr': 2, 'elpais.com': 2, 'spiegel.de': 2,
+  'ansa.it': 2, 'yna.co.kr': 2, 'nos.nl': 2, 'nhk.or.jp': 2,
   // Tier 1 — quality regionals
   'brazilianreport.com': 1, 'batimes.com.ar': 1, 'mexiconewsdaily.com': 1,
   'businessday.ng': 1, 'nation.africa': 1, 'africanews.com': 1,
   'middleeasteye.net': 1, 'jakartaglobe.id': 1, 'inquirer.net': 1,
   'rappler.com': 1, 'notesfrompoland.com': 1, 'meduza.io': 1,
+  // Non-English RSS feeds — regional
+  'tvn24.pl': 1, 'rtp.pt': 1,
+  // feeds.folha.com resolves to folha.uol.com.br / folha.com.br
+  'feeds.folha.com': 1, 'folha.uol.com.br': 1,
 };
 
 export function getSourceTier(article) {
