@@ -474,7 +474,7 @@ const COUNTRY_DEMONYMS = {
 // Each entry produces queries like "Australian economy" or "Indian election".
 // These are paired with country demonyms, so keep them as common nouns/phrases.
 const CATEGORY_QUERY_NOUNS = {
-  politics: ['politics', 'government', 'election', 'parliament', 'prime minister', 'legislation', 'policy'],
+  politics: ['politics', 'election', 'parliament', 'prime minister', 'legislation', 'government', 'chancellor'],
   world: ['foreign policy', 'diplomacy', 'trade deal', 'international relations', 'summit'],
   business: ['economy', 'market', 'industry', 'trade', 'central bank', 'stocks', 'finance'],
   technology: ['tech', 'startup', 'innovation', 'digital', 'AI', 'software', 'cybersecurity'],
@@ -507,14 +507,21 @@ const CATEGORY_RELEVANCE_KEYWORDS = {
       'ballot', 'referendum', 'bipartisan', 'geopoliti', 'impeach',
       'inaugurat', 'gubernator', 'governorship', 'caucus', 'filibuster',
       'executive order', 'head of state', 'prime minister', 'veto',
+      // International political titles
+      'chancellor', 'foreign minister', 'secretary of state', 'attorney general',
+      'speaker of the house', 'opposition leader', 'party leader',
+      // Electoral processes
+      'by-election', 'snap election', 'no-confidence', 'head of government',
     ],
     weak: [
       'government', 'elect', 'minister', 'president', 'vote', 'voter',
-      'opposition', 'coalition', 'campaign', 'democrat', 'republican',
-      'labor party', 'liberal', 'conservative', 'cabinet', 'regulation',
-      'policy', 'reform', 'constitutional', 'sanction', 'diplomatic',
+      'opposition', 'coalition', 'democrat', 'republican',
+      'labor party', 'cabinet', 'constitutional', 'sanction', 'diplomatic',
       'nato', 'tariff', 'populis', 'authoritar', 'regime', 'judiciary',
       'governance', 'sovereignty', 'junta', 'coup',
+      // Parliamentary concepts
+      'majority government', 'minority government', 'political party',
+      'constituency', 'electorate',
     ],
   },
   world: {
@@ -678,6 +685,12 @@ function countKeywordHits(text, keywords) {
 function articleMatchesCategory(article, category) {
   // 'world' is too broad to filter usefully — we rely on query-level filtering
   if (category === 'world') return true;
+  // Trust native API category assignments: Guardian, WorldNewsAPI, NewsData.io,
+  // and GNews have already filtered to the correct category. Bypass keyword
+  // validation for these articles to avoid false negatives from sparse descriptions
+  // or non-English political terminology.
+  // NewsAPI articles (fetched via keyword query) still require keyword validation.
+  if (article._nativeCategory) return true;
   const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
   if (!catKeywords) return true; // unknown category, don't filter
 
@@ -1451,6 +1464,8 @@ const SOURCE_AUTHORITY_TIER = {
   'bangkokpost.com': 2, 'timesofisrael.com': 2, 'arabnews.com': 2,
   'middleeasteye.net': 2, 'dailysabah.com': 2, 'euractiv.com': 2,
   'kyivindependent.com': 2, 'theeastafrican.co.ke': 2, 'nation.africa': 2,
+  // Politics specialists
+  'thehill.com': 2, 'axios.com': 2, 'foreignpolicy.com': 2,
   // Tier 1 — quality regionals (default tier, listed explicitly for clarity)
   'brazilianreport.com': 1, 'batimes.com.ar': 1, 'mexiconewsdaily.com': 1,
   'businessday.ng': 1, 'africanews.com': 1,
@@ -1560,6 +1575,22 @@ function contentDepthScore(article) {
   return descScore + contentScore;
 }
 
+// Sources with strong topical specialization get a modest catScore bonus when
+// ranking articles in their specialty category.
+const CATEGORY_SOURCE_AFFINITY = {
+  politics: new Set([
+    'politico.com', 'politico.eu', 'thehill.com', 'axios.com',
+    'foreignpolicy.com', 'foreignaffairs.com', 'euractiv.com',
+  ]),
+  business: new Set([
+    'bloomberg.com', 'ft.com', 'economist.com', 'wsj.com',
+  ]),
+  technology: new Set([
+    'arstechnica.com', 'wired.com', 'techcrunch.com', 'theverge.com',
+  ]),
+  sports: new Set(['espn.com']),
+};
+
 // Category relevance strength (0-1): how strongly an article matches a category.
 // Uses the two-tier keyword system with title weighting:
 //   - Strong keywords count 2x (domain-specific, high confidence)
@@ -1591,6 +1622,10 @@ function categoryRelevanceScore(article, category) {
       if (title.includes(kw)) score += 0.5;
     }
   }
+
+  // Source-category affinity: give a modest bonus to outlets with strong
+  // topical specialization (e.g. Politico for politics, FT for business).
+  if (CATEGORY_SOURCE_AFFINITY[category]?.has(getSourceDomain(article))) score += 1.5;
 
   // Normalise to 0-1 range. Calibrated so:
   //   1 strong hit           = 2/8  = 0.25
@@ -1815,7 +1850,7 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
 // Search-query templates for categories that use /v2/everything (more targeted than top-headlines).
 // All 10 categories now have custom queries for better precision than generic top-headlines.
 const EVERYTHING_QUERY_MAP = {
-  politics: '(politics OR government OR election OR parliament OR president OR minister OR policy OR legislation)',
+  politics: '(politics OR election OR parliament OR legislature OR legislation OR referendum OR "prime minister" OR chancellor OR "political party" OR "head of state" OR "executive order")',
   world: '(international OR diplomacy OR foreign OR global OR "trade deal" OR summit OR "United Nations")',
   business: '(economy OR "stock market" OR finance OR business OR GDP OR inflation OR earnings OR merger OR IPO)',
   technology: '(technology OR software OR AI OR "artificial intelligence" OR cybersecurity OR semiconductor OR startup OR "machine learning")',
@@ -1901,7 +1936,7 @@ const WORLD_NEWS_QUERY_TERMS = {
   film: 'film movie cinema box office Oscar screenplay',
   tv: 'television TV series Netflix HBO Emmy showrunner',
   music: 'music album artist Grammy concert tour record label',
-  politics: 'politics government election parliament legislation policy',
+  politics: 'politics election parliament legislation referendum chancellor "prime minister"',
   world: 'international diplomacy foreign summit United Nations',
 };
 
@@ -2894,7 +2929,7 @@ function formatNewsAPIArticle(article, country, category) {
   };
 }
 
-function formatWorldNewsAPIArticle(article, country, category) {
+function formatWorldNewsAPIArticle(article, country, category, nativeCategory = false) {
   return {
     id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     title: article.title || 'No title',
@@ -2908,6 +2943,7 @@ function formatWorldNewsAPIArticle(article, country, category) {
     country, category,
     language: article.language || 'en', // WorldNewsAPI returns language per article
     summary_points: null,
+    _nativeCategory: nativeCategory,
     _meta: {
       // WorldNewsAPI provides explicit source_country — most reliable signal
       sourceCountry: article.source_country?.toLowerCase() || inferCountryFromUrl(article.url),
@@ -2915,7 +2951,7 @@ function formatWorldNewsAPIArticle(article, country, category) {
   };
 }
 
-function formatNewsDataArticle(article, country, category) {
+function formatNewsDataArticle(article, country, category, nativeCategory = false) {
   const sourceUrl = article.link || '#';
   return {
     id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -2930,13 +2966,14 @@ function formatNewsDataArticle(article, country, category) {
     country, category,
     language: article.language || 'en', // NewsData.io returns language per article
     summary_points: null,
+    _nativeCategory: nativeCategory,
     _meta: {
       sourceCountry: inferCountryFromUrl(sourceUrl),
     },
   };
 }
 
-function formatGuardianArticle(result, country, category) {
+function formatGuardianArticle(result, country, category, nativeCategory = false) {
   const fields = result.fields || {};
   // bodyText is the full article body; trailText is a short teaser
   const bodyText = fields.bodyText ? fields.bodyText.slice(0, 3000) : '';
@@ -2953,6 +2990,7 @@ function formatGuardianArticle(result, country, category) {
     country, category,
     language: 'en', // Guardian only publishes in English
     summary_points: null,
+    _nativeCategory: nativeCategory,
     _meta: {
       // Guardian sectionId often encodes country (e.g. 'australia-news')
       sourceCountry: GUARDIAN_SECTION_TO_COUNTRY[result.sectionId] ?? inferCountryFromUrl(result.webUrl),
@@ -2961,7 +2999,7 @@ function formatGuardianArticle(result, country, category) {
   };
 }
 
-function formatGNewsArticle(article, country, category) {
+function formatGNewsArticle(article, country, category, nativeCategory = false) {
   const sourceUrl = article.url || '#';
   return {
     id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -2976,6 +3014,7 @@ function formatGNewsArticle(article, country, category) {
     country, category,
     language: article.language || 'en', // GNews returns language per article
     summary_points: null,
+    _nativeCategory: nativeCategory,
     _meta: {
       sourceCountry: inferCountryFromUrl(article.source?.url || sourceUrl),
     },
@@ -3337,7 +3376,7 @@ export default async function handler(req, res) {
         }
       }
 
-      const clean = filtered.map(({ _meta, _coverage, _countryScore, _matchesCategory, ...rest }) => rest);
+      const clean = filtered.map(({ _meta, _coverage, _countryScore, _matchesCategory, _nativeCategory, ...rest }) => rest);
 
       // AI summaries for top ranked articles (up to MAX_SUMMARY_ARTICLES)
       if (HAS_LLM && clean.length > 0) {
@@ -3505,7 +3544,7 @@ export default async function handler(req, res) {
     }
 
     // Strip internal fields before sending to the client
-    const cleanArticles = rankedArticles.map(({ _meta, _coverage, _countryScore, _matchesCategory, ...rest }) => rest);
+    const cleanArticles = rankedArticles.map(({ _meta, _coverage, _countryScore, _matchesCategory, _nativeCategory, ...rest }) => rest);
 
     // ── Enforce requested date window ────────────────────────────────────────
     // The per-pair backfill widens the time window (e.g. 24h → 72h) to ensure
@@ -3709,9 +3748,9 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
   const newsApiArticles = newsApiRaw
     .filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com')
     .map(a => formatNewsAPIArticle(a, country, category));
-  const worldNewsArticles = worldNewsRaw.map(a => formatWorldNewsAPIArticle(a, country, category));
-  const gNewsArticles = gNewsRaw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category));
-  const newsDataArticles = newsDataRaw.filter(a => a.title && a.title !== '[Removed]').map(a => formatNewsDataArticle(a, country, category));
+  const worldNewsArticles = worldNewsRaw.map(a => formatWorldNewsAPIArticle(a, country, category, true));
+  const gNewsArticles = gNewsRaw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category, true));
+  const newsDataArticles = newsDataRaw.filter(a => a.title && a.title !== '[Removed]').map(a => formatNewsDataArticle(a, country, category, true));
   const currentsArticles = currentsRaw.filter(a => a.title && a.url).map(a => formatCurrentsAPIArticle(a, country, category));
   const mediaStackArticles = mediaStackRaw.filter(a => a.title && a.url).map(a => formatMediaStackArticle(a, country, category));
 
@@ -3739,7 +3778,7 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
     console.log(`  [4] Guardian [${country}/${category}] (have ${formattedArticles.length} so far)`);
     try {
       const results = await fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: fromDateOnly });
-      const extra = results.map(r => formatGuardianArticle(r, country, category)).filter(a => !seenUrls.has(a.url));
+      const extra = results.map(r => formatGuardianArticle(r, country, category, true)).filter(a => !seenUrls.has(a.url));
       formattedArticles = [...formattedArticles, ...extra];
     } catch (err) {
       console.error(`  Guardian failed:`, err.message);
@@ -3870,28 +3909,28 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
     if (!calledSources.has('worldnews') && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) {
       retryPromises.push(
         fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
-          .then(raw => raw.map(a => formatWorldNewsAPIArticle(a, country, category)))
+          .then(raw => raw.map(a => formatWorldNewsAPIArticle(a, country, category, true)))
           .catch(() => [])
       );
     }
     if (!calledSources.has('newsdata') && NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
       retryPromises.push(
         fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly, showNonEnglish: effectiveShowNonEnglish })
-          .then(raw => raw.filter(a => a.title && a.title !== '[Removed]').map(a => formatNewsDataArticle(a, country, category)))
+          .then(raw => raw.filter(a => a.title && a.title !== '[Removed]').map(a => formatNewsDataArticle(a, country, category, true)))
           .catch(() => [])
       );
     }
     if (!calledSources.has('guardian') && GUARDIAN_API_KEY) {
       retryPromises.push(
         fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: fromDateOnly })
-          .then(r => r.map(r => formatGuardianArticle(r, country, category)))
+          .then(r => r.map(r => formatGuardianArticle(r, country, category, true)))
           .catch(() => [])
       );
     }
     if (!calledSources.has('gnews') && GNEWS_API_KEY) {
       retryPromises.push(
         fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
-          .then(raw => raw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category)))
+          .then(raw => raw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category, true)))
           .catch(() => [])
       );
     }
@@ -3961,14 +4000,14 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
       if (GUARDIAN_API_KEY) {
         backfillPromises.push(
           fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: widerFromISO.split('T')[0] })
-            .then(r => r.map(r => formatGuardianArticle(r, country, category)))
+            .then(r => r.map(r => formatGuardianArticle(r, country, category, true)))
             .catch(() => [])
         );
       }
       if (GNEWS_API_KEY) {
         backfillPromises.push(
           fetchFromGNews(country, category, GNEWS_API_KEY, { from: widerFromISO, sortByPopularity: true })
-            .then(raw => raw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category)))
+            .then(raw => raw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category, true)))
             .catch(() => [])
         );
       }
@@ -4036,14 +4075,14 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
         if (GUARDIAN_API_KEY) {
           backfillPromises2.push(
             fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: widerFromISO2.split('T')[0] })
-              .then(r => r.map(r => formatGuardianArticle(r, country, category)))
+              .then(r => r.map(r => formatGuardianArticle(r, country, category, true)))
               .catch(() => [])
           );
         }
         if (GNEWS_API_KEY) {
           backfillPromises2.push(
             fetchFromGNews(country, category, GNEWS_API_KEY, { from: widerFromISO2, sortByPopularity: true })
-              .then(raw => raw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category)))
+              .then(raw => raw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category, true)))
               .catch(() => [])
           );
         }

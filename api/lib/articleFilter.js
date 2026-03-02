@@ -62,7 +62,7 @@ export const COUNTRY_DEMONYMS = {
 
 // ── Category query nouns (for building search queries) ─────────────────────
 export const CATEGORY_QUERY_NOUNS = {
-  politics:   ['politics', 'government', 'election', 'parliament', 'prime minister', 'legislation', 'policy'],
+  politics:   ['politics', 'election', 'parliament', 'prime minister', 'legislation', 'government', 'chancellor'],
   world:      ['foreign policy', 'diplomacy', 'trade deal', 'international relations', 'summit'],
   business:   ['economy', 'market', 'industry', 'trade', 'central bank', 'stocks', 'finance'],
   technology: ['tech', 'startup', 'innovation', 'digital', 'AI', 'software', 'cybersecurity'],
@@ -86,14 +86,21 @@ export const CATEGORY_RELEVANCE_KEYWORDS = {
       'ballot', 'referendum', 'bipartisan', 'geopoliti', 'impeach',
       'inaugurat', 'gubernator', 'governorship', 'caucus', 'filibuster',
       'executive order', 'head of state', 'prime minister', 'veto',
+      // International political titles
+      'chancellor', 'foreign minister', 'secretary of state', 'attorney general',
+      'speaker of the house', 'opposition leader', 'party leader',
+      // Electoral processes
+      'by-election', 'snap election', 'no-confidence', 'head of government',
     ],
     weak: [
       'government', 'elect', 'minister', 'president', 'vote', 'voter',
-      'opposition', 'coalition', 'campaign', 'democrat', 'republican',
-      'labor party', 'liberal', 'conservative', 'cabinet', 'regulation',
-      'policy', 'reform', 'constitutional', 'sanction', 'diplomatic',
+      'opposition', 'coalition', 'democrat', 'republican',
+      'labor party', 'cabinet', 'constitutional', 'sanction', 'diplomatic',
       'nato', 'tariff', 'populis', 'authoritar', 'regime', 'judiciary',
       'governance', 'sovereignty', 'junta', 'coup',
+      // Parliamentary concepts
+      'majority government', 'minority government', 'political party',
+      'constituency', 'electorate',
     ],
   },
   world: {
@@ -276,9 +283,12 @@ export function countKeywordHits(text, keywords) {
 /**
  * Returns true if an article matches the given category.
  * Uses a two-tier keyword system: any strong match OR 2+ weak matches confirm relevance.
+ * Articles tagged with _nativeCategory skip keyword validation — their source API
+ * (Guardian, WorldNewsAPI, NewsData.io, GNews) has already filtered to the correct category.
  */
 export function articleMatchesCategory(article, category) {
   if (category === 'world') return true;
+  if (article._nativeCategory) return true;
   const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
   if (!catKeywords) return true;
 
