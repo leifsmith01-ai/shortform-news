@@ -3530,6 +3530,11 @@ export default async function handler(req, res) {
   const categoryList = Array.isArray(categories) ? categories : [categories || 'technology'];
   const sourceFingerprint = getSourceFingerprint(userSources);
 
+  // Expand the 'all' wildcard category to every real category so that existing
+  // per-pair fetching, caching, and filtering logic works without modification.
+  const ALL_REAL_CATEGORIES = ['health-tech-science', 'business', 'sports', 'entertainment', 'politics'];
+  const effectiveCategoryList = [...new Set(categoryList.flatMap(c => c === 'all' ? ALL_REAL_CATEGORIES : [c]))];
+
   try {
     // ── Fetch all country/category pairs in PARALLEL ──────────────────────
     // Previously sequential: each pair waited for the previous to finish.
@@ -3537,7 +3542,7 @@ export default async function handler(req, res) {
     // parallelization dramatically reduces total response time.
     const pairs = [];
     for (const country of countryList) {
-      for (const category of categoryList) {
+      for (const category of effectiveCategoryList) {
         pairs.push({ country, category });
       }
     }
@@ -3572,7 +3577,7 @@ export default async function handler(req, res) {
     }
 
     // Rank ALL articles together by authority + coverage + freshness + depth + category
-    const singleCategory = categoryList.length === 1 ? categoryList[0] : null;
+    const singleCategory = effectiveCategoryList.length === 1 ? effectiveCategoryList[0] : null;
     let rankedArticles = rankAndDeduplicateArticles(allArticles, { usePopularity: usePopularitySort, category: singleCategory, rangeHours });
 
     // Post-dedup fill-back: if deduplication reduced the count below 10, add back
