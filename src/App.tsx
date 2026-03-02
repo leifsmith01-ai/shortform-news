@@ -60,6 +60,17 @@ function UserInitialiser({ setApiReady }: { setApiReady: (ready: boolean) => voi
           api.setUser(user!.id)
           setApiReady(true)
         }
+      } else if (!cancelled) {
+        // getToken() returns null when the Clerk JWT Template named "supabase" does
+        // not exist in the Clerk Dashboard, or when it is misconfigured.
+        // Supabase operations will be blocked for this user until this is resolved.
+        console.error(
+          '[UserInitialiser] Clerk getToken({ template: "supabase" }) returned null. ' +
+          'Supabase API calls will not work for this user.\n' +
+          'Fix: Clerk Dashboard → JWT Templates → create a template named exactly "supabase" ' +
+          'with {"sub": "{{user.id}}"} in the claims (RS256). ' +
+          'Then add the Clerk JWKS endpoint to Supabase: Authentication → JWT Settings.'
+        )
       }
     }
 
@@ -71,6 +82,10 @@ function UserInitialiser({ setApiReady }: { setApiReady: (ready: boolean) => voi
       const token = await session!.getToken({ template: 'supabase' })
       if (token && !cancelled) {
         await supabase.auth.setSession({ access_token: token, refresh_token: '' })
+      } else if (!cancelled) {
+        console.error(
+          '[UserInitialiser] Token refresh failed: Clerk getToken({ template: "supabase" }) returned null.'
+        )
       }
     }, 50_000)
 
