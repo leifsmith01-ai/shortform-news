@@ -203,7 +203,7 @@ export default function Keywords() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100">
-              Keyword Monitor
+              Keywords and Media Monitoring
             </h1>
             <p className="text-sm text-stone-500 dark:text-slate-400">
               {isLoaded && isSignedIn
