@@ -1034,12 +1034,80 @@ const RSS_SOURCES = [
     countries: new Set(['nz']),
   },
   {
+    name: 'RNZ Pacific',
+    domain: 'rnz.co.nz',
+    // Radio New Zealand's Pacific regional news service. Only English-language
+    // RSS feed covering Fiji, Samoa, Tonga, Vanuatu, Papua New Guinea, and other
+    // Pacific island nations. Free RSS feed, no paywall.
+    url: process.env.RNZ_PACIFIC_RSS_URL || 'https://www.rnz.co.nz/rss/pacific.xml',
+    countries: new Set(['fj', 'ws', 'to', 'vu', 'pg', 'sb', 'ki', 'fm', 'pw']),
+  },
+  {
     name: 'RTÉ News',
     domain: 'rte.ie',
     // Ireland's national public broadcaster. Primary source for Irish news.
     // Free RSS feed, no paywall.
     url: process.env.RTE_RSS_URL || 'https://www.rte.ie/news/rss/rte-news-national.xml',
     countries: new Set(['ie']),
+  },
+  {
+    name: 'ABC News Australia',
+    domain: 'abc.net.au',
+    // Australia's national public broadcaster. Primary source for Australian national
+    // news, politics, and society. Free RSS feed, no paywall.
+    // Gated by well-served country threshold — only activates when API sources
+    // provide fewer than 25 articles for au.
+    url: process.env.ABC_AU_RSS_URL || 'https://www.abc.net.au/news/feed/51120/rss.xml',
+    countries: new Set(['au']),
+  },
+  {
+    name: 'SBS News',
+    domain: 'sbs.com.au',
+    // Australia's multicultural public broadcaster. Covers Australian news with
+    // strong international and multicultural perspectives. Free RSS feed.
+    // TODO: confirm this feed URL is stable — SBS has changed their feed paths before.
+    // Alternative: https://www.sbs.com.au/news/feed
+    url: process.env.SBS_NEWS_RSS_URL || 'https://www.sbs.com.au/news/topic/latest/feed',
+    countries: new Set(['au']),
+  },
+  {
+    name: 'BBC News World',
+    domain: 'bbc.co.uk',
+    // BBC's primary English-language world news RSS feed. One of the most trusted
+    // international sources globally. Applied broadly — the well-served country gate
+    // prevents it from flooding GB/AU results when API sources already cover quota.
+    // TODO: confirm accessible from your production host — BBC occasionally
+    // restricts datacenter IPs. Alternative: https://feeds.bbci.co.uk/news/rss.xml
+    url: process.env.BBC_WORLD_RSS_URL || 'https://feeds.bbci.co.uk/news/world/rss.xml',
+    countries: new Set([
+      'gb', 'au', 'nz', 'ie', 'in', 'za', 'ng', 'ke', 'gh', 'eg', 'pk',
+      'sg', 'my', 'tr', 'il', 'ps', 'ae', 'sa', 'jo', 'lb', 'ua', 'ru',
+      'de', 'fr', 'it', 'es', 'pl', 'br', 'ar', 'mx', 'co', 'cn', 'jp', 'kr',
+    ]),
+  },
+  {
+    name: 'BBC News UK',
+    domain: 'bbc.co.uk',
+    // BBC's dedicated UK domestic news feed. Separate from BBC World so British
+    // users get focused national coverage (politics, devolved nations, economy).
+    // TODO: confirm accessible from your production host.
+    url: process.env.BBC_UK_RSS_URL || 'https://feeds.bbci.co.uk/news/uk/rss.xml',
+    countries: new Set(['gb']),
+  },
+  {
+    name: 'Al Jazeera English',
+    domain: 'aljazeera.com',
+    // Al Jazeera's English-language international feed. Qatar-based; provides
+    // strong coverage of MENA, South Asia, Africa, and global affairs from a
+    // non-Western editorial perspective. Free RSS feed, no paywall.
+    // Note: domain is aljazeera.com (English) — distinct from aljazeera.net (Arabic feed).
+    // TODO: confirm feed URL is accessible from your production host.
+    url: process.env.AJ_ENGLISH_RSS_URL || 'https://www.aljazeera.com/xml/rss/all.xml',
+    countries: new Set([
+      'qa', 'ae', 'sa', 'eg', 'jo', 'lb', 'iq', 'ps', 'il', 'tr',
+      'in', 'pk', 'af', 'id', 'my', 'ng', 'et', 'za', 'ke',
+      'us', 'gb', 'au', 'de', 'fr',
+    ]),
   },
   // ── Middle East ──────────────────────────────────────────────────────────
   {
@@ -1073,6 +1141,26 @@ const RSS_SOURCES = [
     // and regional affairs. Free RSS feed.
     url: process.env.DAILY_SABAH_RSS_URL || 'https://www.dailysabah.com/rssfeed/home',
     countries: new Set(['tr']),
+  },
+  {
+    name: 'Gulf News',
+    domain: 'gulfnews.com',
+    // UAE-based pan-Gulf English-language newspaper. Strong coverage of the UAE,
+    // Saudi Arabia, and broader Gulf Cooperation Council states. Free RSS feed.
+    // TODO: verify this RSS endpoint is accessible from your host — gulfnews.com
+    // has historically restricted non-browser user agents.
+    // Alternative: https://gulfnews.com/rss
+    url: process.env.GULF_NEWS_RSS_URL || 'https://gulfnews.com/tools/rss',
+    countries: new Set(['ae', 'sa', 'kw', 'bh', 'om', 'qa']),
+  },
+  {
+    name: 'Jerusalem Post',
+    domain: 'jpost.com',
+    // Israel's largest English-language newspaper. Comprehensive coverage of
+    // Israeli politics, security, and regional affairs. Complements Times of Israel.
+    // Free RSS feed.
+    url: process.env.JERUSALEM_POST_RSS_URL || 'https://www.jpost.com/rss/rssfeedsheadlines.aspx',
+    countries: new Set(['il', 'ps']),
   },
   // ── Asia ─────────────────────────────────────────────────────────────────
   {
@@ -1149,6 +1237,32 @@ const RSS_SOURCES = [
     countries: new Set(['sg', 'my', 'id', 'ph', 'th', 'vn', 'mm', 'kh', 'bd', 'lk', 'np']),
   },
   {
+    name: 'The Irrawaddy',
+    domain: 'irrawaddy.com',
+    // Independent English-language outlet covering Myanmar politics, human rights,
+    // and society. One of the most credible sources on Myanmar affairs.
+    // Free WordPress RSS feed.
+    url: process.env.IRRAWADDY_RSS_URL || 'https://www.irrawaddy.com/feed',
+    countries: new Set(['mm']),
+  },
+  {
+    name: 'Khmer Times',
+    domain: 'khmertimeskh.com',
+    // Cambodia's leading English-language newspaper. Covers Cambodian politics,
+    // economy, and society. Free WordPress RSS feed.
+    url: process.env.KHMER_TIMES_RSS_URL || 'https://www.khmertimeskh.com/feed/',
+    countries: new Set(['kh']),
+  },
+  {
+    name: 'Kathmandu Post',
+    domain: 'kathmandupost.com',
+    // Nepal's most widely read English-language newspaper. Covers Nepali politics,
+    // economy, and society. Free RSS feed.
+    // TODO: confirm feed URL is accessible from your production host.
+    url: process.env.KATHMANDU_POST_RSS_URL || 'https://kathmandupost.com/rss',
+    countries: new Set(['np']),
+  },
+  {
     name: 'Dawn (Pakistan)',
     domain: 'dawn.com',
     // Pakistan's most widely read English-language newspaper. Covers politics,
@@ -1163,6 +1277,23 @@ const RSS_SOURCES = [
     // and society. Free RSS feed.
     url: process.env.DAILY_STAR_BD_RSS_URL || 'https://www.thedailystar.net/feeds/frontpage',
     countries: new Set(['bd']),
+  },
+  {
+    name: 'The Hindu',
+    domain: 'thehindu.com',
+    // India's leading English-language national newspaper of record. Covers
+    // Indian politics, economy, science, and international affairs. High editorial
+    // quality. Free RSS feed.
+    url: process.env.THE_HINDU_RSS_URL || 'https://www.thehindu.com/news/national/feeder/default.rss',
+    countries: new Set(['in']),
+  },
+  {
+    name: 'Times of India',
+    domain: 'timesofindia.indiatimes.com',
+    // India's largest-circulation English-language newspaper. Broad national
+    // coverage: politics, business, technology, and society. Free RSS feed.
+    url: process.env.TIMES_OF_INDIA_RSS_URL || 'https://timesofindia.indiatimes.com/rssfeedstopstories.cms',
+    countries: new Set(['in']),
   },
   // ── Africa ───────────────────────────────────────────────────────────────
   {
@@ -1196,6 +1327,33 @@ const RSS_SOURCES = [
     // East Africa broadly. Free RSS feed.
     url: process.env.EAST_AFRICAN_RSS_URL || 'https://www.theeastafrican.co.ke/feed',
     countries: new Set(['ke', 'tz', 'ug', 'rw', 'et']),
+  },
+  {
+    name: 'Premium Times',
+    domain: 'premiumtimesng.com',
+    // Nigeria's leading independent investigative journalism outlet. Covers
+    // Nigerian politics, governance, and accountability. Complements BusinessDay
+    // (business-focused) with stronger investigative and political coverage.
+    // Free WordPress RSS feed.
+    url: process.env.PREMIUM_TIMES_RSS_URL || 'https://www.premiumtimesng.com/feed',
+    countries: new Set(['ng']),
+  },
+  {
+    name: 'Addis Standard',
+    domain: 'addisstandard.com',
+    // Ethiopia's leading independent English-language news outlet. Covers Ethiopian
+    // politics, society, and the Horn of Africa region. Free WordPress RSS feed.
+    url: process.env.ADDIS_STANDARD_RSS_URL || 'https://addisstandard.com/feed/',
+    countries: new Set(['et']),
+  },
+  {
+    name: 'New Zimbabwe',
+    domain: 'newzimbabwe.com',
+    // Zimbabwe's independent online news outlet. Covers Zimbabwean politics,
+    // economy, and society. Only dedicated English-language Zimbabwe source
+    // in the registry. Free WordPress RSS feed.
+    url: process.env.NEW_ZIMBABWE_RSS_URL || 'https://www.newzimbabwe.com/feed/',
+    countries: new Set(['zw']),
   },
   // ── Europe (English-language regional outlets) ───────────────────────────
   {
@@ -1285,6 +1443,67 @@ const RSS_SOURCES = [
       'at', 'se', 'dk', 'fi', 'bg', 'hr', 'sk', 'lt', 'lv', 'ee', 'lu', 'ie',
     ]),
   },
+  {
+    name: 'Brussels Times',
+    domain: 'brusselstimes.com',
+    // Belgium's English-language newspaper. Covers Belgian national politics,
+    // EU affairs, and Flemish/Walloon society. Free WordPress RSS feed.
+    url: process.env.BRUSSELS_TIMES_RSS_URL || 'https://www.brusselstimes.com/feed',
+    countries: new Set(['be']),
+  },
+  {
+    name: 'DutchNews.nl',
+    domain: 'dutchnews.nl',
+    // English-language news about the Netherlands. Covers Dutch politics, economy,
+    // and society. Complements the native NOS feed for English-speaking audiences.
+    // Free RSS feed.
+    url: process.env.DUTCH_NEWS_RSS_URL || 'https://www.dutchnews.nl/feed',
+    countries: new Set(['nl']),
+  },
+  {
+    name: 'Ekathimerini',
+    domain: 'ekathimerini.com',
+    // Greece's English-language edition of the Kathimerini newspaper of record.
+    // Covers Greek politics, economy, and society. Free RSS feed.
+    // TODO: confirm accessible from your production host.
+    url: process.env.EKATHIMERINI_RSS_URL || 'https://www.ekathimerini.com/rss',
+    countries: new Set(['gr']),
+  },
+  {
+    name: 'The Baltic Times',
+    domain: 'baltictimes.com',
+    // English-language newspaper covering Estonia, Latvia, and Lithuania.
+    // Only dedicated English-language source for all three Baltic states.
+    // Free RSS feed.
+    url: process.env.BALTIC_TIMES_RSS_URL || 'https://www.baltictimes.com/rss/news/',
+    countries: new Set(['lt', 'lv', 'ee']),
+  },
+  {
+    name: 'Hungary Today',
+    domain: 'hungarytoday.hu',
+    // Hungary's English-language news outlet. Covers Hungarian politics, society,
+    // and Central European affairs. Complements Kyiv Independent's incidental
+    // Hungary coverage with dedicated Hungarian reporting. Free WordPress RSS feed.
+    url: process.env.HUNGARY_TODAY_RSS_URL || 'https://hungarytoday.hu/feed/',
+    countries: new Set(['hu']),
+  },
+  {
+    name: 'Romania Insider',
+    domain: 'romania-insider.com',
+    // English-language news and lifestyle outlet covering Romania. Covers Romanian
+    // politics, business, and society. Free WordPress RSS feed.
+    url: process.env.ROMANIA_INSIDER_RSS_URL || 'https://www.romania-insider.com/feed',
+    countries: new Set(['ro']),
+  },
+  {
+    name: 'CPH Post',
+    domain: 'cphpost.dk',
+    // Copenhagen's English-language newspaper. Covers Danish politics, society,
+    // and Scandinavian affairs. Only dedicated English-language Danish source
+    // in the registry. Free RSS feed.
+    url: process.env.CPH_POST_RSS_URL || 'https://cphpost.dk/?format=feed&type=rss',
+    countries: new Set(['dk']),
+  },
   // ── Americas (supplemental regional) ────────────────────────────────────
   {
     name: 'Tico Times',
@@ -1301,6 +1520,25 @@ const RSS_SOURCES = [
     // and economy. Free RSS feed.
     url: process.env.COLOMBIA_REPORTS_RSS_URL || 'https://colombiareports.com/feed/',
     countries: new Set(['co', 've', 'ec']),
+  },
+  {
+    name: 'Chile Today',
+    domain: 'chiletoday.cl',
+    // Chile's English-language news outlet. Covers Chilean politics, economy,
+    // and society. Provides Chile-specific coverage that MercoPress (pan-regional)
+    // only partially delivers. Free WordPress RSS feed.
+    url: process.env.CHILE_TODAY_RSS_URL || 'https://chiletoday.cl/feed/',
+    countries: new Set(['cl']),
+  },
+  {
+    name: 'Caribbean Journal',
+    domain: 'caribjournal.com',
+    // English-language news outlet covering the Caribbean basin. Covers Dominican
+    // Republic, Cuba, Jamaica, Trinidad, Barbados, Bahamas, Haiti, and island
+    // nations not covered by Tico Times (Central America-focused).
+    // Free WordPress RSS feed.
+    url: process.env.CARIBBEAN_JOURNAL_RSS_URL || 'https://www.caribjournal.com/feed/',
+    countries: new Set(['do', 'cu', 'jm', 'tt', 'bb', 'bs', 'ht', 'pr']),
   },
   // ── Non-English native-language feeds ───────────────────────────────────
   // These feeds are in the local language of the country they serve.
@@ -1493,6 +1731,7 @@ const SOURCE_AUTHORITY_TIER = {
   'bangkokpost.com': 2, 'timesofisrael.com': 2, 'arabnews.com': 2,
   'middleeasteye.net': 2, 'dailysabah.com': 2, 'euractiv.com': 2,
   'kyivindependent.com': 2, 'theeastafrican.co.ke': 2, 'nation.africa': 2,
+  'jpost.com': 2, 'gulfnews.com': 2, 'irrawaddy.com': 2, 'sbs.com.au': 2,
   // Politics specialists
   'thehill.com': 2, 'axios.com': 2, 'foreignpolicy.com': 2,
   // Tier 1 — quality regionals (default tier, listed explicitly for clarity)
@@ -1506,6 +1745,11 @@ const SOURCE_AUTHORITY_TIER = {
   'thelocal.it': 1, 'thelocal.no': 1,
   'vietnamnews.vn': 1, 'thedailystar.net': 1, 'ticotimes.net': 1,
   'colombiareports.com': 1, 'swissinfo.ch': 1,
+  'khmertimeskh.com': 1, 'kathmandupost.com': 1,
+  'premiumtimesng.com': 1, 'addisstandard.com': 1, 'newzimbabwe.com': 1,
+  'brusselstimes.com': 1, 'ekathimerini.com': 1, 'baltictimes.com': 1,
+  'hungarytoday.hu': 1, 'romania-insider.com': 1, 'cphpost.dk': 1,
+  'chiletoday.cl': 1, 'caribjournal.com': 1,
 };
 
 // Normalise a source name or URL to a domain key for tier lookup
