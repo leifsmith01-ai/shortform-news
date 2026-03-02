@@ -51,6 +51,7 @@ const COUNTRY_NAMES: Record<string, string> = {
 };
 
 const CATEGORY_NAMES = {
+  all: 'All',
   'health-tech-science': 'Health, Tech and Science', business: 'Business',
   sports: 'Sports', entertainment: 'Entertainment (Music, film, tv and gaming)',
   politics: 'Politics', world: 'World'

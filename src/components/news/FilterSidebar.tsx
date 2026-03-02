@@ -148,6 +148,7 @@ const COUNTRIES_BY_CONTINENT = {
 };
 
 const CATEGORIES = [
+  { id: 'all', name: 'All', icon: '📰' },
   { id: 'health-tech-science', name: 'Health, Tech and Science', icon: '🧬' },
   { id: 'business', name: 'Business', icon: '📈' },
   { id: 'sports', name: 'Sports', icon: '⚽' },
@@ -261,11 +262,15 @@ export default function FilterSidebar({
   };
 
   const toggleCategory = (id) => {
-    setSelectedCategories(prev =>
-      prev.includes(id)
-        ? prev.filter(c => c !== id)
-        : [...prev, id]
-    );
+    setSelectedCategories(prev => {
+      if (id === 'all') {
+        return prev.includes('all') ? prev.filter(c => c !== 'all') : ['all'];
+      }
+      const withoutAll = prev.filter(c => c !== 'all');
+      return withoutAll.includes(id)
+        ? withoutAll.filter(c => c !== id)
+        : [...withoutAll, id];
+    });
   };
 
   const allSourcesSelected = !selectedSources || selectedSources.length === 0 || selectedSources.length === ALL_SOURCE_DOMAINS.length;
