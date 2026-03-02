@@ -7,16 +7,27 @@
 -- at runtime as:  auth.jwt() ->> 'sub'
 --
 -- Setup required (one-time, outside this migration):
---   1. In Clerk Dashboard → JWT Templates → create a "Supabase" template.
---   2. In your Supabase project → Authentication → JWT Secret, add the
---      Clerk signing secret so Supabase can verify Clerk-issued JWTs.
---   3. Pass the Clerk session token to the Supabase client:
---        supabase.auth.setSession({ access_token: clerkToken, refresh_token: '' })
---      (or use the Clerk useSession hook + supabase.realtime.setAuth()).
+--   1. Clerk Dashboard → Configure → JWT Templates → Create template named exactly "supabase"
+--      - Claims: { "sub": "{{user.id}}", "role": "authenticated" }
+--      - Leave algorithm as RS256 (default)
+--      - Note the JWKS URL shown in the template editor
+--
+--   2. Supabase Dashboard → Authentication → Sign In / Up → Third-party auth
+--      - Click "Add provider" → select Clerk
+--      - Enter your Clerk JWKS endpoint:
+--          https://<your-clerk-domain>/.well-known/jwks.json
+--        (your-clerk-domain is shown in Clerk Dashboard → Domains)
+--
+--   3. The client-side code already handles token injection (see src/App.tsx).
 
 -- ─── reading_history ─────────────────────────────────────────────────────────
 
 ALTER TABLE public.reading_history ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies so this migration is idempotent (safe to re-run)
+DROP POLICY IF EXISTS "Users can read own reading_history" ON public.reading_history;
+DROP POLICY IF EXISTS "Users can insert own reading_history" ON public.reading_history;
+DROP POLICY IF EXISTS "Users can delete own reading_history" ON public.reading_history;
 
 -- Users can read their own history
 CREATE POLICY "Users can read own reading_history"
@@ -40,6 +51,11 @@ CREATE POLICY "Users can delete own reading_history"
 
 ALTER TABLE public.tracked_keywords ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies so this migration is idempotent (safe to re-run)
+DROP POLICY IF EXISTS "Users can read own tracked_keywords" ON public.tracked_keywords;
+DROP POLICY IF EXISTS "Users can insert own tracked_keywords" ON public.tracked_keywords;
+DROP POLICY IF EXISTS "Users can delete own tracked_keywords" ON public.tracked_keywords;
+
 CREATE POLICY "Users can read own tracked_keywords"
   ON public.tracked_keywords
   FOR SELECT
@@ -58,6 +74,12 @@ CREATE POLICY "Users can delete own tracked_keywords"
 -- ─── article_reactions ───────────────────────────────────────────────────────
 
 ALTER TABLE public.article_reactions ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies so this migration is idempotent (safe to re-run)
+DROP POLICY IF EXISTS "Users can read own article_reactions" ON public.article_reactions;
+DROP POLICY IF EXISTS "Users can upsert own article_reactions" ON public.article_reactions;
+DROP POLICY IF EXISTS "Users can update own article_reactions" ON public.article_reactions;
+DROP POLICY IF EXISTS "Users can delete own article_reactions" ON public.article_reactions;
 
 CREATE POLICY "Users can read own article_reactions"
   ON public.article_reactions
