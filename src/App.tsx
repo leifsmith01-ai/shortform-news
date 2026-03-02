@@ -161,21 +161,16 @@ export default function App() {
           </Layout>
         } />
 
-        {/* Auth-required routes — saving and history need a user ID */}
         <Route path="/saved" element={
-          <ProtectedRoute>
-            <Layout currentPageName="/saved">
-              <SavedArticles />
-            </Layout>
-          </ProtectedRoute>
+          <Layout currentPageName="/saved">
+            <SavedArticles />
+          </Layout>
         } />
 
         <Route path="/history" element={
-          <ProtectedRoute>
-            <Layout currentPageName="/history">
-              <History />
-            </Layout>
-          </ProtectedRoute>
+          <Layout currentPageName="/history">
+            <History />
+          </Layout>
         } />
       </Routes>
       </Suspense>

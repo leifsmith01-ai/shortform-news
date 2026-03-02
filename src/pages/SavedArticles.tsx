@@ -1,5 +1,5 @@
 import React, { useContext, useState, useEffect } from 'react';
-import { Bookmark, Trash2, Filter } from 'lucide-react';
+import { Bookmark, Trash2, Filter, Lock, LogIn } from 'lucide-react';
 import { ApiReadyContext } from '@/App';
 import { useCountUp } from '@/hooks/useCountUp';
 import { Button } from "@/components/ui/button";
@@ -9,20 +9,23 @@ import LoadingCard from '@/components/news/LoadingCard';
 import AdUnit from '@/components/AdUnit';
 import api from '@/api';
 import { toast } from 'sonner';
+import { useUser } from '@clerk/clerk-react';
+import { Link } from 'react-router-dom';
 
 export default function SavedArticles() {
   const apiReady = useContext(ApiReadyContext);
+  const { isSignedIn, isLoaded } = useUser();
   const [savedArticles, setSavedArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState('all');
 
   useEffect(() => {
-    if (!apiReady) {
-      setLoading(true);
+    if (!apiReady || !isSignedIn) {
+      setLoading(false);
       return;
     }
     loadSavedArticles();
-  }, [apiReady]);
+  }, [apiReady, isSignedIn]);
 
   const loadSavedArticles = async () => {
     setLoading(true);
@@ -66,12 +69,14 @@ export default function SavedArticles() {
             <div>
               <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100">Saved Articles</h1>
               <p className="text-sm text-stone-500 dark:text-slate-400">
-                {animatedCount} saved {savedArticles.length === 1 ? 'article' : 'articles'}
+                {isLoaded && isSignedIn
+                  ? `${animatedCount} saved ${savedArticles.length === 1 ? 'article' : 'articles'}`
+                  : 'Sign in to view your saved articles'}
               </p>
             </div>
           </div>
 
-          {savedArticles.length > 0 && (
+          {isSignedIn && savedArticles.length > 0 && (
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-stone-400" />
               <select
@@ -99,46 +104,81 @@ export default function SavedArticles() {
         />
       </div>
 
-      {/* Content */}
-      <ScrollArea className="flex-1">
-        <div className="p-4 lg:p-8">
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <LoadingCard key={i} />
-              ))}
-            </div>
-          ) : filteredArticles.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {filteredArticles.map((article, index) => (
-                <div key={article.id || index} className="relative">
-                  <NewsCard article={article} index={index} rank={index + 1} />
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="absolute top-2 right-2 z-20"
-                    onClick={() => handleDelete(article.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
-              <div className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6">
-                <Bookmark className="w-10 h-10 text-stone-400 dark:text-slate-500" />
+      {/* Body */}
+      {isLoaded && !isSignedIn ? (
+        <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
+          {/* Login suggestion sidebar */}
+          <aside className="w-full lg:w-72 flex-shrink-0 bg-white dark:bg-slate-800 border-b lg:border-b-0 lg:border-r border-stone-200 dark:border-slate-700 flex flex-col">
+            <div className="p-4 flex flex-col items-center justify-center py-10 text-center">
+              <div className="w-12 h-12 rounded-full bg-stone-100 dark:bg-slate-700 flex items-center justify-center mb-3 hidden lg:flex">
+                <Lock className="w-5 h-5 text-stone-400 dark:text-slate-500" />
               </div>
-              <h3 className="text-xl font-semibold text-stone-800 dark:text-stone-100 mb-2">
-                No saved articles yet
-              </h3>
-              <p className="text-stone-500 dark:text-slate-400 max-w-sm">
-                Articles you bookmark will appear here for easy access later.
-              </p>
+              <p className="text-sm text-stone-500 dark:text-slate-400 font-medium mb-1">Sign in to get started</p>
+              <p className="text-xs text-stone-400 dark:text-slate-500 mb-4 hidden lg:block">Save articles to revisit them anytime.</p>
+              <Link to="/sign-in">
+                <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white gap-2 h-8 text-xs">
+                  <LogIn className="w-3.5 h-3.5" />
+                  Sign In
+                </Button>
+              </Link>
             </div>
-          )}
+          </aside>
+
+          {/* Empty state */}
+          <div className="flex-1 flex flex-col items-center justify-center text-center px-6 min-h-[400px]">
+            <div className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6">
+              <Bookmark className="w-10 h-10 text-stone-400 dark:text-slate-500" />
+            </div>
+            <h3 className="text-xl font-semibold text-stone-800 dark:text-stone-100 mb-2">
+              No saved articles yet
+            </h3>
+            <p className="text-stone-500 dark:text-slate-400 max-w-sm">
+              Articles you bookmark will appear here for easy access later.
+            </p>
+          </div>
         </div>
-      </ScrollArea>
+      ) : (
+        /* Content for signed-in users */
+        <ScrollArea className="flex-1">
+          <div className="p-4 lg:p-8">
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <LoadingCard key={i} />
+                ))}
+              </div>
+            ) : filteredArticles.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {filteredArticles.map((article, index) => (
+                  <div key={article.id || index} className="relative">
+                    <NewsCard article={article} index={index} rank={index + 1} />
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="absolute top-2 right-2 z-20"
+                      onClick={() => handleDelete(article.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
+                <div className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6">
+                  <Bookmark className="w-10 h-10 text-stone-400 dark:text-slate-500" />
+                </div>
+                <h3 className="text-xl font-semibold text-stone-800 dark:text-stone-100 mb-2">
+                  No saved articles yet
+                </h3>
+                <p className="text-stone-500 dark:text-slate-400 max-w-sm">
+                  Articles you bookmark will appear here for easy access later.
+                </p>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      )}
     </div>
   );
 }
