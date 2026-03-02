@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { Sparkles, BookOpen } from 'lucide-react'
+import React, { useContext, useState, useEffect } from 'react'
+import { Sparkles, BookOpen, Lock, LogIn } from 'lucide-react'
 import { useCountUp } from '@/hooks/useCountUp'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,8 @@ import NewsCard from '@/components/news/NewsCard'
 import LoadingCard from '@/components/news/LoadingCard'
 import { toast } from 'sonner'
 import api from '@/api'
+import { ApiReadyContext } from '@/App'
+import { useUser } from '@clerk/clerk-react'
 
 const COUNTRY_NAMES: Record<string, string> = {
   us: 'US', gb: 'UK', ca: 'Canada', au: 'Australia', de: 'Germany',
@@ -77,6 +79,8 @@ function computeTopCombos(
 }
 
 export default function Personalized() {
+  const apiReady = useContext(ApiReadyContext)
+  const { isSignedIn, isLoaded } = useUser()
   const [articles, setArticles] = useState<any[]>([])
   const [topCombos, setTopCombos] = useState<Combo[]>([])
   const [historyCount, setHistoryCount] = useState(0)
@@ -85,6 +89,10 @@ export default function Personalized() {
   const [noHistory, setNoHistory] = useState(false)
 
   useEffect(() => {
+    if (!apiReady || !isSignedIn) {
+      setLoading(false)
+      return
+    }
     async function load() {
       setLoading(true)
       try {
@@ -144,7 +152,7 @@ export default function Personalized() {
     }
 
     load()
-  }, [])
+  }, [apiReady, isSignedIn])
 
   const animatedHistoryCount = useCountUp(historyCount);
   const animatedLikedCount = useCountUp(likedCount);
@@ -160,12 +168,14 @@ export default function Personalized() {
             <div>
               <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100">For You</h1>
               <p className="text-sm text-stone-500 dark:text-slate-400">
-                {historyCount > 0 || likedCount > 0
-                  ? [
-                      historyCount > 0 && `${animatedHistoryCount} article${historyCount !== 1 ? 's' : ''} read`,
-                      likedCount > 0 && `${animatedLikedCount} liked`,
-                    ].filter(Boolean).join(' · ')
-                  : 'Your personalised feed'}
+                {isLoaded && !isSignedIn
+                  ? 'Sign in to build your personalised feed'
+                  : historyCount > 0 || likedCount > 0
+                    ? [
+                        historyCount > 0 && `${animatedHistoryCount} article${historyCount !== 1 ? 's' : ''} read`,
+                        likedCount > 0 && `${animatedLikedCount} liked`,
+                      ].filter(Boolean).join(' · ')
+                    : 'Your personalised feed'}
               </p>
             </div>
           </div>
@@ -185,6 +195,39 @@ export default function Personalized() {
         </div>
       </header>
 
+      {isLoaded && !isSignedIn ? (
+        <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
+          {/* Sign-in suggestion sidebar */}
+          <aside className="w-full lg:w-72 flex-shrink-0 bg-white dark:bg-slate-800 border-b lg:border-b-0 lg:border-r border-stone-200 dark:border-slate-700 flex flex-col">
+            <div className="p-4 flex flex-col items-center justify-center py-10 text-center">
+              <div className="w-12 h-12 rounded-full bg-stone-100 dark:bg-slate-700 flex items-center justify-center mb-3 hidden lg:flex">
+                <Lock className="w-5 h-5 text-stone-400 dark:text-slate-500" />
+              </div>
+              <p className="text-sm text-stone-500 dark:text-slate-400 font-medium mb-1">Sign in to get started</p>
+              <p className="text-xs text-stone-400 dark:text-slate-500 mb-4 hidden lg:block">Get a personalised feed based on what you read and like.</p>
+              <Link to="/sign-in">
+                <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white gap-2 h-8 text-xs">
+                  <LogIn className="w-3.5 h-3.5" />
+                  Sign In
+                </Button>
+              </Link>
+            </div>
+          </aside>
+
+          {/* Empty state */}
+          <div className="flex-1 flex flex-col items-center justify-center text-center px-6 min-h-[400px]">
+            <div className="w-20 h-20 rounded-2xl bg-stone-200 dark:bg-slate-700 flex items-center justify-center mb-6">
+              <Sparkles className="w-10 h-10 text-stone-400 dark:text-slate-500" />
+            </div>
+            <h3 className="text-xl font-semibold text-stone-800 dark:text-stone-100 mb-2">
+              Your personalised feed awaits
+            </h3>
+            <p className="text-stone-500 dark:text-slate-400 max-w-sm">
+              Sign in and start reading articles — we'll build a feed tailored to your interests.
+            </p>
+          </div>
+        </div>
+      ) : (
       <ScrollArea className="flex-1">
         <div className="p-4 lg:p-8">
           {loading ? (
@@ -223,6 +266,7 @@ export default function Personalized() {
           )}
         </div>
       </ScrollArea>
+      )}
     </div>
   )
 }
