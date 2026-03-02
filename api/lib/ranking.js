@@ -33,6 +33,8 @@ const SOURCE_AUTHORITY_TIER = {
   'dailymaverick.co.za': 2, 'koreaherald.com': 2, 'channelnewsasia.com': 2,
   'kyivindependent.com': 2, 'timesofisrael.com': 2, 'arabnews.com': 2,
   'thenationalnews.com': 2, 'bangkokpost.com': 2, 'mercopress.com': 2,
+  // Politics specialists — elevated to Tier 2 for their topical depth
+  'thehill.com': 2, 'axios.com': 2, 'foreignpolicy.com': 2,
   // Non-English RSS feeds — native-language outlets
   'lemonde.fr': 2, 'elpais.com': 2, 'spiegel.de': 2,
   'ansa.it': 2, 'yna.co.kr': 2, 'nos.nl': 2, 'nhk.or.jp': 2,
@@ -56,6 +58,24 @@ export function getSourceTier(article) {
   const domain = getSourceDomain(article);
   return SOURCE_AUTHORITY_TIER[domain] || 1;
 }
+
+// ── Category-source affinity ───────────────────────────────────────────────
+// Sources with strong topical specialization get a modest catScore bonus when
+// ranking articles in their specialty category. This lets politics-focused
+// outlets surface above generalist Tier-2 sources on borderline stories.
+const CATEGORY_SOURCE_AFFINITY = {
+  politics: new Set([
+    'politico.com', 'politico.eu', 'thehill.com', 'axios.com',
+    'foreignpolicy.com', 'foreignaffairs.com', 'euractiv.com',
+  ]),
+  business: new Set([
+    'bloomberg.com', 'ft.com', 'economist.com', 'wsj.com',
+  ]),
+  technology: new Set([
+    'arstechnica.com', 'wired.com', 'techcrunch.com', 'theverge.com',
+  ]),
+  sports: new Set(['espn.com']),
+};
 
 // ── Stop words ────────────────────────────────────────────────────────────
 const STOP_WORDS = new Set([
@@ -128,6 +148,13 @@ function categoryRelevanceScore(article, category) {
   for (const kw of catKeywords.weak) {
     if (text.includes(kw)) { score += 1; if (title.includes(kw)) score += 0.5; }
   }
+
+  // Source-category affinity: give a modest bonus to outlets with strong
+  // topical specialization (e.g. Politico for politics, FT for business).
+  // Equivalent to ~0.75 of one weak keyword hit on the 0–1 scale.
+  const affinitySet = CATEGORY_SOURCE_AFFINITY[category];
+  if (affinitySet && affinitySet.has(getSourceDomain(article))) score += 1.5;
+
   return Math.min(score / 8, 1);
 }
 
@@ -304,13 +331,15 @@ export function rankAndDeduplicateArticles(articles, {
   // Weight table — effective max points = weight × signal_max:
   //   Keyword mode: precision matters most, freshness reduced
   //   Popularity mode: cross-source coverage + authority drive the Trending feed
-  //   Normal (home) mode: country + category relevance raised to compete fairly
-  //     with freshness (was 3.0 freshness dominating; now 2.0 to level the field)
+  //   Normal (home) mode: freshness removed — the date-window filter already
+  //     ensures all articles are recent, so re-ranking by recency within the
+  //     window unfairly demotes important older stories. Authority and coverage
+  //     are better proxies for importance; freed weight is redistributed to them.
   const W = keywordMode
     ? { freshness: 1.0, authority: 1.5, coverage: 1.5, cat: 1.0, depth: 0.5, countryRel: 3.0, kwRel: 5.0 }
     : usePopularity
       ? { freshness: 1.0, authority: 2.5, coverage: 3.0, cat: 1.5, depth: 1.0, countryRel: 2.0, kwRel: hasKeywordSearch ? 2.5 : 0 }
-      : { freshness: 2.0, authority: 1.5, coverage: 1.5, cat: 2.5, depth: 1.0, countryRel: 2.5, kwRel: hasKeywordSearch ? 2.5 : 0 };
+      : { freshness: 0, authority: 2.0, coverage: 2.0, cat: 2.5, depth: 1.0, countryRel: 2.5, kwRel: hasKeywordSearch ? 2.5 : 0 };
 
   for (const s of scored) {
     const { authority, coverage, freshness, depth, catScore, countryRelScore, kwRelevanceScore } = s.signals;
