@@ -36,6 +36,8 @@ const API_DAILY_LIMITS = {
   newsdata: parseInt(process.env.NEWSDATA_DAILY_LIMIT || '200', 10),
   guardian: parseInt(process.env.GUARDIAN_DAILY_LIMIT || '5000', 10),
   gnews: parseInt(process.env.GNEWS_DAILY_LIMIT || '100', 10),
+  mediastack: parseInt(process.env.MEDIASTACK_DAILY_LIMIT || '16', 10),  // ~500/month free
+  currents: parseInt(process.env.CURRENTS_DAILY_LIMIT || '600', 10),     // 600/day free
 };
 const API_DAILY_COUNTERS = {};
 
@@ -1227,6 +1229,122 @@ const RSS_SOURCES = [
     url: process.env.COLOMBIA_REPORTS_RSS_URL || 'https://colombiareports.com/feed/',
     countries: new Set(['co', 've', 'ec']),
   },
+  // ── Non-English native-language feeds ───────────────────────────────────
+  // These feeds are in the local language of the country they serve.
+  // Articles are automatically shown for non-English-primary countries
+  // (showNonEnglish is forced true for all countries outside ENGLISH_PRIMARY_COUNTRIES).
+  // Each feed carries a `language` field so formatRSSArticle can tag articles correctly.
+  {
+    name: 'Spiegel Online',
+    domain: 'spiegel.de',
+    language: 'de',
+    // Germany's largest news magazine. Broad national and international coverage.
+    url: process.env.SPIEGEL_RSS_URL || 'https://www.spiegel.de/schlagzeilen/index.rss',
+    countries: new Set(['de', 'at', 'ch']),
+  },
+  {
+    name: 'Le Monde',
+    domain: 'lemonde.fr',
+    language: 'fr',
+    // France's newspaper of record. Covers French politics, economy, and world affairs.
+    url: process.env.LEMONDE_RSS_URL || 'https://www.lemonde.fr/rss/une.xml',
+    countries: new Set(['fr', 'be', 'ch']),
+  },
+  {
+    name: 'El País',
+    domain: 'elpais.com',
+    language: 'es',
+    // Spain's leading daily newspaper. Covers Spanish and Latin American affairs.
+    url: process.env.ELPAIS_RSS_URL || 'https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada',
+    countries: new Set(['es']),
+  },
+  {
+    name: 'Folha de S.Paulo',
+    domain: 'folha.uol.com.br',
+    language: 'pt',
+    // Brazil's largest daily newspaper. Covers Brazilian politics, economy, and society.
+    url: process.env.FOLHA_RSS_URL || 'https://feeds.folha.com/folha/mundo/rss091.xml',
+    countries: new Set(['br']),
+  },
+  {
+    name: 'RTP Notícias',
+    domain: 'rtp.pt',
+    language: 'pt',
+    // Portugal's public broadcaster. Covers Portuguese news and Lusophone world affairs.
+    url: process.env.RTP_RSS_URL || 'https://www.rtp.pt/noticias/?format=feed&type=rss',
+    countries: new Set(['pt']),
+  },
+  {
+    name: 'BBC Arabic',
+    domain: 'bbc.co.uk',
+    language: 'ar',
+    // BBC's Arabic-language service. Trusted source for Arabic-speaking audiences
+    // across the Middle East and North Africa.
+    url: process.env.BBC_ARABIC_RSS_URL || 'https://feeds.bbci.co.uk/arabic/rss.xml',
+    countries: new Set(['sa', 'ae', 'eg', 'dz', 'ma', 'tn', 'lb', 'jo', 'iq', 'ps', 'kw', 'qa', 'bh', 'om', 'ly', 'sd', 'sy', 'ye']),
+  },
+  {
+    name: 'Al Jazeera Arabic',
+    domain: 'aljazeera.net',
+    language: 'ar',
+    // Al Jazeera's Arabic-language feed. Qatar-based; broad coverage of Arab world news.
+    // TODO: confirm feed URL is accessible from your host. Alternative:
+    //   https://www.aljazeera.net/aljazeeraxml/mritems/htmlfiles/rss20.xml
+    url: process.env.AJ_ARABIC_RSS_URL || 'https://www.aljazeera.net/xmlrssfeeds/mritems/htmlfiles/rss20.xml',
+    countries: new Set(['sa', 'ae', 'eg', 'dz', 'ma', 'tn', 'lb', 'jo', 'iq', 'ps', 'kw', 'qa', 'bh', 'om', 'ly', 'sd', 'sy', 'ye']),
+  },
+  {
+    name: 'NHK News (Japanese)',
+    domain: 'nhk.or.jp',
+    language: 'ja',
+    // NHK public broadcaster Japanese-language news. Supplements the existing
+    // NHK World English feed with native Japanese content.
+    url: process.env.NHK_JP_RSS_URL || 'https://www.nhk.or.jp/rss/news/cat0.xml',
+    countries: new Set(['jp']),
+  },
+  {
+    name: 'Yonhap News',
+    domain: 'yna.co.kr',
+    language: 'ko',
+    // South Korea's national news agency. Comprehensive Korean-language coverage
+    // of Korean and international affairs.
+    // TODO: confirm feed URL is accessible from your host.
+    url: process.env.YONHAP_RSS_URL || 'https://www.yna.co.kr/RSS/headline.xml',
+    countries: new Set(['kr']),
+  },
+  {
+    name: 'Meduza (Russian)',
+    domain: 'meduza.io',
+    language: 'ru',
+    // Meduza's Russian-language feed. Independent exile outlet covering Russia and
+    // post-Soviet states. Complements the existing English Meduza feed.
+    url: process.env.MEDUZA_RU_RSS_URL || 'https://meduza.io/rss/ru/all',
+    countries: new Set(['ru', 'by', 'kz']),
+  },
+  {
+    name: 'NOS Nieuws',
+    domain: 'nos.nl',
+    language: 'nl',
+    // Dutch public broadcaster. Covers Netherlands politics, economy, and world news.
+    url: process.env.NOS_RSS_URL || 'https://feeds.nos.nl/nosnieuws',
+    countries: new Set(['nl', 'be']),
+  },
+  {
+    name: 'ANSA',
+    domain: 'ansa.it',
+    language: 'it',
+    // Italy's national news agency. Comprehensive Italian-language wire coverage.
+    url: process.env.ANSA_RSS_URL || 'https://www.ansa.it/sito/notizie/top/top_rss.xml',
+    countries: new Set(['it']),
+  },
+  {
+    name: 'TVN24',
+    domain: 'tvn24.pl',
+    language: 'pl',
+    // Poland's leading independent TV news channel. Covers Polish politics and society.
+    url: process.env.TVN24_RSS_URL || 'https://tvn24.pl/najnowsze.xml',
+    countries: new Set(['pl']),
+  },
 ];
 
 // Countries already well-served by targeted API sources (NewsAPI top-headlines,
@@ -1894,6 +2012,106 @@ async function fetchFromGNews(country, category, apiKey, opts = {}) {
   const data = await response.json();
   if (data.errors) throw new Error(`GNews error: ${JSON.stringify(data.errors)}`);
   return data.articles || [];
+}
+
+// Helper: fetch from MediaStack API
+// Free tier: ~500 req/month (~16/day). To conserve quota, only call this when
+// showNonEnglish=true and the country is not in RSS_WELL_SERVED_COUNTRIES.
+// MediaStack natively supports multiple languages in one call, making it
+// well-suited for non-English coverage gaps.
+// Docs: https://mediastack.com/documentation
+async function fetchFromMediaStack(country, category, apiKey, opts = {}) {
+  const MEDIASTACK_CATEGORY_MAP = {
+    business: 'business', technology: 'technology', sports: 'sports',
+    science: 'science', health: 'health', gaming: 'entertainment',
+    film: 'entertainment', tv: 'entertainment', politics: 'general',
+    world: 'general',
+  };
+  const params = new URLSearchParams({
+    access_key: apiKey,
+    sort: 'published_desc',
+    limit: '50',
+  });
+  const msCategory = MEDIASTACK_CATEGORY_MAP[category] || 'general';
+  params.set('categories', msCategory);
+  if (country !== 'world') params.set('countries', country);
+  if (opts.from) params.set('date', `${opts.from.split('T')[0]},`); // "YYYY-MM-DD," = from date onwards
+  const url = `https://api.mediastack.com/v1/news?${params}`;
+  const response = await fetchWithTimeout(url);
+  if (!response.ok) throw new Error(`MediaStack error: ${response.status}`);
+  const data = await response.json();
+  if (data.error) throw new Error(`MediaStack error: ${JSON.stringify(data.error)}`);
+  return data.data || [];
+}
+
+function formatMediaStackArticle(article, country, category) {
+  const sourceUrl = article.url || '#';
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    title: article.title || 'No title',
+    description: article.description || '',
+    content: article.description || '',
+    url: sourceUrl,
+    image_url: article.image || null,
+    source: article.source || 'MediaStack',
+    publishedAt: article.published_at || new Date().toISOString(),
+    time_ago: timeAgo(article.published_at),
+    country, category,
+    language: article.language || 'en',
+    summary_points: null,
+    _meta: {
+      sourceCountry: article.country || inferCountryFromUrl(sourceUrl),
+    },
+  };
+}
+
+// Helper: fetch from Currents API
+// Free tier: 600 req/day. Supports country + language filtering.
+// Positioned after NewsData.io and before Guardian as a general fallback.
+// Docs: https://currentsapi.services/en/docs/
+async function fetchFromCurrentsAPI(country, category, apiKey, opts = {}) {
+  const CURRENTS_CATEGORY_MAP = {
+    business: 'business', technology: 'technology', sports: 'sports',
+    science: 'science', health: 'health', gaming: 'entertainment',
+    film: 'entertainment', tv: 'entertainment', politics: 'politics',
+    world: 'world news',
+  };
+  const params = new URLSearchParams({
+    apiKey,
+    page_size: '30',
+  });
+  const currentsCategory = CURRENTS_CATEGORY_MAP[category];
+  if (currentsCategory) params.set('category', currentsCategory);
+  if (country !== 'world') params.set('country', country.toUpperCase());
+  if (!opts.showNonEnglish) params.set('language', 'en');
+  if (opts.from) params.set('start_date', opts.from);
+  const url = `https://api.currentsapi.services/v1/latest-news?${params}`;
+  const response = await fetchWithTimeout(url);
+  if (!response.ok) throw new Error(`CurrentsAPI error: ${response.status}`);
+  const data = await response.json();
+  if (data.status && data.status !== 'ok') throw new Error(`CurrentsAPI error: ${data.message || data.status}`);
+  return data.news || [];
+}
+
+function formatCurrentsAPIArticle(article, country, category) {
+  const sourceUrl = article.url || '#';
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    title: article.title || 'No title',
+    description: article.description || '',
+    content: article.description || '',
+    url: sourceUrl,
+    image_url: article.image || null,
+    source: article.author || 'Currents API',
+    publishedAt: article.published || new Date().toISOString(),
+    time_ago: timeAgo(article.published),
+    country, category,
+    language: article.language || 'en',
+    summary_points: null,
+    _meta: {
+      sourceCountry: inferCountryFromUrl(sourceUrl),
+    },
+  };
 }
 
 // ── RSS support ───────────────────────────────────────────────────────────
@@ -2808,6 +3026,7 @@ export default async function handler(req, res) {
   const { valid: envValid } = validateEnv(res, {
     required: ['NEWS_API_KEY'],
     optional: ['GUARDIAN_API_KEY', 'WORLD_NEWS_API_KEY', 'NEWS_DATA_API_KEY', 'GNEWS_API_KEY',
+      'MEDIASTACK_API_KEY', 'CURRENTS_API_KEY',
       'GEMINI_API_KEY', 'GROQ_API_KEY', 'OPENAI_API_KEY', 'COHERE_API_KEY',
       'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'],
   });
@@ -2843,6 +3062,8 @@ export default async function handler(req, res) {
   const WORLD_NEWS_API_KEY = process.env.WORLD_NEWS_API_KEY || null;
   const NEWS_DATA_API_KEY = process.env.NEWS_DATA_API_KEY || null;
   const GNEWS_API_KEY = process.env.GNEWS_API_KEY || null;
+  const MEDIASTACK_API_KEY = process.env.MEDIASTACK_API_KEY || null;
+  const CURRENTS_API_KEY = process.env.CURRENTS_API_KEY || null;
   const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || null;
   const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || null;
 
@@ -3140,7 +3361,14 @@ export default async function handler(req, res) {
         .then(raw => raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com').map(a => formatNewsAPIArticle(a, 'world', 'trending')))
         .catch(err => { console.error('  Trending NewsAPI failed:', err.message); return []; });
 
-      // Guardian fallback when NewsAPI returns too few results
+      // Currents API fallback before Guardian for trending — 600/day vs Guardian's 5000
+      if (trendingArticles.length < 10 && CURRENTS_API_KEY) {
+        console.log('  Trending Currents API fallback');
+        incrementApiCounter('currents');
+        const cRaw = await fetchFromCurrentsAPI('world', 'world', CURRENTS_API_KEY, {}).catch(err => { console.error('  Trending Currents failed:', err.message); return []; });
+        trendingArticles = [...trendingArticles, ...cRaw.filter(a => a.title).map(a => formatCurrentsAPIArticle(a, 'world', 'trending'))];
+      }
+      // Guardian fallback when other APIs return too few results
       if (trendingArticles.length < 10 && GUARDIAN_API_KEY) {
         console.log('  Trending Guardian fallback');
         incrementApiCounter('guardian');
@@ -3198,6 +3426,7 @@ export default async function handler(req, res) {
       pairs.map(({ country, category }) =>
         fetchCountryCategoryPair(country, category, {
           NEWS_API_KEY, WORLD_NEWS_API_KEY, NEWS_DATA_API_KEY, GUARDIAN_API_KEY, GNEWS_API_KEY,
+          MEDIASTACK_API_KEY, CURRENTS_API_KEY,
           activeDomains, activeSourceIds, fromISO, fromDateOnly, usePopularitySort,
           rangeHours, dateRange, sourceFingerprint, showNonEnglish,
         })
@@ -3343,6 +3572,7 @@ async function fetchCountryCategoryPair(country, category, ctx) {
 async function _doFetchPair(cacheKey, country, category, ctx, existingArticles = []) {
   const {
     NEWS_API_KEY, WORLD_NEWS_API_KEY, NEWS_DATA_API_KEY, GUARDIAN_API_KEY, GNEWS_API_KEY,
+    MEDIASTACK_API_KEY, CURRENTS_API_KEY,
     activeDomains, activeSourceIds, fromISO, fromDateOnly, usePopularitySort,
     rangeHours, dateRange, showNonEnglish,
   } = ctx;
@@ -3384,8 +3614,11 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
   const skipDomains = !RSS_WELL_SERVED_COUNTRIES.has(country) && country !== 'world';
   const skipSecondaryAPIs = NEWSAPI_FIRST_PASS_COUNTRIES.has(country);
 
-  console.log(`  [1+2+3+6] Parallel fetch [${country}/${category}]${skipDomains ? ' (skipDomains)' : ''}${skipSecondaryAPIs ? ' (NewsAPI-first)' : ''}${effectiveShowNonEnglish ? ' (bilingual)' : ''}`);
-  const [newsApiRaw, worldNewsRaw, gNewsRaw, newsDataRaw] = await Promise.all([
+  console.log(`  [1+2+3+6+7+8] Parallel fetch [${country}/${category}]${skipDomains ? ' (skipDomains)' : ''}${skipSecondaryAPIs ? ' (NewsAPI-first)' : ''}${effectiveShowNonEnglish ? ' (bilingual)' : ''}`);
+  // MediaStack: non-English specialist, very low quota (~16/day free).
+  // Only call when showNonEnglish=true and country is not an English-primary well-served country.
+  const useMediaStack = MEDIASTACK_API_KEY && effectiveShowNonEnglish && !RSS_WELL_SERVED_COUNTRIES.has(country);
+  const [newsApiRaw, worldNewsRaw, gNewsRaw, newsDataRaw, currentsRaw, mediaStackRaw] = await Promise.all([
     (country === 'world' || NEWS_API_SUPPORTED_COUNTRIES.has(country))
       ? fetchFromNewsAPI(country, category, NEWS_API_KEY, activeDomains, activeSourceIds, { from: fromISO, sortByPopularity: usePopularitySort, skipDomains, showNonEnglish: effectiveShowNonEnglish })
         .catch(err => { console.error('  NewsAPI failed:', err.message); return []; })
@@ -3404,6 +3637,16 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
       ? fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly, showNonEnglish: effectiveShowNonEnglish })
         .catch(err => { console.error('  NewsData failed:', err.message); return []; })
       : Promise.resolve([]),
+    // Currents API — 600 req/day free; general fallback for additional source diversity.
+    CURRENTS_API_KEY
+      ? fetchFromCurrentsAPI(country, category, CURRENTS_API_KEY, { from: fromISO, showNonEnglish: effectiveShowNonEnglish })
+        .catch(err => { console.error('  Currents failed:', err.message); return []; })
+      : Promise.resolve([]),
+    // MediaStack — ~16 req/day free; non-English specialist; skipped for English-primary countries.
+    useMediaStack
+      ? fetchFromMediaStack(country, category, MEDIASTACK_API_KEY, { from: fromISO })
+        .catch(err => { console.error('  MediaStack failed:', err.message); return []; })
+      : Promise.resolve([]),
   ]);
 
   calledSources.add('newsapi');
@@ -3420,6 +3663,14 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
     calledSources.add('newsdata');
     incrementApiCounter('newsdata');
   }
+  if (CURRENTS_API_KEY) {
+    calledSources.add('currents');
+    incrementApiCounter('currents');
+  }
+  if (useMediaStack) {
+    calledSources.add('mediastack');
+    incrementApiCounter('mediastack');
+  }
 
   const newsApiArticles = newsApiRaw
     .filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com')
@@ -3427,10 +3678,12 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
   const worldNewsArticles = worldNewsRaw.map(a => formatWorldNewsAPIArticle(a, country, category));
   const gNewsArticles = gNewsRaw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category));
   const newsDataArticles = newsDataRaw.filter(a => a.title && a.title !== '[Removed]').map(a => formatNewsDataArticle(a, country, category));
+  const currentsArticles = currentsRaw.filter(a => a.title && a.url).map(a => formatCurrentsAPIArticle(a, country, category));
+  const mediaStackArticles = mediaStackRaw.filter(a => a.title && a.url).map(a => formatMediaStackArticle(a, country, category));
 
   // Merge parallel results; dedup by URL so overlapping wire service articles aren't doubled
   const seenUrls = new Set();
-  for (const batch of [newsApiArticles, worldNewsArticles, gNewsArticles, newsDataArticles]) {
+  for (const batch of [newsApiArticles, worldNewsArticles, gNewsArticles, newsDataArticles, currentsArticles, mediaStackArticles]) {
     for (const article of batch) {
       if (!seenUrls.has(article.url)) {
         seenUrls.add(article.url);
@@ -3438,14 +3691,15 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
       }
     }
   }
-  console.log(`  Parallel result: ${newsApiArticles.length} NewsAPI + ${worldNewsArticles.length} WorldNews + ${gNewsArticles.length} GNews + ${newsDataArticles.length} NewsData = ${formattedArticles.length} unique`);
+  console.log(`  Parallel result: ${newsApiArticles.length} NewsAPI + ${worldNewsArticles.length} WorldNews + ${gNewsArticles.length} GNews + ${newsDataArticles.length} NewsData + ${currentsArticles.length} Currents + ${mediaStackArticles.length} MediaStack = ${formattedArticles.length} unique`);
 
-  // ── 4. Guardian (priority for AU/GB/US, fallback if < 20) ─────────────
-  // NOTE: NewsData.io now fires in the parallel first pass; Guardian remains the
-  // trusted editorial fallback. If Guardian articles are dominating results for
-  // all countries, check API key status — NewsAPI/WorldNewsAPI/NewsData may have
-  // hit their daily quota. Guardian's generous free tier (5000/day) never fails.
-  if (GUARDIAN_API_KEY && (guardianPriorityCountry || formattedArticles.length < 20)) {
+  // ── 4. Guardian (priority for AU/GB/US, fallback if < 12) ─────────────
+  // Threshold reduced from 20 → 12 to limit Guardian's role as a de-facto primary
+  // source. Currents API and MediaStack now fill coverage gaps first (above), so
+  // Guardian is reserved for genuinely thin-coverage pairs.
+  // If Guardian articles are still dominating, check whether NewsAPI/WorldNewsAPI/
+  // NewsData/Currents keys are set and not exhausted.
+  if (GUARDIAN_API_KEY && (guardianPriorityCountry || formattedArticles.length < 12)) {
     calledSources.add('guardian');
     incrementApiCounter('guardian');
     console.log(`  [4] Guardian [${country}/${category}] (have ${formattedArticles.length} so far)`);
