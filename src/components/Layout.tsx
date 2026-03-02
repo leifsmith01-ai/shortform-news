@@ -55,8 +55,8 @@ export default function Layout({ children, currentPageName }: { children: React.
         <aside className="hidden md:flex w-20 bg-slate-900 flex-col items-center py-6 gap-6 border-r border-slate-800 flex-shrink-0">
           {/* Logo */}
           <Link to="/">
-            <div className="w-12 h-12 rounded-xl overflow-hidden bg-white border border-slate-700 mb-4">
-              <img src="/logo.webp" alt="Shortform" fetchPriority="high" className="w-full h-full object-cover" />
+            <div className="w-12 h-12 rounded-xl overflow-hidden bg-[#f5f0e8] mb-4">
+              <img src="/logo.webp" alt="Shortform" fetchPriority="high" className="w-full h-full object-cover scale-[1.75]" />
             </div>
           </Link>
 
