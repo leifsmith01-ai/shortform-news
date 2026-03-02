@@ -611,6 +611,13 @@ const CATEGORY_RELEVANCE_KEYWORDS = {
     ],
   },
   gaming: {
+    // Exclusion terms: crime/violence articles about entertainers should not match
+    // even when weak keywords like 'rapper', 'singer', or 'actor' appear in the text.
+    // A strong keyword match always overrides exclusion.
+    exclude: [
+      'shot dead', 'killed by police', 'police shooting', 'murder suspect',
+      'arrested for', 'drug bust', 'gang member', 'charged with murder',
+    ],
     strong: [
       'video game', 'esport', 'playstation', 'xbox', 'nintendo',
       'game developer', 'gameplay', 'game pass', 'battle royale',
@@ -624,6 +631,10 @@ const CATEGORY_RELEVANCE_KEYWORDS = {
     ],
   },
   film: {
+    exclude: [
+      'shot dead', 'killed by police', 'police shooting', 'murder suspect',
+      'arrested for', 'drug bust', 'gang member', 'charged with murder',
+    ],
     strong: [
       'box office', 'screenplay', 'hollywood', 'blockbuster',
       'oscar', 'academy award', 'golden globe', 'bafta',
@@ -638,6 +649,10 @@ const CATEGORY_RELEVANCE_KEYWORDS = {
     ],
   },
   tv: {
+    exclude: [
+      'shot dead', 'killed by police', 'police shooting', 'murder suspect',
+      'arrested for', 'drug bust', 'gang member', 'charged with murder',
+    ],
     strong: [
       'tv show', 'tv series', 'showrunner', 'series finale',
       'primetime', 'cable network', 'reality tv', 'talk show',
@@ -654,6 +669,10 @@ const CATEGORY_RELEVANCE_KEYWORDS = {
     ],
   },
   music: {
+    exclude: [
+      'shot dead', 'killed by police', 'police shooting', 'murder suspect',
+      'arrested for', 'drug bust', 'gang member', 'charged with murder',
+    ],
     strong: [
       'grammy', 'grammy award', 'brit award', 'mercury prize', 'vma', 'mtv award',
       'album release', 'record label', 'music festival', 'music video', 'world tour',
@@ -677,6 +696,12 @@ function countKeywordHits(text, keywords) {
   return hits;
 }
 
+// Categories where external APIs use a single broad bucket rather than discrete
+// subcategories. For these, _nativeCategory cannot be trusted — e.g. WorldNewsAPI,
+// GNews and NewsData.io all map gaming/film/tv/music → one "entertainment" bucket,
+// which also captures sports celebrities and crime involving entertainers.
+const BROAD_API_CATEGORIES = new Set(['gaming', 'film', 'tv', 'music']);
+
 // Check if an article's title+description match the requested category.
 // Uses the two-tier keyword system:
 //   - 1 strong hit → match
@@ -685,20 +710,24 @@ function countKeywordHits(text, keywords) {
 function articleMatchesCategory(article, category) {
   // 'world' is too broad to filter usefully — we rely on query-level filtering
   if (category === 'world') return true;
-  // Trust native API category assignments: Guardian, WorldNewsAPI, NewsData.io,
-  // and GNews have already filtered to the correct category. Bypass keyword
-  // validation for these articles to avoid false negatives from sparse descriptions
-  // or non-English political terminology.
-  // NewsAPI articles (fetched via keyword query) still require keyword validation.
-  if (article._nativeCategory) return true;
+  // Trust native API category assignments (Guardian, WorldNewsAPI, NewsData.io, GNews)
+  // for categories with precise native API support. Skip bypass for entertainment
+  // subcategories (gaming/film/tv/music): external APIs map all of these to a single
+  // broad "entertainment" bucket which includes sports celebrities and crime involving
+  // entertainers, so keyword validation is still needed for accurate subcategorisation.
+  if (article._nativeCategory && !BROAD_API_CATEGORIES.has(category)) return true;
   const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
   if (!catKeywords) return true; // unknown category, don't filter
 
   const title = (article.title || '').toLowerCase();
   const text = `${title} ${article.description || ''}`.toLowerCase();
 
-  // Any strong keyword is an immediate match
+  // Any strong keyword is an immediate match (overrides exclusion)
   if (catKeywords.strong.some(kw => text.includes(kw))) return true;
+
+  // If the article matches an exclusion term and has no strong keyword, reject it.
+  // This catches crime/police articles about entertainers that slip through weak matching.
+  if (catKeywords.exclude?.some(kw => text.includes(kw))) return false;
 
   // Count weak keyword hits
   const weakHits = countKeywordHits(text, catKeywords.weak);
@@ -1932,10 +1961,10 @@ const WORLD_NEWS_QUERY_TERMS = {
   science: 'science research discovery NASA climate environment',
   health: 'health medical hospital disease vaccine healthcare',
   sports: 'sports championship tournament athlete league football',
-  gaming: 'gaming video game esports PlayStation Xbox Nintendo mobile game',
-  film: 'film movie cinema box office Oscar screenplay',
-  tv: 'television TV series Netflix HBO Emmy showrunner',
-  music: 'music album artist Grammy concert tour record label',
+  gaming: '"video game" OR esports OR PlayStation OR Xbox OR Nintendo OR "game release" OR "game studio" OR "game developer"',
+  film: '"box office" OR screenplay OR Hollywood OR Oscar OR "film festival" OR "movie review" OR "film review" OR blockbuster',
+  tv: '"TV series" OR "TV show" OR Netflix OR HBO OR Emmy OR showrunner OR "streaming series" OR sitcom OR "season finale"',
+  music: '"album release" OR Grammy OR "record label" OR "music festival" OR "music video" OR "world tour" OR "chart-topping"',
   politics: 'politics election parliament legislation referendum chancellor "prime minister"',
   world: 'international diplomacy foreign summit United Nations',
 };
