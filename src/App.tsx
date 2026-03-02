@@ -7,7 +7,7 @@ import { SpeedInsights } from '@vercel/speed-insights/react'
 import Layout from './components/Layout'
 import Home from './pages/Home'
 import { api } from './api'
-import { supabase } from './lib/supabaseClient'
+import { setSupabaseToken } from './lib/supabaseClient'
 
 // Pages wait for this before querying Supabase so RLS (auth.jwt() ->> 'sub') works.
 export const ApiReadyContext = createContext(false)
@@ -55,7 +55,7 @@ function UserInitialiser({ setApiReady }: { setApiReady: (ready: boolean) => voi
       if (cancelled) return
       const token = await session!.getToken({ template: 'supabase' })
       if (token && !cancelled) {
-        await supabase.auth.setSession({ access_token: token, refresh_token: '' })
+        setSupabaseToken(token)
         if (!cancelled) {
           api.setUser(user!.id)
           setApiReady(true)
@@ -81,7 +81,7 @@ function UserInitialiser({ setApiReady }: { setApiReady: (ready: boolean) => voi
       if (cancelled) return
       const token = await session!.getToken({ template: 'supabase' })
       if (token && !cancelled) {
-        await supabase.auth.setSession({ access_token: token, refresh_token: '' })
+        setSupabaseToken(token)
       } else if (!cancelled) {
         console.error(
           '[UserInitialiser] Token refresh failed: Clerk getToken({ template: "supabase" }) returned null.'
