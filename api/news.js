@@ -1987,6 +1987,12 @@ async function fetchFromNewsData(country, category, apiKey, opts = {}) {
     'category': newsDataCategory,
     'apikey': apiKey,
   });
+  // When the native API category is a broad 'entertainment' bucket (covering gaming/film/tv/music),
+  // add subcategory keyword refinement to narrow results — following the WorldNewsAPI pattern.
+  const newsDataQuery = WORLD_NEWS_QUERY_TERMS[category];
+  if (newsDataQuery && newsDataCategory !== category) {
+    params.set('q', newsDataQuery);
+  }
   if (!opts.showNonEnglish) params.set('language', 'en');
   if (country !== 'world') params.set('country', country);
   // NewsData.io /latest supports timeframe param (e.g. "24" for 24 hours)
@@ -2074,6 +2080,12 @@ async function fetchFromGNews(country, category, apiKey, opts = {}) {
   if (!opts.showNonEnglish) params.set('lang', 'en');
   if (opts.from) params.set('from', opts.from); // ISO 8601, e.g. 2024-01-01T00:00:00Z
   params.set('category', gnewsCategory);
+  // When the native API category is a broad 'entertainment' bucket (covering gaming/film/tv/music),
+  // add subcategory keyword refinement to narrow results — following the WorldNewsAPI pattern.
+  const gnewsSubcategoryQuery = WORLD_NEWS_QUERY_TERMS[category];
+  if (gnewsSubcategoryQuery && gnewsCategory !== category) {
+    params.set('q', gnewsSubcategoryQuery);
+  }
   if (country !== 'world') params.set('country', country);
   const url = `https://gnews.io/api/v4/top-headlines?${params}`;
   const response = await fetchWithTimeout(url);
@@ -2151,6 +2163,12 @@ async function fetchFromCurrentsAPI(country, category, apiKey, opts = {}) {
   });
   const currentsCategory = CURRENTS_CATEGORY_MAP[category];
   if (currentsCategory) params.set('category', currentsCategory);
+  // When the native API category is a broad 'entertainment' bucket (covering gaming/film/tv/music),
+  // add subcategory keyword refinement to narrow results — following the WorldNewsAPI pattern.
+  const currentsQuery = WORLD_NEWS_QUERY_TERMS[category];
+  if (currentsQuery && currentsCategory && currentsCategory !== category) {
+    params.set('keywords', currentsQuery);
+  }
   if (country !== 'world') params.set('country', country.toUpperCase());
   if (!opts.showNonEnglish) params.set('language', 'en');
   if (opts.from) params.set('start_date', opts.from);
