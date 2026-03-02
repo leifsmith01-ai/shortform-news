@@ -7,4 +7,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables')
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Holds the current Clerk JWT so the accessToken callback can return it.
+// Updated by setSupabaseToken() in UserInitialiser (App.tsx).
+let _clerkToken = ''
+
+export function setSupabaseToken(token: string) {
+  _clerkToken = token
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  accessToken: () => Promise.resolve(_clerkToken),
+})
