@@ -139,11 +139,9 @@ export default function App() {
         } />
 
         <Route path="/personalized" element={
-          <ProtectedRoute>
-            <Layout currentPageName="/personalized">
-              <Personalized />
-            </Layout>
-          </ProtectedRoute>
+          <Layout currentPageName="/personalized">
+            <Personalized />
+          </Layout>
         } />
 
         <Route path="/keywords" element={
