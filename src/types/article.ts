@@ -27,6 +27,37 @@ export interface Keyword {
   keyword: string
   user_id: string
   created_at: string
+  threshold?: number
+  last_article_count?: number
+}
+
+export interface KeywordTopic {
+  id: string
+  user_id: string
+  name: string
+  created_at: string
+  keywords?: Keyword[]
+}
+
+export interface KeywordAlertSetting {
+  id: string
+  user_id: string
+  keyword_id: string
+  email: string
+  frequency: 'hourly' | 'daily'
+  enabled: boolean
+  last_sent_at: string | null
+  created_at: string
+}
+
+export interface SearchAnalyticsEntry {
+  id: string
+  user_id: string | null
+  keyword: string
+  expansion_source: string | null
+  result_count: number | null
+  is_boolean: boolean
+  created_at: string
 }
 
 export interface FetchNewsParams {
@@ -39,6 +70,7 @@ export interface FetchNewsParams {
   userId?: string
   mode?: 'keyword'
   strictMode?: boolean
+  threshold?: number
 }
 
 export interface FetchNewsResult {

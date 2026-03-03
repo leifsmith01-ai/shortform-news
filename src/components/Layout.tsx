@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Bookmark, Clock, Sparkles, Tag, Bell, TrendingUp, LogIn, Flame, Settings, Info, Shield } from 'lucide-react';
+import { Home, Bookmark, Clock, Sparkles, Tag, Bell, TrendingUp, LogIn, Flame, Settings, Info, Shield, BarChart2 } from 'lucide-react';
 import { UserButton, SignedIn, SignedOut } from '@clerk/clerk-react';
 
 export default function Layout({ children, currentPageName }: { children: React.ReactNode; currentPageName: string }) {
@@ -12,6 +12,7 @@ export default function Layout({ children, currentPageName }: { children: React.
     { name: 'Finance', icon: TrendingUp, page: '/finance' },
     { name: 'For You', icon: Sparkles, page: '/personalized' },
     { name: 'Keywords', icon: Tag, page: '/keywords' },
+    { name: 'Analytics', icon: BarChart2, page: '/analytics' },
     { name: 'Saved', icon: Bookmark, page: '/saved' },
     { name: 'History', icon: Clock, page: '/history' },
     { name: 'Settings', icon: Settings, page: '/settings' },

@@ -23,6 +23,7 @@ const Trending = lazy(() => import('./pages/Trending'))
 const Settings = lazy(() => import('./pages/Settings'))
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
 const About = lazy(() => import('./pages/About'))
+const Analytics = lazy(() => import('./pages/Analytics'))
 
 // Placeholder components for routes referenced in Layout
 const PlaceholderPage = ({ title }: { title: string }) => (
@@ -171,6 +172,12 @@ export default function App() {
         <Route path="/alerts" element={
           <Layout currentPageName="/alerts">
             <PlaceholderPage title="News Alerts" />
+          </Layout>
+        } />
+
+        <Route path="/analytics" element={
+          <Layout currentPageName="/analytics">
+            <Analytics />
           </Layout>
         } />
 

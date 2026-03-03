@@ -5,7 +5,7 @@
 import { mockApiService } from './mockApiService'
 import { newsApiClient } from './newsApiClient'
 import SupabaseApiService from './supabaseApiService'
-import type { ApiClient, Article, FetchNewsParams } from '@/types/article'
+import type { ApiClient, Article, FetchNewsParams, KeywordTopic, KeywordAlertSetting, SearchAnalyticsEntry } from '@/types/article'
 
 // Use mock API ONLY if explicitly set to 'true', otherwise always use real API
 const USE_MOCK_API = String(import.meta.env.VITE_USE_MOCK_API).toLowerCase() === 'true'
@@ -118,6 +118,72 @@ class ApiService {
   async deleteKeyword(id: string) {
     if (!this.supabase) throw new Error('Must be signed in to manage keywords')
     return await this.supabase.deleteKeyword(id)
+  }
+
+  async updateKeywordThreshold(id: string, threshold: number) {
+    if (!this.supabase) throw new Error('Must be signed in to manage keywords')
+    return await this.supabase.updateKeywordThreshold(id, threshold)
+  }
+
+  async updateKeywordArticleCount(id: string, count: number) {
+    if (!this.supabase) throw new Error('Must be signed in')
+    return await this.supabase.updateKeywordArticleCount(id, count)
+  }
+
+  // ─── Keyword Topics ───────────────────────────────────────────────────────
+
+  async getTopics(): Promise<KeywordTopic[]> {
+    if (!this.supabase) throw new Error('Must be signed in to manage topics')
+    return await this.supabase.getTopics()
+  }
+
+  async createTopic(name: string): Promise<KeywordTopic> {
+    if (!this.supabase) throw new Error('Must be signed in to manage topics')
+    return await this.supabase.createTopic(name)
+  }
+
+  async deleteTopic(id: string) {
+    if (!this.supabase) throw new Error('Must be signed in to manage topics')
+    return await this.supabase.deleteTopic(id)
+  }
+
+  async addKeywordToTopic(topicId: string, keywordId: string) {
+    if (!this.supabase) throw new Error('Must be signed in to manage topics')
+    return await this.supabase.addKeywordToTopic(topicId, keywordId)
+  }
+
+  async removeKeywordFromTopic(topicId: string, keywordId: string) {
+    if (!this.supabase) throw new Error('Must be signed in to manage topics')
+    return await this.supabase.removeKeywordFromTopic(topicId, keywordId)
+  }
+
+  // ─── Keyword Alert Settings ───────────────────────────────────────────────
+
+  async getAlertSettings(): Promise<KeywordAlertSetting[]> {
+    if (!this.supabase) throw new Error('Must be signed in to manage alerts')
+    return await this.supabase.getAlertSettings()
+  }
+
+  async upsertAlertSetting(
+    keywordId: string,
+    email: string,
+    frequency: 'hourly' | 'daily',
+    enabled: boolean
+  ): Promise<KeywordAlertSetting> {
+    if (!this.supabase) throw new Error('Must be signed in to manage alerts')
+    return await this.supabase.upsertAlertSetting(keywordId, email, frequency, enabled)
+  }
+
+  async deleteAlertSetting(id: string) {
+    if (!this.supabase) throw new Error('Must be signed in to manage alerts')
+    return await this.supabase.deleteAlertSetting(id)
+  }
+
+  // ─── Search Analytics ─────────────────────────────────────────────────────
+
+  async getSearchAnalytics(days?: number): Promise<SearchAnalyticsEntry[]> {
+    if (!this.supabase) throw new Error('Must be signed in to view analytics')
+    return await this.supabase.getSearchAnalytics(days)
   }
 
   // ─── Article Reactions — requires sign-in ────────────────────────────────

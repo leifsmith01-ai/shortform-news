@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron/keyword-alerts",
+      "schedule": "0 * * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
@@ -13,6 +19,10 @@
     "api/*.js": {
       "memory": 512,
       "maxDuration": 30
+    },
+    "api/cron/keyword-alerts.js": {
+      "memory": 512,
+      "maxDuration": 60
     }
   },
   "headers": [

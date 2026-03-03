@@ -2740,6 +2740,26 @@ async function expandQueryWithLLM(keyword, llmKeys, useKeywordMonitorPrompt = fa
   const cacheKey = (useKeywordMonitorPrompt ? 'kwm:' : '') + keyword.trim().toLowerCase();
   if (EXPANSION_CACHE[cacheKey]) return EXPANSION_CACHE[cacheKey];
 
+  // Check Supabase persistent cache before calling the LLM.
+  // This survives serverless cold starts and is shared across all instances.
+  const SB_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+  if (SB_URL && SB_KEY) {
+    try {
+      const sbRes = await fetch(
+        `${SB_URL}/rest/v1/keyword_expansions?cache_key=eq.${encodeURIComponent(cacheKey)}&select=terms,expires_at`,
+        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+      );
+      if (sbRes.ok) {
+        const [row] = await sbRes.json();
+        if (row && new Date(row.expires_at) > new Date()) {
+          EXPANSION_CACHE[cacheKey] = row.terms;
+          return row.terms;
+        }
+      }
+    } catch { /* non-fatal — fall through to LLM */ }
+  }
+
   const prompt = useKeywordMonitorPrompt
     ? KEYWORD_MONITOR_EXPANSION_PROMPT(keyword)
     : EXPANSION_PROMPT(keyword);
@@ -2782,6 +2802,23 @@ async function expandQueryWithLLM(keyword, llmKeys, useKeywordMonitorPrompt = fa
       const terms = parseExpansionResponse(text, keyword);
       if (terms) {
         EXPANSION_CACHE[cacheKey] = terms;
+        // Persist to Supabase so future cold starts skip the LLM call.
+        if (SB_URL && SB_KEY) {
+          fetch(`${SB_URL}/rest/v1/keyword_expansions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              apikey: SB_KEY,
+              Authorization: `Bearer ${SB_KEY}`,
+              Prefer: 'resolution=merge-duplicates,return=minimal',
+            },
+            body: JSON.stringify({
+              cache_key: cacheKey,
+              terms,
+              expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            }),
+          }).catch(() => {});
+        }
         return terms;
       }
     } catch (err) {
@@ -3455,7 +3492,7 @@ export default async function handler(req, res) {
   });
   if (!envValid) return;
 
-  const { countries, categories, searchQuery, dateRange, sources: userSources, language: langParam, userId, mode, strictMode } = req.method === 'POST' ? req.body : req.query;
+  const { countries, categories, searchQuery, dateRange, sources: userSources, language: langParam, userId, mode, strictMode, threshold } = req.method === 'POST' ? req.body : req.query;
   const isKeywordMode = mode === 'keyword';
   // showNonEnglish=true removes the language=en filter from all API calls, allowing
   // native-language articles to surface for non-English-dominant countries.
@@ -3594,11 +3631,20 @@ export default async function handler(req, res) {
           rssPromises.push(
             fetchRSSFeed(feed.url)
               .then(items => {
-                // Filter RSS items that mention the keyword in title/description
+                // Filter RSS items using expanded search terms + stemming,
+                // consistent with how API sources are filtered.
                 const kwLower = keyword.toLowerCase();
                 const matched = items.filter(item => {
                   const text = `${item.title || ''} ${item.description || ''}`.toLowerCase();
-                  return text.includes(kwLower);
+                  if (text.includes(kwLower)) return true;
+                  for (const term of searchTerms) {
+                    const t = term.toLowerCase().replace(/^["'(]+|["')]+$/g, '');
+                    if (t.length < 2) continue;
+                    if (text.includes(t)) return true;
+                    const stemmed = stemWord(t);
+                    if (stemmed !== t && stemmed.length >= 3 && text.includes(stemmed)) return true;
+                  }
+                  return false;
                 });
                 return matched.map(item => formatRSSArticle(item, feed, country, categoryList[0]));
               })
@@ -3690,9 +3736,11 @@ export default async function handler(req, res) {
         const kwTerms = searchTerms.map(t => t.toLowerCase().replace(/^["'(]+|["')]+$/g, ''));
 
         // Option A: Minimum relevance threshold — drop articles that barely
-        // mention the keyword. Threshold of 0.12 means at least one search
-        // term must appear in the title, or 2+ terms in the body/description.
-        const MIN_KW_RELEVANCE = 0.12;
+        // mention the keyword. Default 0.12; can be tuned per-keyword via the
+        // `threshold` request param (clamped to [0, 1]).
+        const MIN_KW_RELEVANCE = (threshold !== undefined && threshold !== null && !isNaN(parseFloat(threshold)))
+          ? Math.min(Math.max(parseFloat(threshold), 0), 1)
+          : 0.12;
         const beforeThreshold = filtered.length;
         filtered = filtered.filter(a => {
           const score = keywordRelevanceScore(a, searchTerms, keyword);
