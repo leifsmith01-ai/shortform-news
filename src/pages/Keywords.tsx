@@ -162,10 +162,10 @@ function CreateTopicModal({ keywords, onClose, onCreate }: TopicModalProps) {
   const [saving, setSaving] = useState(false)
 
   async function handleCreate() {
-    if (!name.trim()) { toast.error('Enter a topic name'); return }
+    if (!name.trim()) { toast.error('Enter a feed name'); return }
     if (selected.size === 0) { toast.error('Select at least one keyword'); return }
     setSaving(true)
-    try { await onCreate(name.trim(), [...selected]); onClose() } finally { setSaving(false) }
+    try { await onCreate(name.trim(), [...selected]); onClose() } catch { toast.error('Failed to create feed') } finally { setSaving(false) }
   }
 
   return (
@@ -173,7 +173,7 @@ function CreateTopicModal({ keywords, onClose, onCreate }: TopicModalProps) {
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FolderPlus className="w-4 h-4" /> Create Topic
+            <FolderPlus className="w-4 h-4" /> Create Feed
           </DialogTitle>
           <DialogDescription>Group keywords into a combined feed.</DialogDescription>
         </DialogHeader>
@@ -181,7 +181,7 @@ function CreateTopicModal({ keywords, onClose, onCreate }: TopicModalProps) {
           <Input
             value={name}
             onChange={e => setName(e.target.value)}
-            placeholder="Topic name (e.g. Climate Policy)"
+            placeholder="Feed name (e.g. Climate Policy)"
             className="h-9 text-sm"
           />
           <div>
@@ -206,7 +206,7 @@ function CreateTopicModal({ keywords, onClose, onCreate }: TopicModalProps) {
             </div>
           </div>
           <Button onClick={handleCreate} disabled={saving} className="w-full bg-slate-900 hover:bg-slate-800 text-white">
-            {saving ? 'Creating…' : 'Create topic'}
+            {saving ? 'Creating…' : 'Create feed'}
           </Button>
         </div>
       </DialogContent>
@@ -350,7 +350,7 @@ export default function Keywords() {
       setArticles(result?.articles ?? [])
     } catch {
       if (ctrl.signal.aborted) return
-      toast.error(`Failed to fetch articles for topic "${topic.name}"`)
+      toast.error(`Failed to fetch articles for feed "${topic.name}"`)
       setArticles([])
     } finally {
       if (!ctrl.signal.aborted) setIsLoadingArticles(false)
@@ -421,7 +421,7 @@ export default function Keywords() {
       await api.deleteTopic(topic.id)
     } catch {
       setTopics(prev => [...prev, topic].sort((a, b) => a.name.localeCompare(b.name)))
-      toast.error('Failed to delete topic')
+      toast.error('Failed to delete feed')
     }
   }
 
@@ -432,7 +432,7 @@ export default function Keywords() {
     const fresh = await api.getTopics()
     setTopics(fresh)
     setSelection({ type: 'topic', id: topic.id })
-    toast.success(`Topic "${name}" created`)
+    toast.success(`Feed "${name}" created`)
   }
 
   const handleSaveAlert = async (email: string, frequency: 'hourly' | 'daily') => {
@@ -484,7 +484,7 @@ export default function Keywords() {
             <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100">Keywords and Media Monitoring</h1>
             <p className="text-sm text-stone-500 dark:text-slate-400">
               {isLoaded && isSignedIn
-                ? `${keywords.length} keyword${keywords.length !== 1 ? 's' : ''} · ${topics.length} topic${topics.length !== 1 ? 's' : ''}`
+                ? `${keywords.length} keyword${keywords.length !== 1 ? 's' : ''} · ${topics.length} feed${topics.length !== 1 ? 's' : ''}`
                 : 'Sign in to save and track keywords'}
             </p>
           </div>
@@ -671,7 +671,7 @@ export default function Keywords() {
                       {topics.length > 0 && (
                         <div>
                           <p className="text-[10px] font-semibold text-stone-400 dark:text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1">
-                            <Layers className="w-3 h-3" /> Topics
+                            <Layers className="w-3 h-3" /> Feeds
                           </p>
                           <div className="flex flex-nowrap lg:flex-wrap gap-2 overflow-x-auto lg:overflow-visible pb-1">
                             {topics.map(topic => {
@@ -778,7 +778,7 @@ export default function Keywords() {
                           className="flex items-center gap-1.5 text-xs text-stone-400 dark:text-slate-500 hover:text-stone-600 dark:hover:text-slate-300 transition-colors"
                         >
                           <FolderPlus className="w-3.5 h-3.5" />
-                          Create topic from keywords
+                          Create feed from keywords
                         </button>
                       )}
                     </>
@@ -831,7 +831,7 @@ export default function Keywords() {
                     )}
                     {selectedTopic && (
                       <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
-                        Combined topic
+                        Combined feed
                       </span>
                     )}
                   </div>
