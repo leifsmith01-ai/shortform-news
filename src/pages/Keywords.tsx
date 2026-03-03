@@ -2,7 +2,7 @@ import React, { useContext, useState, useEffect, useCallback, useRef } from 'rea
 import {
   Tag, Plus, X, Lock, Newspaper, Search, LogIn, Globe, CrosshairIcon,
   Bell, BellOff, Layers, SlidersHorizontal, ChevronDown, FolderPlus,
-  Folder, FolderOpen, Trash2, Code2,
+  Folder, FolderOpen, Trash2, Code2, BarChart2, Zap,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,7 +21,7 @@ import api from '@/api'
 import { useUser } from '@clerk/clerk-react'
 import { Link } from 'react-router-dom'
 import { sanitizeKeyword, isValidKeyword } from '@/lib/sanitize'
-import type { Article, Keyword, KeywordTopic, KeywordAlertSetting } from '@/types/article'
+import type { Article, Keyword, KeywordTopic, KeywordAlertSetting, SearchAnalyticsEntry } from '@/types/article'
 import { ApiReadyContext } from '@/App'
 
 // ─── Region options ───────────────────────────────────────────────────────────
@@ -64,6 +64,39 @@ const load = <T,>(key: string, fallback: T): T => {
 }
 const save = (key: string, value: unknown) => {
   try { localStorage.setItem(key, JSON.stringify(value)) } catch { }
+}
+
+// ─── Analytics helpers ────────────────────────────────────────────────────────
+
+function groupByDay(entries: SearchAnalyticsEntry[]): { date: string; count: number }[] {
+  const map: Record<string, number> = {}
+  for (const e of entries) {
+    const day = e.created_at.slice(0, 10)
+    map[day] = (map[day] ?? 0) + 1
+  }
+  return Object.entries(map)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, count]) => ({ date, count }))
+}
+
+function expansionBreakdown(entries: SearchAnalyticsEntry[]): { source: string; count: number; pct: number }[] {
+  const map: Record<string, number> = {}
+  for (const e of entries) {
+    const s = e.expansion_source ?? 'unknown'
+    map[s] = (map[s] ?? 0) + 1
+  }
+  const total = entries.length || 1
+  return Object.entries(map)
+    .map(([source, count]) => ({ source, count, pct: Math.round((count / total) * 100) }))
+    .sort((a, b) => b.count - a.count)
+}
+
+const EXPANSION_LABELS: Record<string, { label: string; colour: string }> = {
+  static:  { label: 'Static map', colour: 'bg-blue-500' },
+  llm:     { label: 'AI-expanded', colour: 'bg-purple-500' },
+  boolean: { label: 'Boolean query', colour: 'bg-green-500' },
+  raw:     { label: 'Raw keyword', colour: 'bg-amber-500' },
+  unknown: { label: 'Unknown', colour: 'bg-stone-400' },
 }
 
 // ─── Alert modal ──────────────────────────────────────────────────────────────
@@ -253,6 +286,12 @@ export default function Keywords() {
   const [alertModalKw, setAlertModalKw] = useState<Keyword | null>(null)
   const [showCreateTopic, setShowCreateTopic] = useState(false)
 
+  // ── Analytics tab ──
+  const [activeView, setActiveView] = useState<'articles' | 'analytics'>('articles')
+  const [analyticsDays, setAnalyticsDays] = useState<7 | 30 | 90>(30)
+  const [analyticsEntries, setAnalyticsEntries] = useState<SearchAnalyticsEntry[]>([])
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false)
+
   const abortRef = useRef<AbortController | null>(null)
 
   // Persist preferences
@@ -369,6 +408,25 @@ export default function Keywords() {
     }
   }, [selection, fetchArticlesForKeyword, fetchArticlesForTopic])
 
+  // Reset to articles view when the selected keyword/topic changes
+  useEffect(() => { setActiveView('articles') }, [selection])
+
+  // Load analytics when the analytics tab is active
+  useEffect(() => {
+    if (activeView !== 'analytics' || !selection || !isSignedIn) return
+    const kwNames: string[] = selection.type === 'keyword'
+      ? [keywords.find(k => k.id === selection.id)?.keyword].filter(Boolean) as string[]
+      : ((topics.find(t => t.id === selection.id)?.keyword_topic_members as { keyword_id: string }[] | undefined) ?? [])
+          .map(m => keywords.find(k => k.id === m.keyword_id)?.keyword)
+          .filter(Boolean) as string[]
+    if (!kwNames.length) return
+    setIsLoadingAnalytics(true)
+    api.getSearchAnalytics(analyticsDays, kwNames.length === 1 ? kwNames[0] : kwNames)
+      .then(setAnalyticsEntries)
+      .catch(() => toast.error('Failed to load analytics'))
+      .finally(() => setIsLoadingAnalytics(false))
+  }, [activeView, analyticsDays, selection, isSignedIn, keywords, topics])
+
   // ── CRUD ────────────────────────────────────────────────────────────────────
 
   const handleAdd = async () => {
@@ -471,6 +529,13 @@ export default function Keywords() {
   const selectedTopic = selection?.type === 'topic' ? topics.find(t => t.id === selection.id) : null
   const selectionLabel = selectedKeyword?.keyword ?? selectedTopic?.name ?? null
   const selectionThreshold = selectedKeyword?.threshold ?? threshold
+
+  const analyticsDaily = groupByDay(analyticsEntries)
+  const analyticsBreakdown = expansionBreakdown(analyticsEntries)
+  const analyticsMaxDay = Math.max(...analyticsDaily.map(d => d.count), 1)
+  const analyticsAvgResults = analyticsEntries.length
+    ? Math.round(analyticsEntries.reduce((s, e) => s + (e.result_count ?? 0), 0) / analyticsEntries.length)
+    : 0
 
   return (
     <div className="h-full flex flex-col bg-stone-50 dark:bg-slate-900">
@@ -837,8 +902,8 @@ export default function Keywords() {
                   </div>
 
                   <div className="ml-auto flex items-center gap-3">
-                    {/* Alert button (keyword only) */}
-                    {selectedKeyword && (
+                    {/* Alert button (keyword only, articles view) */}
+                    {selectedKeyword && activeView === 'articles' && (
                       <button
                         onClick={() => setAlertModalKw(selectedKeyword)}
                         className={`p-1.5 rounded-lg transition-colors ${alertSettings.some(s => s.keyword_id === selectedKeyword.id && s.enabled)
@@ -850,22 +915,57 @@ export default function Keywords() {
                         <Bell className="w-4 h-4" />
                       </button>
                     )}
-                    {/* Timeframe */}
-                    <div className="flex items-center gap-1">
-                      {(['24h', '3d', 'week'] as const).map(range => (
+                    {/* View tabs: Articles / Analytics */}
+                    <div className="flex items-center gap-0.5 bg-stone-100 dark:bg-slate-700 rounded-lg p-0.5">
+                      {(['articles', 'analytics'] as const).map(view => (
                         <button
-                          key={range}
-                          onClick={() => setDateRange(range)}
-                          className={`px-2.5 py-1 text-xs rounded-full font-medium transition-colors ${dateRange === range
-                            ? 'bg-slate-900 text-white'
-                            : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-600'
+                          key={view}
+                          onClick={() => setActiveView(view)}
+                          className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md font-medium transition-colors ${activeView === view
+                            ? 'bg-white dark:bg-slate-600 text-stone-900 dark:text-stone-100 shadow-sm'
+                            : 'text-stone-500 dark:text-slate-400 hover:text-stone-700 dark:hover:text-slate-200'
                           }`}
                         >
-                          {range === '24h' ? '24h' : range === '3d' ? '3 days' : '1 week'}
+                          {view === 'articles' ? <Newspaper className="w-3 h-3" /> : <BarChart2 className="w-3 h-3" />}
+                          {view === 'articles' ? 'Articles' : 'Analytics'}
                         </button>
                       ))}
                     </div>
-                    {!isLoadingArticles && (
+                    {/* Timeframe (articles view only) */}
+                    {activeView === 'articles' && (
+                      <div className="flex items-center gap-1">
+                        {(['24h', '3d', 'week'] as const).map(range => (
+                          <button
+                            key={range}
+                            onClick={() => setDateRange(range)}
+                            className={`px-2.5 py-1 text-xs rounded-full font-medium transition-colors ${dateRange === range
+                              ? 'bg-slate-900 text-white'
+                              : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-600'
+                            }`}
+                          >
+                            {range === '24h' ? '24h' : range === '3d' ? '3 days' : '1 week'}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {/* Analytics days selector (analytics view only) */}
+                    {activeView === 'analytics' && (
+                      <div className="flex items-center gap-1">
+                        {([7, 30, 90] as const).map(d => (
+                          <button
+                            key={d}
+                            onClick={() => setAnalyticsDays(d)}
+                            className={`px-2.5 py-1 text-xs rounded-full font-medium transition-colors ${analyticsDays === d
+                              ? 'bg-slate-900 text-white'
+                              : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-600'
+                            }`}
+                          >
+                            {d}d
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {activeView === 'articles' && !isLoadingArticles && (
                       <span className="text-xs text-stone-400 dark:text-slate-500">
                         {articles.length} article{articles.length !== 1 ? 's' : ''}
                       </span>
@@ -873,32 +973,117 @@ export default function Keywords() {
                   </div>
                 </div>
 
-                <ScrollArea className="flex-1">
-                  <div className="p-4 lg:p-6">
-                    {isLoadingArticles ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                        {[...Array(6)].map((_, i) => <LoadingCard key={i} />)}
-                      </div>
-                    ) : articles.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
-                        <Newspaper className="w-10 h-10 text-stone-300 dark:text-slate-600 mb-4" />
-                        <h3 className="text-lg font-semibold text-stone-700 dark:text-slate-300 mb-1">No articles found</h3>
-                        <p className="text-stone-400 dark:text-slate-500 text-sm max-w-xs">
-                          No recent articles matched "{selectionLabel}"
-                          {region !== 'world' ? ` in ${regionLabel}` : ''}
-                          {strictMode ? ' (headline match)' : ''}.
-                          {strictMode ? ' Try turning off "Headline Match Only" for broader results.' : ' Try a broader term or check back later.'}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                        {articles.map((article, index) => (
-                          <NewsCard key={article.url ?? index} article={article} index={index} rank={index + 1} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </ScrollArea>
+                {activeView === 'articles' && (
+                  <ScrollArea className="flex-1">
+                    <div className="p-4 lg:p-6">
+                      {isLoadingArticles ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                          {[...Array(6)].map((_, i) => <LoadingCard key={i} />)}
+                        </div>
+                      ) : articles.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+                          <Newspaper className="w-10 h-10 text-stone-300 dark:text-slate-600 mb-4" />
+                          <h3 className="text-lg font-semibold text-stone-700 dark:text-slate-300 mb-1">No articles found</h3>
+                          <p className="text-stone-400 dark:text-slate-500 text-sm max-w-xs">
+                            No recent articles matched "{selectionLabel}"
+                            {region !== 'world' ? ` in ${regionLabel}` : ''}
+                            {strictMode ? ' (headline match)' : ''}.
+                            {strictMode ? ' Try turning off "Headline Match Only" for broader results.' : ' Try a broader term or check back later.'}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                          {articles.map((article, index) => (
+                            <NewsCard key={article.url ?? index} article={article} index={index} rank={index + 1} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                )}
+
+                {activeView === 'analytics' && (
+                  <ScrollArea className="flex-1">
+                    <div className="p-4 lg:p-6">
+                      {isLoadingAnalytics ? (
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                          {[...Array(3)].map((_, i) => <div key={i} className="h-24 rounded-xl skeleton-shimmer" />)}
+                        </div>
+                      ) : analyticsEntries.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+                          <BarChart2 className="w-10 h-10 text-stone-300 dark:text-slate-600 mb-4" />
+                          <h3 className="text-lg font-semibold text-stone-700 dark:text-slate-300 mb-1">No search history yet</h3>
+                          <p className="text-stone-400 dark:text-slate-500 text-sm max-w-xs">
+                            Search history for "{selectionLabel}" will appear here after you view articles.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-6 max-w-5xl">
+                          {/* KPI row */}
+                          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                            {[
+                              { label: 'Total searches', value: analyticsEntries.length, icon: Search, colour: 'text-blue-600' },
+                              { label: 'Avg results / search', value: analyticsAvgResults, icon: BarChart2, colour: 'text-purple-600' },
+                              { label: 'AI-expanded queries', value: analyticsBreakdown.find(b => b.source === 'llm')?.count ?? 0, icon: Zap, colour: 'text-amber-600' },
+                            ].map(({ label, value, icon: Icon, colour }) => (
+                              <div key={label} className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-4">
+                                <div className={`${colour} mb-2`}><Icon className="w-5 h-5" /></div>
+                                <div className="text-2xl font-bold text-stone-900 dark:text-stone-100">{value.toLocaleString()}</div>
+                                <div className="text-xs text-stone-500 dark:text-slate-400 mt-0.5">{label}</div>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Searches over time */}
+                            <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
+                              <h2 className="font-semibold text-stone-900 dark:text-stone-100 mb-4 text-sm">Searches per day</h2>
+                              {analyticsDaily.length === 0 ? (
+                                <p className="text-xs text-stone-400">No data</p>
+                              ) : (
+                                <div className="flex items-end gap-1 h-32">
+                                  {analyticsDaily.map(({ date, count }) => (
+                                    <div key={date} className="flex flex-col items-center flex-1 min-w-0 gap-1 group">
+                                      <div
+                                        className="w-full rounded-t bg-slate-800 dark:bg-slate-400 transition-all group-hover:bg-blue-600 dark:group-hover:bg-blue-400"
+                                        style={{ height: `${(count / analyticsMaxDay) * 100}%`, minHeight: 2 }}
+                                        title={`${date}: ${count} search${count !== 1 ? 'es' : ''}`}
+                                      />
+                                      <span className="text-[8px] text-stone-400 rotate-45 origin-left hidden lg:block truncate w-6">
+                                        {date.slice(5)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Expansion method breakdown */}
+                            <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
+                              <h2 className="font-semibold text-stone-900 dark:text-stone-100 mb-4 text-sm">Query expansion method</h2>
+                              <div className="space-y-2.5">
+                                {analyticsBreakdown.map(({ source, count, pct }) => {
+                                  const meta = EXPANSION_LABELS[source] ?? { label: source, colour: 'bg-stone-400' }
+                                  return (
+                                    <div key={source}>
+                                      <div className="flex justify-between text-xs mb-1">
+                                        <span className="text-stone-600 dark:text-slate-400">{meta.label}</span>
+                                        <span className="font-medium text-stone-800 dark:text-slate-300">{count} ({pct}%)</span>
+                                      </div>
+                                      <div className="h-1.5 bg-stone-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                        <div className={`h-full rounded-full ${meta.colour}`} style={{ width: `${pct}%` }} />
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                )}
               </>
             )}
           </div>

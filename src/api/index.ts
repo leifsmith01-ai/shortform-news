@@ -181,9 +181,9 @@ class ApiService {
 
   // ─── Search Analytics ─────────────────────────────────────────────────────
 
-  async getSearchAnalytics(days?: number): Promise<SearchAnalyticsEntry[]> {
+  async getSearchAnalytics(days?: number, keyword?: string | string[]): Promise<SearchAnalyticsEntry[]> {
     if (!this.supabase) throw new Error('Must be signed in to view analytics')
-    return await this.supabase.getSearchAnalytics(days)
+    return await this.supabase.getSearchAnalytics(days, keyword)
   }
 
   // ─── Article Reactions — requires sign-in ────────────────────────────────
