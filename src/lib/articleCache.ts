@@ -1,16 +1,19 @@
 // src/lib/articleCache.ts
-// Client-side article cache backed by sessionStorage.
+// Client-side article cache backed by localStorage.
 //
 // Articles are stored by URL (unique key). When new articles arrive from
 // the API, they are merged into the cache — existing articles (and their
-// AI summaries) are preserved. The cache expires naturally when the tab
-// closes (sessionStorage) and is capped at 500 articles to prevent
-// storage quota issues.
+// AI summaries) are preserved. The cache is capped at 500 articles to
+// prevent storage quota issues. Using localStorage (vs sessionStorage)
+// means the cache survives across browser sessions, eliminating the
+// skeleton flash for returning visitors opening a new tab.
 
 import type { Article } from '@/types/article'
 
 const CACHE_KEY = 'shortform_article_cache'
 const MAX_CACHED_ARTICLES = 500
+// Articles older than this are considered stale for the instant-render path
+const WARM_CACHE_MAX_AGE_MS = 2 * 60 * 60 * 1000 // 2 hours
 
 // ── Date range helpers ──────────────────────────────────────────────────
 const DATE_RANGE_HOURS: Record<string, number> = {
@@ -31,7 +34,7 @@ export function getDateRangeCutoff(dateRange: string): Date | null {
 
 function readCache(): Map<string, Article> {
     try {
-        const raw = sessionStorage.getItem(CACHE_KEY)
+        const raw = localStorage.getItem(CACHE_KEY)
         if (!raw) return new Map()
         const articles: Article[] = JSON.parse(raw)
         return new Map(articles.map(a => [a.url, a]))
@@ -52,9 +55,29 @@ function writeCache(cache: Map<string, Article>) {
             })
             articles = articles.slice(0, MAX_CACHED_ARTICLES)
         }
-        sessionStorage.setItem(CACHE_KEY, JSON.stringify(articles))
+        localStorage.setItem(CACHE_KEY, JSON.stringify(articles))
     } catch {
         // Storage quota exceeded — silently fail
+    }
+}
+
+/**
+ * Returns true if the cache has recent articles suitable for instant display
+ * on page load (i.e. the newest article is within WARM_CACHE_MAX_AGE_MS).
+ */
+export function hasFreshCache(): boolean {
+    try {
+        const raw = localStorage.getItem(CACHE_KEY)
+        if (!raw) return false
+        const articles: Article[] = JSON.parse(raw)
+        if (!articles.length) return false
+        const newest = articles.reduce((best, a) => {
+            const t = a.publishedAt ? new Date(a.publishedAt).getTime() : 0
+            return t > best ? t : best
+        }, 0)
+        return Date.now() - newest < WARM_CACHE_MAX_AGE_MS
+    } catch {
+        return false
     }
 }
 
@@ -162,7 +185,7 @@ export function getCachedArticles(opts: {
  */
 export function clearCache() {
     try {
-        sessionStorage.removeItem(CACHE_KEY)
+        localStorage.removeItem(CACHE_KEY)
     } catch { /* noop */ }
 }
 

@@ -22,12 +22,55 @@
     
     <title>Shortform - Your News, In Short</title>
 
-    <!-- Google AdSense -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8230549400439546"
-     crossorigin="anonymous"></script>
+    <!-- Preconnect to common news article image CDNs to eliminate DNS+TLS
+         latency for the first LCP image fetch. -->
+    <link rel="preconnect" href="https://ichef.bbci.co.uk" />
+    <link rel="preconnect" href="https://static01.nyt.com" />
+    <link rel="preconnect" href="https://media.cnn.com" />
+    <link rel="preconnect" href="https://a.guim.co.uk" />
+    <link rel="preconnect" href="https://images.wsj.net" />
+    <link rel="preconnect" href="https://cdn.vox-cdn.com" />
+
+    <!-- Google AdSense — deferred until after the window load event so it
+         doesn't compete for bandwidth during the critical LCP path. -->
+    <script>
+      window.addEventListener('load', function () {
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8230549400439546';
+        s.crossOrigin = 'anonymous';
+        document.head.appendChild(s);
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- Early fetch: fire the news API request immediately on HTML parse,
+         before the React bundle has even finished downloading. The result is
+         stored in window.__newsPreload and consumed by newsApiClient.ts on
+         first mount, eliminating the JS-parse → API-call waterfall step.
+
+         We use GET so the response can be served from Vercel's Edge CDN
+         on a cache hit, making the pre-flight resolve in ~20-50ms. -->
+    <script>
+      (function () {
+        try {
+          var countries = JSON.parse(localStorage.getItem('selectedCountries') || '["us"]');
+          var categories = JSON.parse(localStorage.getItem('selectedCategories') || '["health-tech-science"]');
+          if (!Array.isArray(countries) || countries.length === 0) countries = ['us'];
+          if (!Array.isArray(categories) || categories.length === 0) categories = ['health-tech-science'];
+          var p = new URLSearchParams();
+          countries.forEach(function (c) { p.append('countries', c); });
+          categories.forEach(function (c) { p.append('categories', c); });
+          p.set('dateRange', '24h');
+          p.set('language', 'en');
+          var url = '/api/news?' + p.toString();
+          window.__newsPreload = { url: url, promise: fetch(url) };
+        } catch (e) { /* silently ignore — app still works without preload */ }
+      })();
+    </script>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

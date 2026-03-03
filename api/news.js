@@ -3383,6 +3383,19 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
+  // GET requests without user-specific params are publicly cacheable at the
+  // Vercel Edge CDN (s-maxage=300 = 5-min fresh, stale-while-revalidate=600).
+  // This means subsequent visitors with the same filters get a response from
+  // the nearest edge node in ~20ms instead of hitting the serverless function.
+  // We set this header early so it applies to all early-return paths below.
+  const isPubliclyCacheable = req.method === 'GET'
+    && !req.query.searchQuery
+    && !req.query.userId
+    && !req.query.mode;
+  if (isPubliclyCacheable) {
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+  }
+
   // Rate limiting — 30 requests per IP per minute
   if (applyRateLimit(req, res)) return;
 
