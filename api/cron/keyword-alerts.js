@@ -133,9 +133,9 @@ export default async function handler(req, res) {
             </tr>
             <tr>
               <td style="padding:16px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;">
-                <a href="https://shortform.news/keywords" style="font-size:12px;color:#64748b;">Manage alerts</a>
+                <a href="https://shortformnews.com/keywords" style="font-size:12px;color:#64748b;">Manage alerts</a>
                 <span style="color:#cbd5e1;margin:0 8px;">&middot;</span>
-                <span style="font-size:12px;color:#94a3b8;">Shortform News &mdash; shortform.news</span>
+                <span style="font-size:12px;color:#94a3b8;">Shortform News &mdash; shortformnews.com</span>
               </td>
             </tr>
           </table>
@@ -151,7 +151,7 @@ export default async function handler(req, res) {
             Authorization: `Bearer ${RESEND_KEY}`,
           },
           body: JSON.stringify({
-            from: 'Shortform <alerts@shortform.news>',
+            from: 'Shortform <alerts@shortformnews.com>',
             to: [alert.email],
             subject,
             html,
