@@ -31,17 +31,8 @@
     <link rel="preconnect" href="https://images.wsj.net" />
     <link rel="preconnect" href="https://cdn.vox-cdn.com" />
 
-    <!-- Google AdSense — deferred until after the window load event so it
-         doesn't compete for bandwidth during the critical LCP path. -->
-    <script>
-      window.addEventListener('load', function () {
-        var s = document.createElement('script');
-        s.async = true;
-        s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8230549400439546';
-        s.crossOrigin = 'anonymous';
-        document.head.appendChild(s);
-      });
-    </script>
+    <!-- Google AdSense — standard static async tag required by AdSense policy. -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8230549400439546" crossorigin="anonymous"></script>
   </head>
   <body>
     <div id="root"></div>
