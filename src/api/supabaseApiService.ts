@@ -246,9 +246,9 @@ class SupabaseApiService {
 
   // ─── Search Analytics ─────────────────────────────────────────────────────
 
-  async getSearchAnalytics(days = 30): Promise<SearchAnalyticsEntry[]> {
+  async getSearchAnalytics(days = 30, keyword?: string | string[]): Promise<SearchAnalyticsEntry[]> {
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-    const { data, error } = await supabase
+    let query = supabase
       .from('search_analytics')
       .select('*')
       .eq('user_id', this.userId)
@@ -256,6 +256,13 @@ class SupabaseApiService {
       .order('created_at', { ascending: false })
       .limit(500)
 
+    if (Array.isArray(keyword)) {
+      query = query.in('keyword', keyword)
+    } else if (keyword) {
+      query = query.eq('keyword', keyword)
+    }
+
+    const { data, error } = await query
     if (error) throw error
     return data ?? []
   }
