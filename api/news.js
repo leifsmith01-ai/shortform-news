@@ -2946,7 +2946,7 @@ function keywordRelevanceScore(article, searchTerms, rawKeyword) {
 async function searchNewsAPIByKeyword(keyword, apiKey, domains, opts = {}) {
   const params = new URLSearchParams({
     q: keyword, domains: domains || TRUSTED_DOMAINS, language: 'en',
-    sortBy: opts.sortByPopularity ? 'popularity' : 'publishedAt', pageSize: '20', apiKey,
+    sortBy: opts.sortByPopularity ? 'popularity' : 'publishedAt', pageSize: '50', apiKey,
   });
   if (opts.from) params.set('from', opts.from);
   const response = await fetchWithTimeout(`https://newsapi.org/v2/everything?${params}`);
@@ -2958,7 +2958,7 @@ async function searchNewsAPIByKeyword(keyword, apiKey, domains, opts = {}) {
 
 async function searchWorldNewsAPIByKeyword(keyword, apiKey, opts = {}) {
   const params = new URLSearchParams({
-    text: keyword, language: 'en', number: '20',
+    text: keyword, language: 'en', number: '50',
     sort: opts.sortByPopularity ? 'relevance' : 'publish-time', 'sort-direction': 'DESC', 'api-key': apiKey,
   });
   if (opts.from) params.set('earliest-publish-date', opts.from);
@@ -2969,7 +2969,7 @@ async function searchWorldNewsAPIByKeyword(keyword, apiKey, opts = {}) {
 }
 
 async function searchNewsDataByKeyword(keyword, apiKey, opts = {}) {
-  const params = new URLSearchParams({ q: keyword, language: 'en', apikey: apiKey });
+  const params = new URLSearchParams({ q: keyword, language: 'en', size: '50', apikey: apiKey });
   if (opts.from) params.set('from_date', opts.from);
   const response = await fetchWithTimeout(`https://newsdata.io/api/1/latest?${params}`);
   if (!response.ok) throw new Error(`NewsData keyword error: ${response.status}`);
@@ -2981,7 +2981,7 @@ async function searchNewsDataByKeyword(keyword, apiKey, opts = {}) {
 async function searchGuardianByKeyword(keyword, apiKey, opts = {}) {
   const params = new URLSearchParams({
     q: keyword, 'show-fields': 'trailText,thumbnail,byline,bodyText',
-    'page-size': '20', 'order-by': 'newest', 'api-key': apiKey || 'test',
+    'page-size': '50', 'order-by': 'newest', 'api-key': apiKey || 'test',
   });
   if (opts.from) params.set('from-date', opts.from);
   const response = await fetchWithTimeout(`https://content.guardianapis.com/search?${params}`);
@@ -2993,7 +2993,7 @@ async function searchGuardianByKeyword(keyword, apiKey, opts = {}) {
 
 async function searchGNewsByKeyword(keyword, apiKey, opts = {}) {
   const params = new URLSearchParams({
-    q: keyword, lang: 'en', max: '20', token: apiKey,
+    q: keyword, lang: 'en', max: '10', token: apiKey,
     sortby: opts.sortByPopularity ? 'relevance' : 'publishedAt',
   });
   if (opts.from) params.set('from', opts.from);
@@ -3736,11 +3736,11 @@ export default async function handler(req, res) {
         const kwTerms = searchTerms.map(t => t.toLowerCase().replace(/^["'(]+|["')]+$/g, ''));
 
         // Option A: Minimum relevance threshold — drop articles that barely
-        // mention the keyword. Default 0.12; can be tuned per-keyword via the
+        // mention the keyword. Default 0.05; can be tuned per-keyword via the
         // `threshold` request param (clamped to [0, 1]).
         const MIN_KW_RELEVANCE = (threshold !== undefined && threshold !== null && !isNaN(parseFloat(threshold)))
           ? Math.min(Math.max(parseFloat(threshold), 0), 1)
-          : 0.12;
+          : 0.05;
         const beforeThreshold = filtered.length;
         filtered = filtered.filter(a => {
           const score = keywordRelevanceScore(a, searchTerms, keyword);
