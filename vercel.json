@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron/keyword-alerts",
+      "schedule": "0 7 * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
@@ -13,13 +19,17 @@
     "api/*.js": {
       "memory": 512,
       "maxDuration": 30
+    },
+    "api/cron/keyword-alerts.js": {
+      "memory": 512,
+      "maxDuration": 60
     }
   },
   "headers": [
     {
       "source": "/api/(.*)",
       "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "https://shortform.news" },
+        { "key": "Access-Control-Allow-Origin", "value": "https://shortformnews.com" },
         { "key": "Vary", "value": "Origin" },
         { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" },

@@ -2,6 +2,7 @@
 // Replaces localStorage with a real database, keyed by Clerk user ID
 
 import { supabase } from '@/lib/supabaseClient'
+import type { KeywordTopic, KeywordAlertSetting, SearchAnalyticsEntry } from '@/types/article'
 
 class SupabaseApiService {
   private userId: string
@@ -126,6 +127,137 @@ class SupabaseApiService {
       .eq('user_id', this.userId)
 
     if (error) throw error
+  }
+
+  async updateKeywordThreshold(id: string, threshold: number): Promise<void> {
+    const clamped = Math.min(Math.max(threshold, 0), 1)
+    const { error } = await supabase
+      .from('tracked_keywords')
+      .update({ threshold: clamped })
+      .eq('id', id)
+      .eq('user_id', this.userId)
+
+    if (error) throw error
+  }
+
+  async updateKeywordArticleCount(id: string, count: number): Promise<void> {
+    const { error } = await supabase
+      .from('tracked_keywords')
+      .update({ last_article_count: count })
+      .eq('id', id)
+      .eq('user_id', this.userId)
+
+    if (error) throw error
+  }
+
+  // ─── Keyword Topics ───────────────────────────────────────────────────────
+
+  async getTopics(): Promise<KeywordTopic[]> {
+    const { data, error } = await supabase
+      .from('keyword_topics')
+      .select('*, keyword_topic_members(keyword_id)')
+      .eq('user_id', this.userId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data ?? []
+  }
+
+  async createTopic(name: string): Promise<KeywordTopic> {
+    const { data, error } = await supabase
+      .from('keyword_topics')
+      .insert({ user_id: this.userId, name: name.trim() })
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  }
+
+  async deleteTopic(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('keyword_topics')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', this.userId)
+
+    if (error) throw error
+  }
+
+  async addKeywordToTopic(topicId: string, keywordId: string): Promise<void> {
+    const { error } = await supabase
+      .from('keyword_topic_members')
+      .insert({ topic_id: topicId, keyword_id: keywordId })
+
+    if (error && !error.message.includes('duplicate')) throw error
+  }
+
+  async removeKeywordFromTopic(topicId: string, keywordId: string): Promise<void> {
+    const { error } = await supabase
+      .from('keyword_topic_members')
+      .delete()
+      .eq('topic_id', topicId)
+      .eq('keyword_id', keywordId)
+
+    if (error) throw error
+  }
+
+  // ─── Keyword Alert Settings ───────────────────────────────────────────────
+
+  async getAlertSettings(): Promise<KeywordAlertSetting[]> {
+    const { data, error } = await supabase
+      .from('keyword_alert_settings')
+      .select('*')
+      .eq('user_id', this.userId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data ?? []
+  }
+
+  async upsertAlertSetting(
+    keywordId: string,
+    email: string,
+    frequency: 'hourly' | 'daily',
+    enabled: boolean
+  ): Promise<KeywordAlertSetting> {
+    const { data, error } = await supabase
+      .from('keyword_alert_settings')
+      .upsert(
+        { user_id: this.userId, keyword_id: keywordId, email, frequency, enabled },
+        { onConflict: 'user_id,keyword_id' }
+      )
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  }
+
+  async deleteAlertSetting(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('keyword_alert_settings')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', this.userId)
+
+    if (error) throw error
+  }
+
+  // ─── Search Analytics ─────────────────────────────────────────────────────
+
+  async getSearchAnalytics(days = 30): Promise<SearchAnalyticsEntry[]> {
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+    const { data, error } = await supabase
+      .from('search_analytics')
+      .select('*')
+      .eq('user_id', this.userId)
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(500)
+
+    if (error) throw error
+    return data ?? []
   }
 
   // ─── Article Reactions ────────────────────────────────────────────────────

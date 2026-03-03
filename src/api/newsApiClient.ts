@@ -17,6 +17,7 @@ function buildNewsUrl(params: FetchNewsParams): string {
   if (params.userId) p.set('userId', params.userId);
   if (params.mode) p.set('mode', params.mode);
   if (params.strictMode !== undefined) p.set('strictMode', String(params.strictMode));
+  if (params.threshold !== undefined) p.set('threshold', String(params.threshold));
   return `${API_BASE}/news?${p.toString()}`;
 }
 
