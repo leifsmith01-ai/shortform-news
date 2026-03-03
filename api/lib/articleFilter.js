@@ -69,6 +69,7 @@ export const CATEGORY_QUERY_NOUNS = {
   science:    ['research', 'science', 'discovery', 'climate', 'space', 'laboratory', 'environment'],
   health:     ['health', 'hospital', 'healthcare', 'medical', 'disease', 'public health'],
   sports:     ['sport', 'team', 'league', 'championship', 'football', 'cricket', 'athlete'],
+  entertainment: ['entertainment', 'film', 'music', 'gaming', 'television', 'concert', 'movie'],
   gaming:     ['gaming', 'video game', 'esports', 'game industry', 'game developer', 'game release', 'mobile game'],
   film:       ['film', 'movie', 'cinema', 'box office', 'film industry'],
   tv:         ['television', 'TV', 'streaming', 'TV series', 'broadcast'],
@@ -187,6 +188,34 @@ export const CATEGORY_RELEVANCE_KEYWORDS = {
       'cricket', 'football', 'soccer', 'tennis', 'rugby', 'boxing',
       'hockey', 'baseball', 'basketball', 'qualifier', 'roster',
       'draft pick', 'injury report', 'halftime', 'referee',
+    ],
+  },
+  entertainment: {
+    exclude: [
+      'shot dead', 'killed by police', 'police shooting', 'murder suspect',
+      'arrested for', 'drug bust', 'gang member', 'charged with murder',
+    ],
+    strong: [
+      // Gaming
+      'video game', 'esport', 'playstation', 'xbox', 'nintendo', 'game developer',
+      'game studio', 'indie game', 'game pass', 'battle royale',
+      // Film
+      'box office', 'screenplay', 'hollywood', 'blockbuster', 'oscar', 'academy award',
+      'golden globe', 'bafta', 'film festival', 'cannes', 'film director', 'movie franchise',
+      // TV
+      'tv show', 'tv series', 'showrunner', 'series finale', 'reality tv', 'sitcom',
+      'netflix', 'hbo', 'disney+', 'apple tv+', 'amazon prime video', 'peacock',
+      'paramount+', 'limited series', 'docuseries', 'streaming service',
+      // Music
+      'grammy', 'brit award', 'album release', 'record label', 'music festival',
+      'music video', 'world tour', 'coachella', 'glastonbury', 'billboard chart',
+      'music producer', 'debut album',
+    ],
+    weak: [
+      'gaming', 'console', 'gamer', 'game release',
+      'film', 'movie', 'cinema', 'actor', 'actress', 'premiere', 'trailer',
+      'television', 'episode', 'streaming', 'season finale',
+      'music', 'song', 'singer', 'band', 'album', 'concert', 'rapper', 'musician',
     ],
   },
   gaming: {
