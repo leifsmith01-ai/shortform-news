@@ -65,17 +65,29 @@ async function redisSet(key, value, ttlSeconds) {
 
 /**
  * Get a cache entry. Returns null on miss or error.
- * Checks Redis first, falls back to in-process CACHE.
+ * Checks in-process CACHE first (zero latency for warm same-instance hits),
+ * then falls back to Redis for cross-instance consistency.
  *
  * @param {string} key
  * @returns {Promise<{articles: unknown[], timestamp: number}|null>}
  */
 export async function getCache(key) {
+  // Check in-process cache first — avoids a Redis round-trip (~20-50ms)
+  // on warm serverless instances, which are the most common case.
+  const inProcessEntry = CACHE[key];
+  if (isCacheValid(inProcessEntry, key)) {
+    console.log(`[redisCache] In-process HIT: ${key}`);
+    return inProcessEntry;
+  }
+
+  // Fall back to Redis for cross-instance cache sharing.
   if (REDIS_ENABLED) {
     try {
       const entry = await redisGet(key);
       if (entry) {
         console.log(`[redisCache] Redis HIT: ${key}`);
+        // Warm the in-process cache so the next request on this instance is instant.
+        CACHE[key] = entry;
         return entry;
       }
     } catch (err) {
@@ -83,9 +95,7 @@ export async function getCache(key) {
     }
   }
 
-  // In-process fallback
-  const entry = CACHE[key];
-  return isCacheValid(entry, key) ? entry : null;
+  return null;
 }
 
 /**

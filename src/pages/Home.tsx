@@ -15,7 +15,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import AdUnit from '@/components/AdUnit';
 import api from '@/api';
 import { sanitizeSearchQuery } from '@/lib/sanitize';
-import { mergeAndRank } from '@/lib/articleCache';
+import { mergeAndRank, getCachedArticles, hasFreshCache } from '@/lib/articleCache';
 
 const COUNTRY_NAMES: Record<string, string> = {
   // North America
@@ -110,12 +110,23 @@ export default function Home() {
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState('24h');
-  const [articles, setArticles] = useState([]);
+  const [articles, setArticles] = useState(() => {
+    // Synchronously hydrate from localStorage cache on first render.
+    // This eliminates the skeleton flash for returning visitors — the first
+    // React paint already has real article data visible.
+    if (!hasFreshCache()) return [];
+    return getCachedArticles({
+      countries: getStoredList('selectedCountries', ['us']),
+      categories: getStoredList('selectedCategories', ['health-tech-science']),
+      dateRange: '24h',
+    });
+  });
   const [lowCoverage, setLowCoverage] = useState<{ country: string; category: string; count: number }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   // Stale-while-revalidate: keeps the last successful fetch visible while a new one runs.
-  const [hasStaleData, setHasStaleData] = useState(false);
+  // Pre-populate to true if we already have cached articles so the loading skeleton is skipped.
+  const [hasStaleData, setHasStaleData] = useState(() => hasFreshCache());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [groupBy, setGroupBy] = useState(null);
