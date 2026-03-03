@@ -2402,6 +2402,16 @@ async function fetchFromGNews(country, category, apiKey, opts = {}) {
   return data.articles || [];
 }
 
+// Categories where MediaStack has a reliable direct 1:1 mapping.
+// politics and world both map to 'general' in MediaStack (too broad to trust natively).
+// entertainment subcategories (gaming/film/tv/music) map to 'entertainment' — they are
+// included here but BROAD_API_CATEGORIES in articleFilter.js ensures keyword validation
+// still applies for those subcategories.
+const MEDIASTACK_NATIVE_CATS = new Set([
+  'business', 'technology', 'sports', 'science', 'health',
+  'entertainment', 'gaming', 'film', 'tv', 'music',
+]);
+
 // Helper: fetch from MediaStack API
 // Free tier: ~500 req/month (~16/day). To conserve quota, only call this when
 // showNonEnglish=true and the country is not in RSS_WELL_SERVED_COUNTRIES.
@@ -2432,7 +2442,7 @@ async function fetchFromMediaStack(country, category, apiKey, opts = {}) {
   return data.data || [];
 }
 
-function formatMediaStackArticle(article, country, category) {
+function formatMediaStackArticle(article, country, category, nativeCategory = false) {
   const sourceUrl = article.url || '#';
   return {
     id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -2447,6 +2457,7 @@ function formatMediaStackArticle(article, country, category) {
     country, category,
     language: article.language || 'en',
     summary_points: null,
+    _nativeCategory: nativeCategory,
     _meta: {
       sourceCountry: article.country || inferCountryFromUrl(sourceUrl),
     },
@@ -2487,7 +2498,7 @@ async function fetchFromCurrentsAPI(country, category, apiKey, opts = {}) {
   return data.news || [];
 }
 
-function formatCurrentsAPIArticle(article, country, category) {
+function formatCurrentsAPIArticle(article, country, category, nativeCategory = false) {
   const sourceUrl = article.url || '#';
   return {
     id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -2502,6 +2513,7 @@ function formatCurrentsAPIArticle(article, country, category) {
     country, category,
     language: article.language || 'en',
     summary_points: null,
+    _nativeCategory: nativeCategory,
     _meta: {
       sourceCountry: inferCountryFromUrl(sourceUrl),
     },
@@ -4094,8 +4106,8 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
   const worldNewsArticles = worldNewsRaw.map(a => formatWorldNewsAPIArticle(a, country, category, true));
   const gNewsArticles = gNewsRaw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category, true));
   const newsDataArticles = newsDataRaw.filter(a => a.title && a.title !== '[Removed]').map(a => formatNewsDataArticle(a, country, category, true));
-  const currentsArticles = currentsRaw.filter(a => a.title && a.url).map(a => formatCurrentsAPIArticle(a, country, category));
-  const mediaStackArticles = mediaStackRaw.filter(a => a.title && a.url).map(a => formatMediaStackArticle(a, country, category));
+  const currentsArticles = currentsRaw.filter(a => a.title && a.url).map(a => formatCurrentsAPIArticle(a, country, category, true));
+  const mediaStackArticles = mediaStackRaw.filter(a => a.title && a.url).map(a => formatMediaStackArticle(a, country, category, MEDIASTACK_NATIVE_CATS.has(category)));
 
   // Merge parallel results; dedup by URL so overlapping wire service articles aren't doubled
   const seenUrls = new Set();
