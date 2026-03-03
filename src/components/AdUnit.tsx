@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 
 // Extend window type for AdSense
 declare global {
@@ -33,9 +34,16 @@ export default function AdUnit({
 }: AdUnitProps) {
   const adRef = useRef<HTMLModElement>(null)
   const pushed = useRef(false)
+  const location = useLocation()
+
+  // Reset on route change so the ad re-initialises when the component remounts
+  // on a new page. This signals AdSense that a new page view has occurred,
+  // preventing bursts of push() calls from being read as abnormal navigation.
+  useEffect(() => {
+    pushed.current = false
+  }, [location.pathname])
 
   useEffect(() => {
-    // Only push once and only if adsbygoogle is available
     if (pushed.current) return
     try {
       if (typeof window !== 'undefined') {
@@ -46,7 +54,7 @@ export default function AdUnit({
     } catch (e) {
       // AdSense not loaded yet (pending review) — silently ignore
     }
-  }, [])
+  }, [location.pathname])
 
   const client = import.meta.env.VITE_ADSENSE_CLIENT
 
