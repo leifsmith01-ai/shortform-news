@@ -610,6 +610,34 @@ const CATEGORY_RELEVANCE_KEYWORDS = {
       'draft pick', 'injury report', 'halftime', 'referee',
     ],
   },
+  entertainment: {
+    exclude: [
+      'shot dead', 'killed by police', 'police shooting', 'murder suspect',
+      'arrested for', 'drug bust', 'gang member', 'charged with murder',
+    ],
+    strong: [
+      // Gaming
+      'video game', 'esport', 'playstation', 'xbox', 'nintendo', 'game developer',
+      'game studio', 'indie game', 'game pass', 'battle royale',
+      // Film
+      'box office', 'screenplay', 'hollywood', 'blockbuster', 'oscar', 'academy award',
+      'golden globe', 'bafta', 'film festival', 'cannes', 'film director', 'movie franchise',
+      // TV
+      'tv show', 'tv series', 'showrunner', 'series finale', 'reality tv', 'sitcom',
+      'netflix', 'hbo', 'disney+', 'apple tv+', 'amazon prime video', 'peacock',
+      'paramount+', 'limited series', 'docuseries', 'streaming service',
+      // Music
+      'grammy', 'brit award', 'album release', 'record label', 'music festival',
+      'music video', 'world tour', 'coachella', 'glastonbury', 'billboard chart',
+      'music producer', 'debut album',
+    ],
+    weak: [
+      'gaming', 'console', 'gamer', 'game release',
+      'film', 'movie', 'cinema', 'actor', 'actress', 'premiere', 'trailer',
+      'television', 'episode', 'streaming', 'season finale',
+      'music', 'song', 'singer', 'band', 'album', 'concert', 'rapper', 'musician',
+    ],
+  },
   gaming: {
     // Exclusion terms: crime/violence articles about entertainers should not match
     // even when weak keywords like 'rapper', 'singer', or 'actor' appear in the text.
@@ -854,6 +882,7 @@ const GUARDIAN_SECTION_MAP = {
   science: 'science',
   health: 'society',
   sports: 'sport',
+  entertainment: 'culture',  // Guardian's 'culture' section covers film, TV, music, games
   gaming: 'games',
   film: 'film',
   tv: 'tv-and-radio',
@@ -876,6 +905,7 @@ const WORLD_NEWS_TOPIC_MAP = {
   science: 'science',
   health: 'health',
   sports: 'sports',
+  entertainment: 'entertainment',
   gaming: 'entertainment',
   film: 'entertainment',
   tv: 'entertainment',
@@ -891,6 +921,7 @@ const NEWS_DATA_CATEGORY_MAP = {
   science: 'science',
   health: 'health',
   sports: 'sports',
+  entertainment: 'entertainment',
   gaming: 'entertainment',
   film: 'entertainment',
   tv: 'entertainment',
@@ -1679,6 +1710,7 @@ const GNEWS_CATEGORY_MAP = {
   science: 'science',
   health: 'health',
   sports: 'sports',
+  entertainment: 'entertainment',
   gaming: 'entertainment',
   film: 'entertainment',
   tv: 'entertainment',
@@ -2130,6 +2162,7 @@ const EVERYTHING_QUERY_MAP = {
   science: '(science OR research OR NASA OR climate OR discovery OR "space exploration" OR biology OR physics OR environment)',
   health: '(health OR medical OR hospital OR disease OR vaccine OR pandemic OR "public health" OR "clinical trial" OR healthcare)',
   sports: '(sports OR championship OR tournament OR Olympics OR FIFA OR "Premier League" OR athlete OR "World Cup")',
+  entertainment: '(gaming OR "video game" OR esports OR film OR movie OR "box office" OR Oscar OR television OR "TV series" OR Netflix OR HBO OR music OR album OR Grammy OR concert OR "film festival")',
   gaming: '(gaming OR "video game" OR esports OR console OR PlayStation OR Xbox OR Nintendo OR "mobile game")',
   film: '(film OR movie OR cinema OR "box office" OR Oscar OR screenplay OR "film festival" OR "film review")',
   tv: '(television OR "TV series" OR "TV show" OR showrunner OR Netflix OR HBO OR Emmy OR "streaming series")',
@@ -2205,6 +2238,7 @@ const WORLD_NEWS_QUERY_TERMS = {
   science: 'science research discovery NASA climate environment',
   health: 'health medical hospital disease vaccine healthcare',
   sports: 'sports championship tournament athlete league football',
+  entertainment: 'entertainment film movie music gaming television concert album "video game"',
   gaming: '"video game" OR esports OR PlayStation OR Xbox OR Nintendo OR "game release" OR "game studio" OR "game developer"',
   film: '"box office" OR screenplay OR Hollywood OR Oscar OR "film festival" OR "movie review" OR "film review" OR blockbuster',
   tv: '"TV series" OR "TV show" OR Netflix OR HBO OR Emmy OR showrunner OR "streaming series" OR sitcom OR "season finale"',
@@ -2377,8 +2411,8 @@ async function fetchFromGNews(country, category, apiKey, opts = {}) {
 async function fetchFromMediaStack(country, category, apiKey, opts = {}) {
   const MEDIASTACK_CATEGORY_MAP = {
     business: 'business', technology: 'technology', sports: 'sports',
-    science: 'science', health: 'health', gaming: 'entertainment',
-    film: 'entertainment', tv: 'entertainment', music: 'entertainment',
+    science: 'science', health: 'health', entertainment: 'entertainment',
+    gaming: 'entertainment', film: 'entertainment', tv: 'entertainment', music: 'entertainment',
     politics: 'general', world: 'general',
   };
   const params = new URLSearchParams({
@@ -2426,8 +2460,8 @@ function formatMediaStackArticle(article, country, category) {
 async function fetchFromCurrentsAPI(country, category, apiKey, opts = {}) {
   const CURRENTS_CATEGORY_MAP = {
     business: 'business', technology: 'technology', sports: 'sports',
-    science: 'science', health: 'health', gaming: 'entertainment',
-    film: 'entertainment', tv: 'entertainment', music: 'entertainment',
+    science: 'science', health: 'health', entertainment: 'entertainment',
+    gaming: 'entertainment', film: 'entertainment', tv: 'entertainment', music: 'entertainment',
     politics: 'politics', world: 'world news',
   };
   const params = new URLSearchParams({
