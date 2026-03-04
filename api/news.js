@@ -3789,6 +3789,11 @@ export default async function handler(req, res) {
                 // consistent with how API sources are filtered.
                 const kwLower = keyword.toLowerCase();
                 const matched = items.filter(item => {
+                  // Date window check — reject items older than fromDate
+                  if (fromDate && item.pubDate) {
+                    const pubTime = new Date(item.pubDate).getTime();
+                    if (pubTime < fromDate.getTime()) return false;
+                  }
                   const text = `${item.title || ''} ${item.description || ''}`.toLowerCase();
                   if (text.includes(kwLower)) return true;
                   for (const term of searchTerms) {
@@ -3822,6 +3827,11 @@ export default async function handler(req, res) {
           .then(items => {
             const kwLower = keyword.toLowerCase();
             const matched = items.filter(item => {
+              // Date window check — reject items older than fromDate
+              if (fromDate && item.pubDate) {
+                const pubTime = new Date(item.pubDate).getTime();
+                if (pubTime < fromDate.getTime()) return false;
+              }
               const text = `${item.title || ''} ${item.description || ''}`.toLowerCase();
               if (text.includes(kwLower)) return true;
               for (const term of searchTerms) {
@@ -3946,6 +3956,32 @@ export default async function handler(req, res) {
           if (filtered.length < beforeStrict) {
             console.log(`  [monitor] Strict headline filter: ${filtered.length}/${beforeStrict} articles have keyword in title`);
           }
+        }
+      }
+
+      // ── Enforce requested date window on keyword results ────────────────
+      // API sources already received a `from:` parameter, but RSS feeds can
+      // return cached articles from beyond the window. Apply a strict post-
+      // filter here so stale articles never appear in the keyword results.
+      if (fromDate) {
+        const fromTime = fromDate.getTime();
+        const inWindow = filtered.filter(a => {
+          if (!a.publishedAt) return false; // no date metadata — exclude in keyword mode
+          return new Date(a.publishedAt).getTime() >= fromTime;
+        });
+        const ENFORCE_MIN = rangeHours && rangeHours <= 24 ? 3 : 5;
+        if (inWindow.length >= ENFORCE_MIN) {
+          filtered = inWindow;
+        } else if (inWindow.length > 0) {
+          // Some in-window articles exist but below the floor — top up with
+          // the least-stale out-of-window articles to reach the floor.
+          const outside = filtered
+            .filter(a => a.publishedAt && new Date(a.publishedAt).getTime() < fromTime)
+            .slice(0, ENFORCE_MIN - inWindow.length);
+          filtered = [...inWindow, ...outside];
+        } else {
+          // No in-window articles at all — return empty rather than stale results.
+          filtered = inWindow;
         }
       }
 
