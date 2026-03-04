@@ -1,5 +1,5 @@
-// api/news.js - Vercel Serverless Function
-// Sources: NewsAPI (primary) → WorldNewsAPI → NewsData.io → The Guardian (fallback)
+﻿// api/news.js - Vercel Serverless Function
+// Sources: NewsAPI (primary) â†’ WorldNewsAPI â†’ NewsData.io â†’ The Guardian (fallback)
 // Cache: 30-day article pool with 6-hour refresh interval
 
 import { applyRateLimit } from './lib/rateLimit.js';
@@ -12,7 +12,7 @@ import {
 import { getCache, setCache } from './lib/redisCache.js';
 // articleFilter.js and ranking.js provide the canonical, tested implementations
 // of the functions below. This file still carries its own inline copies during the
-// migration — a full cut-over is the next step once integration tests are in place.
+// migration â€” a full cut-over is the next step once integration tests are in place.
 // import { ... } from './lib/articleFilter.js';
 // import { ... } from './lib/ranking.js';
 
@@ -21,10 +21,10 @@ import { getCache, setCache } from './lib/redisCache.js';
 // Override via MAX_SUMMARY_ARTICLES env var (e.g. set to 5 to reduce costs).
 const MAX_SUMMARY_ARTICLES = parseInt(process.env.MAX_SUMMARY_ARTICLES || '10', 10);
 
-// API request timeout (ms) — prevents a single slow API from blocking the whole response
+// API request timeout (ms) â€” prevents a single slow API from blocking the whole response
 const API_TIMEOUT_MS = 8000;
 
-// ── Daily API call counters ────────────────────────────────────────────────
+// â”€â”€ Daily API call counters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Tracks how many calls have been made to each external API today (UTC).
 // When any primary API approaches its daily limit, the cache TTL is doubled
 // to reduce further fetches. Counters are in-process and reset on cold-start;
@@ -102,7 +102,7 @@ const NEWS_DATA_SUPPORTED_COUNTRIES = new Set([
 ]);
 
 // Countries where NewsAPI alone reliably returns 20+ high-quality articles per
-// category — skip WorldNewsAPI and GNews in the parallel first pass to conserve
+// category â€” skip WorldNewsAPI and GNews in the parallel first pass to conserve
 // their daily quotas. If post-filter article count still falls below MIN_ARTICLES,
 // the post-filter retry automatically calls those APIs as a safety net.
 const NEWSAPI_FIRST_PASS_COUNTRIES = new Set(['us', 'gb', 'au', 'ca']);
@@ -133,10 +133,10 @@ const COUNTRY_NAMES = {
   au: 'Australia', nz: 'New Zealand', fj: 'Fiji', pg: 'Papua New Guinea',
 };
 
-// Trusted news sources — single registry used to derive domain and source-ID lists.
+// Trusted news sources â€” single registry used to derive domain and source-ID lists.
 // Each entry: { domain, sourceId (NewsAPI ID, nullable), name, group }
 const ALL_TRUSTED_SOURCES = [
-  // ── General / Wire ────────────────────────────────────────────────────────
+  // â”€â”€ General / Wire â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { domain: 'reuters.com', sourceId: 'reuters', name: 'Reuters', group: 'general' },
   { domain: 'bbc.co.uk', sourceId: 'bbc-news', name: 'BBC News', group: 'general' },
   { domain: 'bbc.com', sourceId: null, name: 'BBC (intl)', group: 'general' },
@@ -157,7 +157,7 @@ const ALL_TRUSTED_SOURCES = [
   { domain: 'theatlantic.com', sourceId: 'the-atlantic', name: 'The Atlantic', group: 'general' },
   { domain: 'time.com', sourceId: 'time', name: 'Time', group: 'general' },
   { domain: 'usatoday.com', sourceId: 'usa-today', name: 'USA Today', group: 'general' },
-  // ── Regional ──────────────────────────────────────────────────────────────
+  // â”€â”€ Regional â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { domain: 'smh.com.au', sourceId: null, name: 'Sydney Morning Herald', group: 'regional' },
   { domain: 'theaustralian.com.au', sourceId: null, name: 'The Australian', group: 'regional' },
   { domain: 'france24.com', sourceId: null, name: 'France 24', group: 'regional' },
@@ -169,7 +169,7 @@ const ALL_TRUSTED_SOURCES = [
   { domain: 'straitstimes.com', sourceId: null, name: 'Straits Times', group: 'regional' },
   { domain: 'caixinglobal.com', sourceId: null, name: 'Caixin Global', group: 'regional' },
   { domain: 'asia.nikkei.com', sourceId: null, name: 'Nikkei Asia', group: 'regional' },
-  // ── Regional (supplemental — underserved countries) ──────────────────────
+  // â”€â”€ Regional (supplemental â€” underserved countries) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Canada (national outlets improve coverage when NewsAPI trusted-domains filter is active)
   { domain: 'cbc.ca', sourceId: null, name: 'CBC News', group: 'regional' },
   { domain: 'globeandmail.com', sourceId: null, name: 'The Globe and Mail', group: 'regional' },
@@ -180,7 +180,7 @@ const ALL_TRUSTED_SOURCES = [
   { domain: 'nzherald.co.nz', sourceId: null, name: 'NZ Herald', group: 'regional' },
   // Ireland
   { domain: 'irishtimes.com', sourceId: null, name: 'Irish Times', group: 'regional' },
-  { domain: 'rte.ie', sourceId: null, name: 'RTÉ News', group: 'regional' },
+  { domain: 'rte.ie', sourceId: null, name: 'RTÃ‰ News', group: 'regional' },
   // European English-language (supplements DW for non-English-dominant EU countries)
   { domain: 'thelocal.com', sourceId: null, name: 'The Local Europe', group: 'regional' },
   { domain: 'swissinfo.ch', sourceId: null, name: 'SWI swissinfo.ch', group: 'regional' },
@@ -215,7 +215,7 @@ const ALL_TRUSTED_SOURCES = [
   { domain: 'notesfrompoland.com', sourceId: null, name: 'Notes from Poland', group: 'regional' },
   { domain: 'meduza.io', sourceId: null, name: 'Meduza', group: 'regional' },
   { domain: 'independent.co.uk', sourceId: 'the-independent', name: 'The Independent', group: 'regional' },
-  // ── Business & Finance ────────────────────────────────────────────────────
+  // â”€â”€ Business & Finance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { domain: 'politico.com', sourceId: 'politico', name: 'Politico', group: 'business' },
   { domain: 'economist.com', sourceId: null, name: 'The Economist', group: 'business' },
   { domain: 'ft.com', sourceId: null, name: 'Financial Times', group: 'business' },
@@ -224,7 +224,7 @@ const ALL_TRUSTED_SOURCES = [
   { domain: 'cnbc.com', sourceId: 'cnbc', name: 'CNBC', group: 'business' },
   { domain: 'forbes.com', sourceId: 'forbes', name: 'Forbes', group: 'business' },
   { domain: 'fortune.com', sourceId: null, name: 'Fortune', group: 'business' },
-  // ── Technology ────────────────────────────────────────────────────────────
+  // â”€â”€ Technology â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { domain: 'arstechnica.com', sourceId: 'ars-technica', name: 'Ars Technica', group: 'technology' },
   { domain: 'wired.com', sourceId: 'wired', name: 'Wired', group: 'technology' },
   { domain: 'techcrunch.com', sourceId: 'techcrunch', name: 'TechCrunch', group: 'technology' },
@@ -234,19 +234,19 @@ const ALL_TRUSTED_SOURCES = [
   { domain: 'technologyreview.com', sourceId: null, name: 'MIT Technology Review', group: 'technology' },
   { domain: 'venturebeat.com', sourceId: 'venture-beat', name: 'VentureBeat', group: 'technology' },
   { domain: 'zdnet.com', sourceId: 'zdnet', name: 'ZDNet', group: 'technology' },
-  // ── Science ───────────────────────────────────────────────────────────────
+  // â”€â”€ Science â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { domain: 'nationalgeographic.com', sourceId: 'national-geographic', name: 'National Geographic', group: 'science' },
   { domain: 'newscientist.com', sourceId: 'new-scientist', name: 'New Scientist', group: 'science' },
   { domain: 'scientificamerican.com', sourceId: null, name: 'Scientific American', group: 'science' },
   { domain: 'nature.com', sourceId: null, name: 'Nature', group: 'science' },
   { domain: 'statnews.com', sourceId: null, name: 'STAT News', group: 'science' },
-  // ── Sports ────────────────────────────────────────────────────────────────
+  // â”€â”€ Sports â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { domain: 'espn.com', sourceId: 'espn', name: 'ESPN', group: 'sports' },
   { domain: 'theathletic.com', sourceId: null, name: 'The Athletic', group: 'sports' },
   { domain: 'si.com', sourceId: null, name: 'Sports Illustrated', group: 'sports' },
   { domain: 'skysports.com', sourceId: null, name: 'Sky Sports', group: 'sports' },
   { domain: 'bleacherreport.com', sourceId: 'bleacher-report', name: 'Bleacher Report', group: 'sports' },
-  // ── Gaming ────────────────────────────────────────────────────────────────
+  // â”€â”€ Gaming â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { domain: 'ign.com', sourceId: 'ign', name: 'IGN', group: 'gaming' },
   { domain: 'polygon.com', sourceId: 'polygon', name: 'Polygon', group: 'gaming' },
   { domain: 'eurogamer.net', sourceId: null, name: 'Eurogamer', group: 'gaming' },
@@ -257,7 +257,7 @@ const ALL_TRUSTED_SOURCES = [
   { domain: 'gamesradar.com', sourceId: null, name: 'GamesRadar', group: 'gaming' },
   { domain: 'vg247.com', sourceId: null, name: 'VG247', group: 'gaming' },
   { domain: 'dualshockers.com', sourceId: null, name: 'DualShockers', group: 'gaming' },
-  // ── Film & TV ─────────────────────────────────────────────────────────────
+  // â”€â”€ Film & TV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { domain: 'variety.com', sourceId: null, name: 'Variety', group: 'film' },
   { domain: 'hollywoodreporter.com', sourceId: null, name: 'Hollywood Reporter', group: 'film' },
   { domain: 'deadline.com', sourceId: null, name: 'Deadline', group: 'film' },
@@ -267,22 +267,22 @@ const ALL_TRUSTED_SOURCES = [
   { domain: 'tvline.com', sourceId: null, name: 'TVLine', group: 'tv' },
   { domain: 'collider.com', sourceId: null, name: 'Collider', group: 'tv' },
   { domain: 'buzzfeed.com', sourceId: 'buzzfeed', name: 'BuzzFeed', group: 'tv' },
-  // ── Music ─────────────────────────────────────────────────────────────────
+  // â”€â”€ Music â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { domain: 'rollingstone.com', sourceId: null, name: 'Rolling Stone', group: 'music' },
   { domain: 'billboard.com', sourceId: null, name: 'Billboard', group: 'music' },
   { domain: 'pitchfork.com', sourceId: null, name: 'Pitchfork', group: 'music' },
   { domain: 'nme.com', sourceId: null, name: 'NME', group: 'music' },
   { domain: 'consequence.net', sourceId: null, name: 'Consequence of Sound', group: 'music' },
-  // ── Middle East (additional) ──────────────────────────────────────────────
+  // â”€â”€ Middle East (additional) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { domain: 'dailysabah.com', sourceId: null, name: 'Daily Sabah', group: 'regional' },
-  // ── Asia (additional) ─────────────────────────────────────────────────────
+  // â”€â”€ Asia (additional) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { domain: 'nhk.or.jp', sourceId: null, name: 'NHK World', group: 'regional' },
   { domain: 'dawn.com', sourceId: null, name: 'Dawn (Pakistan)', group: 'regional' },
   { domain: 'thedailystar.net', sourceId: null, name: 'The Daily Star (BD)', group: 'regional' },
   { domain: 'vietnamnews.vn', sourceId: null, name: 'Vietnam News', group: 'regional' },
-  // ── Africa (additional) ───────────────────────────────────────────────────
+  // â”€â”€ Africa (additional) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { domain: 'theeastafrican.co.ke', sourceId: null, name: 'The East African', group: 'regional' },
-  // ── Europe (additional) ───────────────────────────────────────────────────
+  // â”€â”€ Europe (additional) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { domain: 'thelocal.de', sourceId: null, name: 'The Local (Germany)', group: 'regional' },
   { domain: 'thelocal.fr', sourceId: null, name: 'The Local (France)', group: 'regional' },
   { domain: 'thelocal.es', sourceId: null, name: 'The Local (Spain)', group: 'regional' },
@@ -290,7 +290,7 @@ const ALL_TRUSTED_SOURCES = [
   { domain: 'thelocal.it', sourceId: null, name: 'The Local (Italy)', group: 'regional' },
   { domain: 'thelocal.no', sourceId: null, name: 'The Local (Norway)', group: 'regional' },
   { domain: 'euractiv.com', sourceId: null, name: 'Euractiv', group: 'regional' },
-  // ── Americas (additional) ─────────────────────────────────────────────────
+  // â”€â”€ Americas (additional) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   { domain: 'ticotimes.net', sourceId: null, name: 'Tico Times', group: 'regional' },
   { domain: 'colombiareports.com', sourceId: null, name: 'Colombia Reports', group: 'regional' },
 ];
@@ -310,69 +310,69 @@ function buildTrustedSourceIds(userDomains) {
   return sources.filter(s => s.sourceId).map(s => s.sourceId).join(',');
 }
 
-// Default (all sources) — used when no user selection is provided
+// Default (all sources) â€” used when no user selection is provided
 const TRUSTED_DOMAINS = buildTrustedDomains(null);
 const TRUSTED_SOURCE_IDS = buildTrustedSourceIds(null);
 
-// Keywords/demonyms for relevance filtering — articles must mention at least one term.
+// Keywords/demonyms for relevance filtering â€” articles must mention at least one term.
 // Includes country name, demonyms, abbreviations, capital cities, and major cities.
-// City names are strong relevance signals (e.g. "Tokyo" → Japan, "Berlin" → Germany).
+// City names are strong relevance signals (e.g. "Tokyo" â†’ Japan, "Berlin" â†’ Germany).
 const COUNTRY_RELEVANCE_KEYWORDS = {
-  // ── North America ──────────────────────────────────────────────────────
+  // â”€â”€ North America â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   us: ['united states', 'america', 'american', 'u.s.', ' us ', 'washington d.c.', 'new york', 'los angeles', 'chicago', 'houston', 'san francisco', 'silicon valley', 'trump', 'donald trump', 'biden', 'joe biden', 'harris', 'kamala harris', 'senate', 'house of representatives', 'supreme court', 'white house', 'capitol', 'pentagon', 'federal reserve', 'republican', 'democrat', 'gop', 'atlanta', 'miami', 'seattle', 'dallas', 'phoenix', 'boston', 'denver', 'minneapolis', 'rubio', 'marco rubio', 'musk', 'elon musk'],
   ca: ['canada', 'canadian', 'ottawa', 'toronto', 'vancouver', 'montreal', 'calgary', 'trudeau', 'justin trudeau', 'poilievre', 'pierre poilievre', 'jagmeet singh', 'mark carney', 'parliament hill', 'house of commons', 'edmonton', 'winnipeg', 'hamilton', 'ontario', 'quebec', 'alberta', 'british columbia', 'nova scotia', 'liberal party of canada', 'ndp', 'rcmp', 'bank of canada'],
   mx: ['mexico', 'mexican', 'mexico city', 'guadalajara', 'monterrey', 'sheinbaum', 'claudia sheinbaum', 'amlo', 'obrador', 'morena', 'tijuana', 'cancun', 'puebla', 'oaxaca', 'juarez', 'merida', 'narco', 'cartel'],
-  cu: ['cuba', 'cuban', 'havana', 'díaz-canel', 'diaz-canel', 'communist party of cuba'],
+  cu: ['cuba', 'cuban', 'havana', 'dÃ­az-canel', 'diaz-canel', 'communist party of cuba'],
   jm: ['jamaica', 'jamaican', 'kingston', 'holness', 'andrew holness'],
   cr: ['costa rica', 'costa rican', 'san jose', 'chaves', 'rodrigo chaves'],
-  pa: ['panama', 'panamanian', 'panama city', 'mulino', 'josé raúl mulino', 'panama canal'],
+  pa: ['panama', 'panamanian', 'panama city', 'mulino', 'josÃ© raÃºl mulino', 'panama canal'],
   do: ['dominican republic', 'dominican', 'santo domingo', 'abinader', 'luis abinader'],
-  gt: ['guatemala', 'guatemalan', 'guatemala city', 'arévalo', 'bernardo arévalo'],
+  gt: ['guatemala', 'guatemalan', 'guatemala city', 'arÃ©valo', 'bernardo arÃ©valo'],
   hn: ['honduras', 'honduran', 'tegucigalpa', 'castro', 'xiomara castro'],
-  // ── South America ──────────────────────────────────────────────────────
-  br: ['brazil', 'brazilian', 'brasilia', 'são paulo', 'sao paulo', 'rio de janeiro', 'lula', 'lula da silva', 'planalto', 'bolsonaro', 'belo horizonte', 'fortaleza', 'manaus', 'curitiba', 'porto alegre', 'amazon', 'pt party', 'stf'],
+  // â”€â”€ South America â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  br: ['brazil', 'brazilian', 'brasilia', 'sÃ£o paulo', 'sao paulo', 'rio de janeiro', 'lula', 'lula da silva', 'planalto', 'bolsonaro', 'belo horizonte', 'fortaleza', 'manaus', 'curitiba', 'porto alegre', 'amazon', 'pt party', 'stf'],
   ar: ['argentina', 'argentinian', 'argentine', 'buenos aires', 'milei', 'javier milei', 'kirchner', 'casa rosada', 'peronist', 'cordoba', 'rosario', 'mendoza', 'libertad avanza', 'peso crisis'],
   cl: ['chile', 'chilean', 'santiago', 'boric', 'gabriel boric', 'valparaiso', 'concepcion', 'antofagasta'],
-  co: ['colombia', 'colombian', 'bogota', 'bogotá', 'medellin', 'medellín', 'petro', 'gustavo petro', 'cartagena', 'cali', 'barranquilla', 'farc', 'coca'],
+  co: ['colombia', 'colombian', 'bogota', 'bogotÃ¡', 'medellin', 'medellÃ­n', 'petro', 'gustavo petro', 'cartagena', 'cali', 'barranquilla', 'farc', 'coca'],
   pe: ['peru', 'peruvian', 'lima', 'boluarte', 'dina boluarte', 'castillo', 'arequipa', 'trujillo'],
-  ve: ['venezuela', 'venezuelan', 'caracas', 'maduro', 'nicolas maduro', 'chavismo', 'miraflores', 'edmundo gonzalez', 'maría corina machado'],
+  ve: ['venezuela', 'venezuelan', 'caracas', 'maduro', 'nicolas maduro', 'chavismo', 'miraflores', 'edmundo gonzalez', 'marÃ­a corina machado'],
   ec: ['ecuador', 'ecuadorian', 'quito', 'guayaquil', 'noboa', 'daniel noboa', 'galapagos'],
-  uy: ['uruguay', 'uruguayan', 'montevideo', 'orsi', 'yamandú orsi', 'frente amplio'],
-  py: ['paraguay', 'paraguayan', 'asuncion', 'asunción', 'peña', 'santiago peña', 'colorado party'],
+  uy: ['uruguay', 'uruguayan', 'montevideo', 'orsi', 'yamandÃº orsi', 'frente amplio'],
+  py: ['paraguay', 'paraguayan', 'asuncion', 'asunciÃ³n', 'peÃ±a', 'santiago peÃ±a', 'colorado party'],
   bo: ['bolivia', 'bolivian', 'la paz', 'sucre', 'arce', 'luis arce', 'morales', 'evo morales', 'cochabamba'],
-  // ── Europe ─────────────────────────────────────────────────────────────
+  // â”€â”€ Europe â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   gb: ['united kingdom', 'britain', 'british', ' uk ', 'england', 'scotland', 'wales', 'london', 'manchester', 'birmingham', 'edinburgh', 'westminster', 'downing street', 'starmer', 'keir starmer', 'labour', 'tory', 'tories', 'conservative', 'sunak', 'rishi sunak', 'badenoch', 'kemi badenoch', 'reeves', 'rachel reeves', 'farage', 'nigel farage', 'reform uk', 'liverpool', 'leeds', 'sheffield', 'parliament', 'chancellor of the exchequer', 'bank of england', 'nhs', 'brexit', 'northern ireland'],
-  de: ['germany', 'german', 'berlin', 'munich', 'frankfurt', 'hamburg', 'bundestag', 'scholz', 'olaf scholz', 'merz', 'friedrich merz', 'spd', 'cdu', 'habeck', 'robert habeck', 'baerbock', 'annalena baerbock', 'bundesrat', 'afd', 'fdp', 'csu', 'greens', 'cologne', 'köln', 'düsseldorf', 'dusseldorf', 'stuttgart', 'chancellery', 'chancellorship', 'weidel', 'alice weidel'],
-  fr: ['france', 'french', 'paris', 'marseille', 'lyon', 'élysée', 'elysee', 'macron', 'emmanuel macron', 'le pen', 'marine le pen', 'bayrou', 'toulouse', 'nice', 'bordeaux', 'national assembly', 'rassemblement national', 'renaissance party', 'nantes', 'strasbourg', 'lille', 'rennes', 'french senate', 'matignon'],
+  de: ['germany', 'german', 'berlin', 'munich', 'frankfurt', 'hamburg', 'bundestag', 'scholz', 'olaf scholz', 'merz', 'friedrich merz', 'spd', 'cdu', 'habeck', 'robert habeck', 'baerbock', 'annalena baerbock', 'bundesrat', 'afd', 'fdp', 'csu', 'greens', 'cologne', 'kÃ¶ln', 'dÃ¼sseldorf', 'dusseldorf', 'stuttgart', 'chancellery', 'chancellorship', 'weidel', 'alice weidel'],
+  fr: ['france', 'french', 'paris', 'marseille', 'lyon', 'Ã©lysÃ©e', 'elysee', 'macron', 'emmanuel macron', 'le pen', 'marine le pen', 'bayrou', 'toulouse', 'nice', 'bordeaux', 'national assembly', 'rassemblement national', 'renaissance party', 'nantes', 'strasbourg', 'lille', 'rennes', 'french senate', 'matignon'],
   it: ['italy', 'italian', 'rome', 'milan', 'naples', 'turin', 'meloni', 'giorgia meloni', 'quirinale', 'genoa', 'bologna', 'palazzo chigi', 'fratelli', 'lega', 'five star', 'democratic party', 'venice', 'florence', 'palermo'],
   es: ['spain', 'spanish', 'madrid', 'barcelona', 'seville', 'sanchez', 'pedro sanchez', 'catalan', 'catalonia', 'valencia', 'bilbao', 'moncloa', 'psoe', 'pp party', 'vox', 'podemos', 'zaragoza', 'malaga', 'cortes', 'rajoy'],
   nl: ['netherlands', 'dutch', 'amsterdam', 'rotterdam', 'the hague', 'den haag', 'wilders', 'geert wilders', 'utrecht', 'pvv', 'eindhoven', 'schiphol', 'second chamber', 'tweede kamer'],
   se: ['sweden', 'swedish', 'stockholm', 'gothenburg', 'kristersson', 'ulf kristersson', 'malmo', 'riksdag', 'sweden democrats', 'moderate party', 'goteborg'],
-  no: ['norway', 'norwegian', 'oslo', 'bergen', 'storting', 'støre', 'jonas gahr støre', 'trondheim', 'stavanger', 'equinor', 'norwegian'],
-  pl: ['poland', 'polish', 'warsaw', 'krakow', 'kraków', 'gdansk', 'tusk', 'donald tusk', 'duda', 'andrzej duda', 'pis', 'sejm', 'wroclaw', 'wrocław', 'poznan', 'lodz', 'łódź', 'senate poland', 'platforma'],
-  ch: ['switzerland', 'swiss', 'bern', 'zurich', 'zürich', 'geneva', 'davos', 'federal council', 'lausanne', 'basel', 'lugano', 'swissinfo', 'world economic forum', 'wef'],
+  no: ['norway', 'norwegian', 'oslo', 'bergen', 'storting', 'stÃ¸re', 'jonas gahr stÃ¸re', 'trondheim', 'stavanger', 'equinor', 'norwegian'],
+  pl: ['poland', 'polish', 'warsaw', 'krakow', 'krakÃ³w', 'gdansk', 'tusk', 'donald tusk', 'duda', 'andrzej duda', 'pis', 'sejm', 'wroclaw', 'wrocÅ‚aw', 'poznan', 'lodz', 'Å‚Ã³dÅº', 'senate poland', 'platforma'],
+  ch: ['switzerland', 'swiss', 'bern', 'zurich', 'zÃ¼rich', 'geneva', 'davos', 'federal council', 'lausanne', 'basel', 'lugano', 'swissinfo', 'world economic forum', 'wef'],
   be: ['belgium', 'belgian', 'brussels', 'antwerp', 'ghent', 'de wever', 'bart de wever', 'vlaams belang', 'mr party', 'liege', 'bruges', 'louvain'],
-  at: ['austria', 'austrian', 'vienna', 'salzburg', 'kickl', 'herbert kickl', 'fpö', 'graz', 'linz', 'innsbruck', 'öst', 'nationalrat', 'austrian freedom party'],
-  ie: ['ireland', 'irish', 'dublin', 'cork', 'martin', 'micheál martin', 'galway', 'taoiseach', 'tánaiste', 'tanaiste', 'fine gael', 'fianna fail', 'sinn féin', 'sinn fein', 'harris', 'simon harris', 'limerick', 'waterford', 'dáil', 'seanad', 'oireachtas'],
-  pt: ['portugal', 'portuguese', 'lisbon', 'porto', 'montenegro', 'luís montenegro', 'ps party', 'psd', 'chega', 'coimbra', 'braga', 'assembleia da república'],
+  at: ['austria', 'austrian', 'vienna', 'salzburg', 'kickl', 'herbert kickl', 'fpÃ¶', 'graz', 'linz', 'innsbruck', 'Ã¶st', 'nationalrat', 'austrian freedom party'],
+  ie: ['ireland', 'irish', 'dublin', 'cork', 'martin', 'micheÃ¡l martin', 'galway', 'taoiseach', 'tÃ¡naiste', 'tanaiste', 'fine gael', 'fianna fail', 'sinn fÃ©in', 'sinn fein', 'harris', 'simon harris', 'limerick', 'waterford', 'dÃ¡il', 'seanad', 'oireachtas'],
+  pt: ['portugal', 'portuguese', 'lisbon', 'porto', 'montenegro', 'luÃ­s montenegro', 'ps party', 'psd', 'chega', 'coimbra', 'braga', 'assembleia da repÃºblica'],
   dk: ['denmark', 'danish', 'copenhagen', 'frederiksen', 'mette frederiksen', 'folketing', 'aarhus', 'odense', 'aalborg', 'danish people'],
   fi: ['finland', 'finnish', 'helsinki', 'orpo', 'petteri orpo', 'eduskunta', 'tampere', 'turku', 'national coalition', 'ps party', 'true finns'],
   gr: ['greece', 'greek', 'athens', 'thessaloniki', 'mitsotakis', 'kyriakos mitsotakis', 'new democracy', 'syriza', 'piraeus', 'hellenic'],
-  cz: ['czech republic', 'czech', 'czechia', 'prague', 'fiala', 'petr fiala', 'brno', 'ostrava', 'spolu', 'ano movement', 'babis', 'andrej babiš'],
+  cz: ['czech republic', 'czech', 'czechia', 'prague', 'fiala', 'petr fiala', 'brno', 'ostrava', 'spolu', 'ano movement', 'babis', 'andrej babiÅ¡'],
   ro: ['romania', 'romanian', 'bucharest', 'iohannis', 'ciuca', 'cluj', 'timisoara', 'iasi', 'george simion', 'aur party'],
-  hu: ['hungary', 'hungarian', 'budapest', 'orban', 'viktor orban', 'fidesz', 'debrecen', 'pécs', 'orbán'],
+  hu: ['hungary', 'hungarian', 'budapest', 'orban', 'viktor orban', 'fidesz', 'debrecen', 'pÃ©cs', 'orbÃ¡n'],
   ua: ['ukraine', 'ukrainian', 'kyiv', 'kiev', 'odesa', 'odessa', 'kharkiv', 'lviv', 'zelenskyy', 'zelensky', 'kherson', 'zaporizhzhia', 'donetsk', 'mariupol', 'zaluzhny', 'verkhovna rada', 'dnipro'],
   rs: ['serbia', 'serbian', 'belgrade', 'vucic', 'aleksandar vucic', 'novi sad', 'sns party', 'nis'],
-  hr: ['croatia', 'croatian', 'zagreb', 'plenković', 'andrej plenkovic', 'split', 'rijeka', 'dubrovnik', 'hdz'],
+  hr: ['croatia', 'croatian', 'zagreb', 'plenkoviÄ‡', 'andrej plenkovic', 'split', 'rijeka', 'dubrovnik', 'hdz'],
   bg: ['bulgaria', 'bulgarian', 'sofia', 'borissov', 'denkov', 'plovdiv', 'varna', 'gerb party'],
   sk: ['slovakia', 'slovak', 'bratislava', 'fico', 'robert fico', 'pellegrini', 'kosice', 'smer party'],
   lt: ['lithuania', 'lithuanian', 'vilnius', 'nauseda', 'gitanas nauseda', 'kaunas', 'seimas', 'klaipeda'],
   lv: ['latvia', 'latvian', 'riga', 'silina', 'evika silina', 'saeima', 'daugavpils'],
   ee: ['estonia', 'estonian', 'tallinn', 'kallas', 'kaja kallas', 'riigikogu', 'tartu', 'narva'],
-  is: ['iceland', 'icelandic', 'reykjavik', 'reykjavík', 'jakobsdottir', 'althing', 'althingi'],
+  is: ['iceland', 'icelandic', 'reykjavik', 'reykjavÃ­k', 'jakobsdottir', 'althing', 'althingi'],
   lu: ['luxembourg', 'luxembourgish', 'frieden', 'luc frieden', 'luxembourg city', 'csv party'],
   si: ['slovenia', 'slovenian', 'ljubljana', 'golob', 'robert golob', 'maribor', 'state assembly'],
-  // ── Asia ───────────────────────────────────────────────────────────────
+  // â”€â”€ Asia â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   cn: ['china', 'chinese', 'beijing', 'shanghai', 'shenzhen', 'guangzhou', 'hong kong', 'xi jinping', 'ccp', 'politburo', 'npc', 'li qiang', 'chengdu', 'wuhan', 'tianjin', 'hangzhou', 'people\'s liberation army', 'pla', 'taiwan strait', 'south china sea', 'brics', 'belt and road'],
   jp: ['japan', 'japanese', 'tokyo', 'osaka', 'kyoto', 'yokohama', 'ishiba', 'shigeru ishiba', 'ldp', 'diet', 'abe', 'kishida', 'nagoya', 'sapporo', 'fukuoka', 'bank of japan', 'self-defense force', 'komeito'],
   in: ['india', 'indian', 'new delhi', 'mumbai', 'bangalore', 'bengaluru', 'chennai', 'kolkata', 'hyderabad', 'modi', 'narendra modi', 'bjp', 'gandhi', 'rahul gandhi', 'lok sabha', 'rajya sabha', 'ahmedabad', 'pune', 'congress party', 'rss', 'supreme court of india', 'jaipur', 'lucknow', 'surat', 'patna'],
@@ -395,12 +395,12 @@ const COUNTRY_RELEVANCE_KEYWORDS = {
   au: ['australia', 'australian', 'sydney', 'melbourne', 'canberra', 'brisbane', 'perth', 'albanese', 'anthony albanese', 'dutton', 'peter dutton', 'labor', 'liberal party', 'national party', 'greens', 'parliament house', 'asx', 'gold coast', 'adelaide', 'darwin', 'hobart', 'nsw', 'queensland', 'reserve bank of australia'],
   fj: ['fiji', 'fijian', 'suva', 'rabuka', 'sitiveni rabuka'],
   pg: ['papua new guinea', 'port moresby', 'marape', 'james marape'],
-  // ── Middle East ────────────────────────────────────────────────────────
+  // â”€â”€ Middle East â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   il: ['israel', 'israeli', 'jerusalem', 'tel aviv', 'netanyahu', 'knesset', 'idf', 'ben-gvir', 'gallant', 'likud', 'gantz', 'haifa', 'herzog', 'smotrich', 'yoav gallant', 'iron dome'],
   ps: ['palestine', 'palestinian', 'gaza', 'west bank', 'ramallah', 'hamas', 'fatah', 'rafah', 'sinwar', 'haniyeh', 'un rwa', 'unrwa', 'occupied', 'two-state', 'abbas', 'mahmoud abbas'],
   ae: ['uae', 'emirates', 'emirati', 'dubai', 'abu dhabi', 'mbz', 'mohammed bin zayed', 'adnoc', 'sheikh', 'sharjah', 'expo', 'expo 2020'],
   sa: ['saudi', 'saudi arabia', 'riyadh', 'jeddah', 'mecca', 'mbs', 'mohammed bin salman', 'bin salman', 'aramco', 'neom', 'vision 2030', 'medina', 'opec'],
-  tr: ['turkey', 'turkish', 'türkiye', 'ankara', 'istanbul', 'erdogan', 'erdoğan', 'akp', 'chp', 'izmir', 'antalya', 'kurds', 'pkk', 'lira', 'bosphorus', 'weidel', 'imamoglu', 'ekrem imamoğlu'],
+  tr: ['turkey', 'turkish', 'tÃ¼rkiye', 'ankara', 'istanbul', 'erdogan', 'erdoÄŸan', 'akp', 'chp', 'izmir', 'antalya', 'kurds', 'pkk', 'lira', 'bosphorus', 'weidel', 'imamoglu', 'ekrem imamoÄŸlu'],
   qa: ['qatar', 'qatari', 'doha', 'al thani', 'tamim', 'qna', 'al jazeera'],
   kw: ['kuwait', 'kuwaiti', 'kuwait city', 'national assembly', 'emir'],
   bh: ['bahrain', 'bahraini', 'manama', 'hamad', 'king hamad'],
@@ -409,7 +409,7 @@ const COUNTRY_RELEVANCE_KEYWORDS = {
   lb: ['lebanon', 'lebanese', 'beirut', 'hezbollah', 'nasrallah', 'aoun', 'salam', 'nawaf salam', 'joseph aoun'],
   iq: ['iraq', 'iraqi', 'baghdad', 'basra', 'mosul', 'erbil', 'kurdistan', 'al-sudani', 'pmu', 'shia'],
   ir: ['iran', 'iranian', 'tehran', 'khamenei', 'supreme leader', 'irgc', 'pezeshkian', 'nuclear deal', 'isfahan', 'mashhad', 'sanctions iran', 'revolutionary guard'],
-  // ── Africa ─────────────────────────────────────────────────────────────
+  // â”€â”€ Africa â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   za: ['south africa', 'south african', 'johannesburg', 'cape town', 'pretoria', 'durban', 'ramaphosa', 'cyril ramaphosa', 'anc', 'da', 'eff', 'zuma', 'port elizabeth', 'mk party', 'julius malema', 'government of national unity'],
   ng: ['nigeria', 'nigerian', 'lagos', 'abuja', 'tinubu', 'bola tinubu', 'buhari', 'kano', 'ibadan', 'national assembly nigeria', 'kaduna', 'port harcourt', 'naira', 'apc party', 'pdp party'],
   eg: ['egypt', 'egyptian', 'cairo', 'alexandria', 'sisi', 'el-sisi', 'abdel fattah', 'suez canal', 'suez', 'giza', 'nile dam', 'egyptian pound'],
@@ -419,9 +419,9 @@ const COUNTRY_RELEVANCE_KEYWORDS = {
   et: ['ethiopia', 'ethiopian', 'addis ababa', 'abiy', 'abiy ahmed', 'tigray', 'oromo', 'dire dawa', 'amhara', 'tplf'],
   tz: ['tanzania', 'tanzanian', 'dar es salaam', 'dodoma', 'hassan', 'samia hassan', 'zanzibar', 'chama cha mapinduzi', 'ccm'],
   ug: ['uganda', 'ugandan', 'kampala', 'museveni', 'yoweri museveni', 'entebbe', 'nrm party'],
-  sn: ['senegal', 'senegalese', 'dakar', 'faye', 'bassirou diomaye faye', 'sonko', 'thiès', 'pastef'],
-  ci: ['ivory coast', "cote d'ivoire", 'ivorian', 'abidjan', 'ouattara', 'alassane ouattara', 'yamoussoukro', 'san-pédro'],
-  cm: ['cameroon', 'cameroonian', 'yaoundé', 'yaounde', 'douala', 'biya', 'paul biya', 'anglophone crisis'],
+  sn: ['senegal', 'senegalese', 'dakar', 'faye', 'bassirou diomaye faye', 'sonko', 'thiÃ¨s', 'pastef'],
+  ci: ['ivory coast', "cote d'ivoire", 'ivorian', 'abidjan', 'ouattara', 'alassane ouattara', 'yamoussoukro', 'san-pÃ©dro'],
+  cm: ['cameroon', 'cameroonian', 'yaoundÃ©', 'yaounde', 'douala', 'biya', 'paul biya', 'anglophone crisis'],
   dz: ['algeria', 'algerian', 'algiers', 'tebboune', 'abdelmadjid tebboune', 'oran', 'sonatrach'],
   tn: ['tunisia', 'tunisian', 'tunis', 'saied', 'kais saied', 'sfax', 'ennahda'],
   rw: ['rwanda', 'rwandan', 'kigali', 'kagame', 'paul kagame', 'rpf', 'eastern drc'],
@@ -430,18 +430,18 @@ const COUNTRY_RELEVANCE_KEYWORDS = {
 
 // Demonyms used to build tighter search queries that pair the adjective with category terms.
 // E.g. "Australian politics" instead of "Australia" AND "politics".
-// Countries without a demonym here fall back to bare country name in loose queries —
+// Countries without a demonym here fall back to bare country name in loose queries â€”
 // adding an entry here improves query precision for that country.
 const COUNTRY_DEMONYMS = {
-  // ── North America ──
+  // â”€â”€ North America â”€â”€
   us: 'American', ca: 'Canadian', mx: 'Mexican', cu: 'Cuban',
   jm: 'Jamaican', cr: 'Costa Rican', pa: 'Panamanian', do: 'Dominican',
   gt: 'Guatemalan', hn: 'Honduran',
-  // ── South America ──
+  // â”€â”€ South America â”€â”€
   br: 'Brazilian', ar: 'Argentine', cl: 'Chilean', co: 'Colombian',
   pe: 'Peruvian', ve: 'Venezuelan', ec: 'Ecuadorian', uy: 'Uruguayan',
   py: 'Paraguayan', bo: 'Bolivian',
-  // ── Europe ──
+  // â”€â”€ Europe â”€â”€
   gb: 'British', de: 'German', fr: 'French', it: 'Italian',
   es: 'Spanish', nl: 'Dutch', se: 'Swedish', no: 'Norwegian',
   pl: 'Polish', ch: 'Swiss', be: 'Belgian', at: 'Austrian',
@@ -450,20 +450,20 @@ const COUNTRY_DEMONYMS = {
   ua: 'Ukrainian', rs: 'Serbian', hr: 'Croatian', bg: 'Bulgarian',
   sk: 'Slovak', lt: 'Lithuanian', lv: 'Latvian', ee: 'Estonian',
   is: 'Icelandic', lu: 'Luxembourgish', si: 'Slovenian', ru: 'Russian',
-  // ── Asia ──
+  // â”€â”€ Asia â”€â”€
   cn: 'Chinese', jp: 'Japanese', in: 'Indian', kr: 'South Korean',
   sg: 'Singaporean', hk: 'Hong Kong', tw: 'Taiwanese', id: 'Indonesian',
   th: 'Thai', my: 'Malaysian', ph: 'Philippine', vn: 'Vietnamese',
   pk: 'Pakistani', bd: 'Bangladeshi', lk: 'Sri Lankan', mm: 'Myanmar',
   kh: 'Cambodian', np: 'Nepalese',
-  // ── Oceania ──
+  // â”€â”€ Oceania â”€â”€
   au: 'Australian', nz: 'New Zealand', fj: 'Fijian', pg: 'Papua New Guinean',
-  // ── Middle East ──
+  // â”€â”€ Middle East â”€â”€
   il: 'Israeli', ps: 'Palestinian', ae: 'Emirati', sa: 'Saudi',
   tr: 'Turkish', qa: 'Qatari', kw: 'Kuwaiti', bh: 'Bahraini',
   om: 'Omani', jo: 'Jordanian', lb: 'Lebanese', iq: 'Iraqi',
   ir: 'Iranian',
-  // ── Africa ──
+  // â”€â”€ Africa â”€â”€
   za: 'South African', ng: 'Nigerian', eg: 'Egyptian', ke: 'Kenyan',
   ma: 'Moroccan', gh: 'Ghanaian', et: 'Ethiopian', tz: 'Tanzanian',
   ug: 'Ugandan', sn: 'Senegalese', ci: 'Ivorian', cm: 'Cameroonian',
@@ -487,7 +487,7 @@ const CATEGORY_QUERY_NOUNS = {
   music: ['music', 'album', 'music festival', 'artist', 'chart', 'song', 'concert'],
 };
 
-// Category relevance keywords — used in post-fetch filtering to verify articles
+// Category relevance keywords â€” used in post-fetch filtering to verify articles
 // actually match the requested topic.
 //
 // Two tiers per category:
@@ -725,18 +725,18 @@ function countKeywordHits(text, keywords) {
 }
 
 // Categories where external APIs use a single broad bucket rather than discrete
-// subcategories. For these, _nativeCategory cannot be trusted — e.g. WorldNewsAPI,
-// GNews and NewsData.io all map gaming/film/tv/music → one "entertainment" bucket,
+// subcategories. For these, _nativeCategory cannot be trusted â€” e.g. WorldNewsAPI,
+// GNews and NewsData.io all map gaming/film/tv/music â†’ one "entertainment" bucket,
 // which also captures sports celebrities and crime involving entertainers.
 const BROAD_API_CATEGORIES = new Set(['gaming', 'film', 'tv', 'music']);
 
 // Check if an article's title+description match the requested category.
 // Uses the two-tier keyword system:
-//   - 1 strong hit → match
-//   - 2+ weak hits → match
-//   - 1 weak hit in the title → match (title mention is a strong signal)
+//   - 1 strong hit â†’ match
+//   - 2+ weak hits â†’ match
+//   - 1 weak hit in the title â†’ match (title mention is a strong signal)
 function articleMatchesCategory(article, category) {
-  // 'world' is too broad to filter usefully — we rely on query-level filtering
+  // 'world' is too broad to filter usefully â€” we rely on query-level filtering
   if (category === 'world') return true;
   // Trust native API category assignments (Guardian, WorldNewsAPI, NewsData.io, GNews)
   // for categories with precise native API support. Skip bypass for entertainment
@@ -814,14 +814,14 @@ function articleCountryScore(article, country, category = null) {
   else if (inText) score += 2;
 
   // Frequency bonus: multiple distinct terms matching is a strong signal
-  // (e.g. "Tokyo" + "Japan" + "Japanese" = 3 hits → +2 bonus)
+  // (e.g. "Tokyo" + "Japan" + "Japanese" = 3 hits â†’ +2 bonus)
   if (termHits >= 3) score += 2;
   else if (termHits >= 2) score += 1;
 
   // Meta-country signal: the source's home country matches
   const metaCountry = article._meta?.sourceCountry;
   if (metaCountry === country) {
-    // International sources (Reuters, AP, BBC) cover all countries — their HQ country
+    // International sources (Reuters, AP, BBC) cover all countries â€” their HQ country
     // should not inflate the score. Only give the bonus to national outlets.
     if (!isInternationalSource(article)) {
       score += 2;
@@ -831,7 +831,7 @@ function articleCountryScore(article, country, category = null) {
   // Combined country+category title bonus: rewards articles explicitly about BOTH
   // signals in the headline (e.g. "Japanese AI startup" for jp+technology).
   // Only applies when the country is mentioned in the title and a category keyword
-  // also appears in the title — a strong signal that the article is squarely on-topic.
+  // also appears in the title â€” a strong signal that the article is squarely on-topic.
   if (inTitle && category && category !== 'world') {
     const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
     if (catKeywords) {
@@ -865,7 +865,7 @@ function buildNationalQuery(country, category) {
   // Tight phrases get priority (NewsAPI ranks by query match), but also include
   // a looser term so articles mentioning the country in a political context aren't missed.
   // Use up to 5 nouns (increased from 3) so more category terms are covered in the
-  // loose fallback — e.g. politics includes "prime minister" and "legislation" beyond
+  // loose fallback â€” e.g. politics includes "prime minister" and "legislation" beyond
   // the first three entries.
   const topicKeywords = nouns.slice(0, 5).join(' OR ');
   const looseTerm = demonym
@@ -932,7 +932,7 @@ const NEWS_DATA_CATEGORY_MAP = {
 
 // Countries considered part of the Asia-Pacific region for RSS feed targeting.
 // Nikkei Asia covers this whole region so its feed is fetched for all of them.
-// NOTE: au and nz are intentionally excluded — they are already well-served by
+// NOTE: au and nz are intentionally excluded â€” they are already well-served by
 // Guardian (dedicated au section), NewsAPI, and GNews. Nikkei is Japan/China-
 // centric and adding it for AU queries dilutes Australian content with Asian
 // articles that only mention Australia tangentially.
@@ -948,12 +948,12 @@ const LATAM_COUNTRIES = new Set([
   'cr', 'pa', 'gt', 'hn', 'cu', 'do',
 ]);
 
-// RSS feed registry — each entry is fetched for applicable countries and merged
+// RSS feed registry â€” each entry is fetched for applicable countries and merged
 // into the article pool alongside API sources. Errors are caught and skipped.
 //
 // url:       Feed URL. Override via environment variable if the default stops working.
 //            IMPORTANT: Verify each URL is accessible from your production environment
-//            before relying on it — both sites are behind paywalls and may restrict
+//            before relying on it â€” both sites are behind paywalls and may restrict
 //            datacenter IPs. Use a browser or RSS reader to confirm the feed loads.
 // countries: Set of country codes this feed is relevant for.
 // name/domain/tier: used for article formatting and ranking.
@@ -962,7 +962,7 @@ const RSS_SOURCES = [
     name: 'Caixin Global',
     domain: 'caixinglobal.com',
     // Primary English-language source for Chinese business/economy/finance news.
-    // TODO: confirm this URL works from your host — try it in a browser first.
+    // TODO: confirm this URL works from your host â€” try it in a browser first.
     // Alternatives if the gateway URL fails:
     //   https://www.caixinglobal.com/rss.xml
     //   https://www.caixinglobal.com/feed
@@ -974,7 +974,7 @@ const RSS_SOURCES = [
     domain: 'asia.nikkei.com',
     // Official Nikkei Asia RSS feed (NAR = Nikkei Asia Report).
     // TODO: confirm this URL works from your host. Category-specific feeds may exist
-    // at /rss/feed/business, /rss/feed/technology etc — check info.asia.nikkei.com/rss
+    // at /rss/feed/business, /rss/feed/technology etc â€” check info.asia.nikkei.com/rss
     // and swap in a more targeted URL if available.
     url: process.env.NIKKEI_RSS_URL || 'https://asia.nikkei.com/rss/feed/nar',
     countries: ASIA_COUNTRIES,
@@ -994,7 +994,7 @@ const RSS_SOURCES = [
     name: 'The Brazilian Report',
     domain: 'brazilianreport.com',
     // English-language outlet focused entirely on Brazil.
-    // Standard WordPress RSS feed — no paywall for the feed itself.
+    // Standard WordPress RSS feed â€” no paywall for the feed itself.
     url: process.env.BRAZILIAN_REPORT_RSS_URL || 'https://brazilianreport.com/feed/',
     countries: new Set(['br']),
   },
@@ -1074,7 +1074,7 @@ const RSS_SOURCES = [
     countries: new Set(['fj', 'ws', 'to', 'vu', 'pg', 'sb', 'ki', 'fm', 'pw']),
   },
   {
-    name: 'RTÉ News',
+    name: 'RTÃ‰ News',
     domain: 'rte.ie',
     // Ireland's national public broadcaster. Primary source for Irish news.
     // Free RSS feed, no paywall.
@@ -1086,7 +1086,7 @@ const RSS_SOURCES = [
     domain: 'abc.net.au',
     // Australia's national public broadcaster. Primary source for Australian national
     // news, politics, and society. Free RSS feed, no paywall.
-    // Gated by well-served country threshold — only activates when API sources
+    // Gated by well-served country threshold â€” only activates when API sources
     // provide fewer than 25 articles for au.
     url: process.env.ABC_AU_RSS_URL || 'https://www.abc.net.au/news/feed/51120/rss.xml',
     countries: new Set(['au']),
@@ -1096,7 +1096,7 @@ const RSS_SOURCES = [
     domain: 'sbs.com.au',
     // Australia's multicultural public broadcaster. Covers Australian news with
     // strong international and multicultural perspectives. Free RSS feed.
-    // TODO: confirm this feed URL is stable — SBS has changed their feed paths before.
+    // TODO: confirm this feed URL is stable â€” SBS has changed their feed paths before.
     // Alternative: https://www.sbs.com.au/news/feed
     url: process.env.SBS_NEWS_RSS_URL || 'https://www.sbs.com.au/news/topic/latest/feed',
     countries: new Set(['au']),
@@ -1105,9 +1105,9 @@ const RSS_SOURCES = [
     name: 'BBC News World',
     domain: 'bbc.co.uk',
     // BBC's primary English-language world news RSS feed. One of the most trusted
-    // international sources globally. Applied broadly — the well-served country gate
+    // international sources globally. Applied broadly â€” the well-served country gate
     // prevents it from flooding GB/AU results when API sources already cover quota.
-    // TODO: confirm accessible from your production host — BBC occasionally
+    // TODO: confirm accessible from your production host â€” BBC occasionally
     // restricts datacenter IPs. Alternative: https://feeds.bbci.co.uk/news/rss.xml
     url: process.env.BBC_WORLD_RSS_URL || 'https://feeds.bbci.co.uk/news/world/rss.xml',
     countries: new Set([
@@ -1131,7 +1131,7 @@ const RSS_SOURCES = [
     // Al Jazeera's English-language international feed. Qatar-based; provides
     // strong coverage of MENA, South Asia, Africa, and global affairs from a
     // non-Western editorial perspective. Free RSS feed, no paywall.
-    // Note: domain is aljazeera.com (English) — distinct from aljazeera.net (Arabic feed).
+    // Note: domain is aljazeera.com (English) â€” distinct from aljazeera.net (Arabic feed).
     // TODO: confirm feed URL is accessible from your production host.
     url: process.env.AJ_ENGLISH_RSS_URL || 'https://www.aljazeera.com/xml/rss/all.xml',
     countries: new Set([
@@ -1140,7 +1140,7 @@ const RSS_SOURCES = [
       'us', 'gb', 'au', 'de', 'fr',
     ]),
   },
-  // ── Middle East ──────────────────────────────────────────────────────────
+  // â”€â”€ Middle East â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   {
     name: 'Arab News',
     domain: 'arabnews.com',
@@ -1178,7 +1178,7 @@ const RSS_SOURCES = [
     domain: 'gulfnews.com',
     // UAE-based pan-Gulf English-language newspaper. Strong coverage of the UAE,
     // Saudi Arabia, and broader Gulf Cooperation Council states. Free RSS feed.
-    // TODO: verify this RSS endpoint is accessible from your host — gulfnews.com
+    // TODO: verify this RSS endpoint is accessible from your host â€” gulfnews.com
     // has historically restricted non-browser user agents.
     // Alternative: https://gulfnews.com/rss
     url: process.env.GULF_NEWS_RSS_URL || 'https://gulfnews.com/tools/rss',
@@ -1193,7 +1193,7 @@ const RSS_SOURCES = [
     url: process.env.JERUSALEM_POST_RSS_URL || 'https://www.jpost.com/rss/rssfeedsheadlines.aspx',
     countries: new Set(['il', 'ps']),
   },
-  // ── Asia ─────────────────────────────────────────────────────────────────
+  // â”€â”€ Asia â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   {
     name: 'Japan Times',
     domain: 'japantimes.co.jp',
@@ -1326,7 +1326,7 @@ const RSS_SOURCES = [
     url: process.env.TIMES_OF_INDIA_RSS_URL || 'https://timesofindia.indiatimes.com/rssfeedstopstories.cms',
     countries: new Set(['in']),
   },
-  // ── Africa ───────────────────────────────────────────────────────────────
+  // â”€â”€ Africa â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   {
     name: 'Nation Africa',
     domain: 'nation.africa',
@@ -1386,7 +1386,7 @@ const RSS_SOURCES = [
     url: process.env.NEW_ZIMBABWE_RSS_URL || 'https://www.newzimbabwe.com/feed/',
     countries: new Set(['zw']),
   },
-  // ── Europe (English-language regional outlets) ───────────────────────────
+  // â”€â”€ Europe (English-language regional outlets) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   {
     name: 'The Local (Germany)',
     domain: 'thelocal.de',
@@ -1535,7 +1535,7 @@ const RSS_SOURCES = [
     url: process.env.CPH_POST_RSS_URL || 'https://cphpost.dk/?format=feed&type=rss',
     countries: new Set(['dk']),
   },
-  // ── Americas (supplemental regional) ────────────────────────────────────
+  // â”€â”€ Americas (supplemental regional) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   {
     name: 'Tico Times',
     domain: 'ticotimes.net',
@@ -1571,7 +1571,7 @@ const RSS_SOURCES = [
     url: process.env.CARIBBEAN_JOURNAL_RSS_URL || 'https://www.caribjournal.com/feed/',
     countries: new Set(['do', 'cu', 'jm', 'tt', 'bb', 'bs', 'ht', 'pr']),
   },
-  // ── Non-English native-language feeds ───────────────────────────────────
+  // â”€â”€ Non-English native-language feeds â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // These feeds are in the local language of the country they serve.
   // Articles are automatically shown for non-English-primary countries
   // (showNonEnglish is forced true for all countries outside ENGLISH_PRIMARY_COUNTRIES).
@@ -1593,7 +1593,7 @@ const RSS_SOURCES = [
     countries: new Set(['fr', 'be', 'ch']),
   },
   {
-    name: 'El País',
+    name: 'El PaÃ­s',
     domain: 'elpais.com',
     language: 'es',
     // Spain's leading daily newspaper. Covers Spanish and Latin American affairs.
@@ -1609,7 +1609,7 @@ const RSS_SOURCES = [
     countries: new Set(['br']),
   },
   {
-    name: 'RTP Notícias',
+    name: 'RTP NotÃ­cias',
     domain: 'rtp.pt',
     language: 'pt',
     // Portugal's public broadcaster. Covers Portuguese news and Lusophone world affairs.
@@ -1691,7 +1691,7 @@ const RSS_SOURCES = [
 
 // Countries already well-served by targeted API sources (NewsAPI top-headlines,
 // Guardian native sections, WorldNewsAPI). For these, RSS feeds are a supplement
-// used only when the article count is low — not always-on. This prevents broad
+// used only when the article count is low â€” not always-on. This prevents broad
 // regional feeds (e.g. Nikkei) from flooding results for countries that have
 // strong dedicated API coverage. Underserved countries always get RSS.
 const RSS_WELL_SERVED_COUNTRIES = new Set(['us', 'gb', 'au', 'ca', 'nz', 'ie']);
@@ -1699,7 +1699,7 @@ const RSS_WELL_SERVED_COUNTRIES = new Set(['us', 'gb', 'au', 'ca', 'nz', 'ie']);
 // Countries where English is the primary official language.
 // For all other countries, both English AND native-language articles are
 // automatically included (showNonEnglish is forced true) so users get local
-// perspectives alongside international wire coverage — no toggle required.
+// perspectives alongside international wire coverage â€” no toggle required.
 const ENGLISH_PRIMARY_COUNTRIES = new Set(['us', 'gb', 'au', 'ca', 'nz', 'ie']);
 
 // Map app categories to GNews API categories
@@ -1719,7 +1719,7 @@ const GNEWS_CATEGORY_MAP = {
   world: 'world',
 };
 
-// Fetch with a timeout — wraps any fetch() call with an AbortController
+// Fetch with a timeout â€” wraps any fetch() call with an AbortController
 // so a single slow API can't block the entire serverless response.
 async function fetchWithTimeout(url, opts = {}, timeoutMs = API_TIMEOUT_MS) {
   const controller = new AbortController();
@@ -1732,17 +1732,17 @@ async function fetchWithTimeout(url, opts = {}, timeoutMs = API_TIMEOUT_MS) {
   }
 }
 
-// ── Source authority tiers ────────────────────────────────────────────────
+// â”€â”€ Source authority tiers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Higher-tier sources are weighted more heavily in ranking.
 // Tier 3 (+3): Major wire services / international quality broadsheets
 // Tier 2 (+2): Strong national outlets & specialist publications
 // Tier 1 (+1): Reputable but narrower outlets (default for any trusted source)
 const SOURCE_AUTHORITY_TIER = {
-  // Tier 3 — wire services & top international
+  // Tier 3 â€” wire services & top international
   'reuters.com': 3, 'apnews.com': 3, 'bbc.co.uk': 3, 'bbc.com': 3,
   'nytimes.com': 3, 'theguardian.com': 3, 'washingtonpost.com': 3,
   'economist.com': 3, 'ft.com': 3, 'bloomberg.com': 3,
-  // Tier 2 — strong nationals & specialists
+  // Tier 2 â€” strong nationals & specialists
   'cnn.com': 2, 'npr.org': 2, 'abc.net.au': 2, 'aljazeera.com': 2,
   'wsj.com': 2, 'politico.com': 2, 'abcnews.go.com': 2, 'cbsnews.com': 2,
   'nbcnews.com': 2, 'pbs.org': 2, 'france24.com': 2, 'dw.com': 2,
@@ -1750,15 +1750,15 @@ const SOURCE_AUTHORITY_TIER = {
   'espn.com': 2, 'scmp.com': 2, 'theconversation.com': 2,
   'timesofindia.indiatimes.com': 2, 'thehindu.com': 2,
   'caixinglobal.com': 2, 'asia.nikkei.com': 2,
-  // Tier 2 — strong regional/national outlets (supplemental countries)
+  // Tier 2 â€” strong regional/national outlets (supplemental countries)
   'dailymaverick.co.za': 2, 'koreaherald.com': 2, 'channelnewsasia.com': 2,
   'kyivindependent.com': 2, 'timesofisrael.com': 2, 'arabnews.com': 2,
   'thenationalnews.com': 2, 'bangkokpost.com': 2, 'mercopress.com': 2,
-  // Tier 2 — strong English-language national outlets
+  // Tier 2 â€” strong English-language national outlets
   'cbc.ca': 2, 'globeandmail.com': 2, 'irishtimes.com': 2,
   'rnz.co.nz': 2, 'nzherald.co.nz': 2, 'rte.ie': 2,
   'politico.eu': 2, 'swissinfo.ch': 2,
-  // Tier 2 — strong regionals (new outlets with solid editorial track records)
+  // Tier 2 â€” strong regionals (new outlets with solid editorial track records)
   'japantimes.co.jp': 2, 'nhk.or.jp': 2, 'dawn.com': 2, 'koreaherald.com': 2,
   'bangkokpost.com': 2, 'timesofisrael.com': 2, 'arabnews.com': 2,
   'middleeasteye.net': 2, 'dailysabah.com': 2, 'euractiv.com': 2,
@@ -1766,7 +1766,7 @@ const SOURCE_AUTHORITY_TIER = {
   'jpost.com': 2, 'gulfnews.com': 2, 'irrawaddy.com': 2, 'sbs.com.au': 2,
   // Politics specialists
   'thehill.com': 2, 'axios.com': 2, 'foreignpolicy.com': 2,
-  // Tier 1 — quality regionals (default tier, listed explicitly for clarity)
+  // Tier 1 â€” quality regionals (default tier, listed explicitly for clarity)
   'brazilianreport.com': 1, 'batimes.com.ar': 1, 'mexiconewsdaily.com': 1,
   'businessday.ng': 1, 'africanews.com': 1,
   'jakartaglobe.id': 1, 'inquirer.net': 1, 'rappler.com': 1,
@@ -1797,21 +1797,21 @@ function getSourceTier(article) {
   return SOURCE_AUTHORITY_TIER[domain] || 1; // default tier 1 for known trusted sources
 }
 
-// ── Advanced multi-signal ranking engine ─────────────────────────────────
+// â”€â”€ Advanced multi-signal ranking engine â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Clusters duplicate stories, then scores each cluster using 6 weighted signals:
 //
-//   1. Source Authority    — tier of the outlet (wire service > national > niche)
-//   2. Cross-Source Coverage — how many distinct outlets cover this story
-//   3. Freshness          — exponential decay (recent articles score much higher)
-//   4. Content Depth      — articles with fuller text rank above thin stubs
-//   5. Category Relevance — how strongly the article matches the requested topic
-//   6. Source Diversity    — penalty if the same domain already dominates results
+//   1. Source Authority    â€” tier of the outlet (wire service > national > niche)
+//   2. Cross-Source Coverage â€” how many distinct outlets cover this story
+//   3. Freshness          â€” exponential decay (recent articles score much higher)
+//   4. Content Depth      â€” articles with fuller text rank above thin stubs
+//   5. Category Relevance â€” how strongly the article matches the requested topic
+//   6. Source Diversity    â€” penalty if the same domain already dominates results
 //
 // The final ranking weight shifts based on time window:
 //   24h:   freshness dominates (breaking news)
 //   3d+:   authority + coverage dominate (biggest stories)
 
-// ── Stop words for smarter title matching ────────────────────────────────
+// â”€â”€ Stop words for smarter title matching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const STOP_WORDS = new Set([
   // Standard English stop words
   'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
@@ -1823,7 +1823,7 @@ const STOP_WORDS = new Set([
   'about', 'over', 'after', 'before', 'between', 'under', 'above', 'into',
   'through', 'during', 'each', 'some', 'such', 'only', 'also', 'more',
   'most', 'other', 'new', 'says', 'said', 'according', 'report', 'news',
-  // News-headline verbs — these appear in many titles but carry no topical
+  // News-headline verbs â€” these appear in many titles but carry no topical
   // meaning, so they inflate similarity between unrelated stories.
   // e.g. "Biden announces X" vs "Netanyahu announces Y" would false-match
   // on "announces" if it weren't filtered out.
@@ -1838,7 +1838,7 @@ const STOP_WORDS = new Set([
 function normaliseTitle(title) {
   return (title || '')
     .toLowerCase()
-    .replace(/[''"""\-–—:,.|!?'()[\]{}]/g, ' ')
+    .replace(/[''"""\-â€“â€”:,.|!?'()[\]{}]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -1940,13 +1940,13 @@ function categoryRelevanceScore(article, category) {
   return Math.min(score / 8, 1);
 }
 
-// ── Main ranking function ────────────────────────────────────────────────
+// â”€â”€ Main ranking function â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // `searchTerms` (optional): when present, enables Signal 7 (keyword relevance)
 // which boosts articles that strongly match the user's search query.
 function rankAndDeduplicateArticles(articles, { usePopularity = false, category = null, searchTerms = null, rawKeyword = null, keywordMode = false, rangeHours = null } = {}) {
   if (articles.length === 0) return [];
 
-  // 1. Build IDF map — words that appear in many titles are less distinctive
+  // 1. Build IDF map â€” words that appear in many titles are less distinctive
   const allTitles = articles.map(a => normaliseTitle(a.title));
   const allKeywords = allTitles.map(t => extractKeywords(t));
   const docFreq = new Map();
@@ -1971,7 +1971,7 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
     catRelevance: categoryRelevanceScore(a, category || a.category),
     // _countryScore is set by the country relevance filter (-1 = not set, i.e. world query)
     countryRel: a._countryScore ?? -1,
-    // Signal 7: keyword relevance — only active during keyword searches
+    // Signal 7: keyword relevance â€” only active during keyword searches
     kwRelevance: searchTerms ? keywordRelevanceScore(a, searchTerms, rawKeyword) : -1,
     domain: getSourceDomain(a),
   }));
@@ -2000,10 +2000,10 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
   const now = Date.now();
   // Scale freshness half-life to the requested date window so articles across
   // the full window are differentiated by recency (not all collapsed to ~0).
-  //   24h  → 4.8h  tight decay (articles stale within hours)
-  //   3d   → 14.4h moderate (yesterday's stories still competitive)
-  //   week → 33.6h broad (mid-week stories stay in the mix)
-  //   month→ 120h  capped (best of the month stays visible)
+  //   24h  â†’ 4.8h  tight decay (articles stale within hours)
+  //   3d   â†’ 14.4h moderate (yesterday's stories still competitive)
+  //   week â†’ 33.6h broad (mid-week stories stay in the mix)
+  //   monthâ†’ 120h  capped (best of the month stays visible)
   // Popularity mode without a date window keeps the existing 48h half-life.
   const FRESHNESS_RATIO = 0.20;
   const MIN_HALF_LIFE_MS = 3 * 3600_000;
@@ -2029,24 +2029,24 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
     const uniqueSources = [...new Set(cluster.map(c => c.domain))];
     const coverageCount = uniqueSources.length;
 
-    // ── Signal 1: Source Authority (0-10) ──
+    // â”€â”€ Signal 1: Source Authority (0-10) â”€â”€
     // Tier 3 = 10, Tier 2 = 7, Tier 1 = 4
     const authority = best.tier === 3 ? 10 : best.tier === 2 ? 7 : 4;
 
-    // ── Signal 2: Cross-Source Coverage (0-10) ──
+    // â”€â”€ Signal 2: Cross-Source Coverage (0-10) â”€â”€
     // Each additional unique source adds 3 points, capped at 10
     const coverage = Math.min((coverageCount - 1) * 3, 10);
 
-    // ── Signal 3: Freshness — exponential decay (0-10) ──
+    // â”€â”€ Signal 3: Freshness â€” exponential decay (0-10) â”€â”€
     // Score = 10 * 2^(-age/halfLife)
     // At t=0: 10,  at t=halfLife: 5,  at t=2*halfLife: 2.5
     const ageMs = Math.max(now - best.timestamp, 0);
     const freshness = 10 * Math.pow(2, -ageMs / halfLife);
 
-    // ── Signal 4: Content Depth (0-5) ──
+    // â”€â”€ Signal 4: Content Depth (0-5) â”€â”€
     const depth = best.depth * 5;
 
-    // ── Signal 5: Category Relevance (0-8) ──
+    // â”€â”€ Signal 5: Category Relevance (0-8) â”€â”€
     // Blend the representative article's own category score (70%) with the cluster
     // maximum (30%). Using pure max caused a mismatch: the representative article
     // (chosen by tier/depth) could borrow a high category score from a different
@@ -2057,7 +2057,7 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
     const maxCatRelevance = Math.max(...cluster.map(c => c.catRelevance));
     const catScore = (repCatRelevance * 0.7 + maxCatRelevance * 0.3) * 8;
 
-    // ── Signal 6: Country Relevance (0-10) ──
+    // â”€â”€ Signal 6: Country Relevance (0-10) â”€â”€
     // Derived from articleCountryScore() which returns 0-10:
     //  10 = title mention + category keyword in title + multiple term hits + national source
     //   8 = title mention + multiple term hits + national source (strongest, no combined bonus)
@@ -2065,11 +2065,11 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
     //   4 = title mention only (or neutral midpoint for world queries)
     //   2 = body/description mention only
     //   0 = not mentioned (passed via filler path)
-    //  -1 = not set (world query — use neutral midpoint to avoid penalising)
+    //  -1 = not set (world query â€” use neutral midpoint to avoid penalising)
     const bestCountryRel = Math.max(...cluster.map(c => c.countryRel));
     const countryRelScore = bestCountryRel === -1 ? 4 : bestCountryRel;
 
-    // ── Signal 7: Keyword Relevance (0-10) ──
+    // â”€â”€ Signal 7: Keyword Relevance (0-10) â”€â”€
     // Only active during keyword searches. Strongly boosts articles where
     // the search term appears in the title vs buried in the body.
     //  -1 = not a keyword search (neutral midpoint used)
@@ -2087,21 +2087,21 @@ function rankAndDeduplicateArticles(articles, { usePopularity = false, category 
   // 5. Apply time-window-dependent weights
   //
   //   Signal            | 24h (breaking)  | 3d+ (popular)
-  //   ──────────────────|────────────────|──────────────
+  //   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€|â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€|â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   //   Freshness         |  3.0            |  1.0
   //   Authority         |  1.5            |  2.5
   //   Coverage          |  1.5            |  3.0
   //   Category Match    |  2.0            |  1.5
   //   Content Depth     |  1.0            |  1.0
-  //   Country Relevance |  2.0            |  2.0   ← constant: user's country choice always matters
-  //   Keyword Relevance |  2.5            |  2.5   ← only active during keyword searches
+  //   Country Relevance |  2.0            |  2.0   â† constant: user's country choice always matters
+  //   Keyword Relevance |  2.5            |  2.5   â† only active during keyword searches
   //
   const hasKeywordSearch = searchTerms && searchTerms.length > 0;
   // In keyword monitoring mode, keyword relevance is the dominant signal (5.0),
-  // freshness is reduced, and country relevance is boosted — this mirrors
+  // freshness is reduced, and country relevance is boosted â€” this mirrors
   // professional media monitoring services like Streem and Isentia where
   // topical precision matters more than recency.
-  // Weight table — effective max points = weight × signal_max:
+  // Weight table â€” effective max points = weight Ã— signal_max:
   //   Keyword mode: precision matters most, freshness reduced
   //   Popularity mode: cross-source coverage + authority drive the Trending feed
   //   Normal (home) mode: country + category relevance raised to compete fairly
@@ -2175,7 +2175,7 @@ const EVERYTHING_QUERY_MAP = {
 // `activeDomains` and `activeSourceIds` allow per-request source overrides (user selection)
 // `opts.from` and `opts.sortByPopularity` control date range and ranking strategy.
 async function fetchFromNewsAPI(country, category, apiKey, activeDomains, activeSourceIds, opts = {}) {
-  // opts.skipDomains: when true, don't restrict to trusted domains — lets NewsAPI search
+  // opts.skipDomains: when true, don't restrict to trusted domains â€” lets NewsAPI search
   // its full index. Used for non-English-dominant countries where our trusted-domain list
   // (mostly US/UK outlets) publishes very few articles about that country per day.
   const domains = opts.skipDomains ? null : (activeDomains || TRUSTED_DOMAINS);
@@ -2186,7 +2186,7 @@ async function fetchFromNewsAPI(country, category, apiKey, activeDomains, active
   // and the trusted-domains filter. This applies to ALL categories, not just those in
   // EVERYTHING_QUERY_MAP. The top-headlines endpoint cannot combine `country` with
   // `sources`, so country-specific top-headlines bypass quality filtering entirely and
-  // return whatever domestic sources NewsAPI associates with that country code — often
+  // return whatever domestic sources NewsAPI associates with that country code â€” often
   // non-English or low-quality outlets. The /v2/everything approach searches across
   // trusted domains (Reuters, SCMP, Bloomberg, FT, etc.) for paired phrases like
   // "Chinese economy" or "Chinese tech", giving far better results for all categories.
@@ -2230,7 +2230,7 @@ async function fetchFromNewsAPI(country, category, apiKey, activeDomains, active
   return data.articles || [];
 }
 
-// Category-specific search terms for WorldNewsAPI — improves relevance over bare category names.
+// Category-specific search terms for WorldNewsAPI â€” improves relevance over bare category names.
 // Broader than EVERYTHING_QUERY_MAP (no OR/quotes syntax) since WorldNewsAPI uses simpler text matching.
 const WORLD_NEWS_QUERY_TERMS = {
   technology: 'technology software AI cybersecurity startup semiconductor',
@@ -2268,7 +2268,7 @@ async function fetchFromWorldNewsAPI(country, category, apiKey, opts = {}) {
     const countryName = COUNTRY_NAMES[country] || country;
     // Text query only (no source-country): finds English articles ABOUT the country
     // from any outlet. Using source-country alone restricts results to articles FROM
-    // that country's own outlets, which are mostly in the local language — wrong for
+    // that country's own outlets, which are mostly in the local language â€” wrong for
     // English-only mode. In non-English mode we add source-country to get native sources.
     const queryTerms = WORLD_NEWS_QUERY_TERMS[category] || category;
     const textQuery = demonym
@@ -2295,7 +2295,7 @@ async function fetchFromNewsData(country, category, apiKey, opts = {}) {
     'apikey': apiKey,
   });
   // When the native API category is a broad 'entertainment' bucket (covering gaming/film/tv/music),
-  // add subcategory keyword refinement to narrow results — following the WorldNewsAPI pattern.
+  // add subcategory keyword refinement to narrow results â€” following the WorldNewsAPI pattern.
   const newsDataQuery = WORLD_NEWS_QUERY_TERMS[category];
   if (newsDataQuery && newsDataCategory !== category) {
     params.set('q', newsDataQuery);
@@ -2317,7 +2317,7 @@ async function fetchFromGuardian(country, category, apiKey, opts = {}) {
   const categorySection = GUARDIAN_SECTION_MAP[category] || 'news';
   let params;
   if (country === 'world') {
-    // No country restriction — fetch by category section only
+    // No country restriction â€” fetch by category section only
     params = new URLSearchParams({
       section: categorySection,
       'show-fields': 'trailText,thumbnail,byline,bodyText',
@@ -2388,7 +2388,7 @@ async function fetchFromGNews(country, category, apiKey, opts = {}) {
   if (opts.from) params.set('from', opts.from); // ISO 8601, e.g. 2024-01-01T00:00:00Z
   params.set('category', gnewsCategory);
   // When the native API category is a broad 'entertainment' bucket (covering gaming/film/tv/music),
-  // add subcategory keyword refinement to narrow results — following the WorldNewsAPI pattern.
+  // add subcategory keyword refinement to narrow results â€” following the WorldNewsAPI pattern.
   const gnewsSubcategoryQuery = WORLD_NEWS_QUERY_TERMS[category];
   if (gnewsSubcategoryQuery && gnewsCategory !== category) {
     params.set('q', gnewsSubcategoryQuery);
@@ -2404,7 +2404,7 @@ async function fetchFromGNews(country, category, apiKey, opts = {}) {
 
 // Categories where MediaStack has a reliable direct 1:1 mapping.
 // politics and world both map to 'general' in MediaStack (too broad to trust natively).
-// entertainment subcategories (gaming/film/tv/music) map to 'entertainment' — they are
+// entertainment subcategories (gaming/film/tv/music) map to 'entertainment' â€” they are
 // included here but BROAD_API_CATEGORIES in articleFilter.js ensures keyword validation
 // still applies for those subcategories.
 const MEDIASTACK_NATIVE_CATS = new Set([
@@ -2482,7 +2482,7 @@ async function fetchFromCurrentsAPI(country, category, apiKey, opts = {}) {
   const currentsCategory = CURRENTS_CATEGORY_MAP[category];
   if (currentsCategory) params.set('category', currentsCategory);
   // When the native API category is a broad 'entertainment' bucket (covering gaming/film/tv/music),
-  // add subcategory keyword refinement to narrow results — following the WorldNewsAPI pattern.
+  // add subcategory keyword refinement to narrow results â€” following the WorldNewsAPI pattern.
   const currentsQuery = WORLD_NEWS_QUERY_TERMS[category];
   if (currentsQuery && currentsCategory && currentsCategory !== category) {
     params.set('keywords', currentsQuery);
@@ -2518,1269 +2518,1564 @@ function formatCurrentsAPIArticle(article, country, category, nativeCategory = f
       sourceCountry: inferCountryFromUrl(sourceUrl),
     },
   };
-}
+  // Map app categories to Google News RSS topics
+  const GOOGLE_NEWS_CATEGORY_MAP = {
+    technology: 'TECHNOLOGY',
+    business: 'BUSINESS',
+    science: 'SCIENCE',
+    health: 'HEALTH',
+    sports: 'SPORTS',
+    gaming: 'ENTERTAINMENT',
+    film: 'ENTERTAINMENT',
+    tv: 'ENTERTAINMENT',
+    politics: 'NATION',
+    world: 'WORLD',
+  };
 
-// ── RSS support ───────────────────────────────────────────────────────────
-// Minimal RSS 2.0 / Atom parser — no external XML library needed.
-// Handles CDATA sections, HTML entities, and both RSS <link> (text node)
-// and Atom <link href="..."> (attribute) formats.
+  // Helper: fetch from Google News API via RSS feed
+  async function fetchFromGoogleNews(country, category, opts = {}) {
+    const gnCategory = GOOGLE_NEWS_CATEGORY_MAP[category] || 'WORLD';
+    let url = '';
 
-function parseRSSFeed(xml) {
-  const items = [];
-  // Match <item> (RSS 2.0) or <entry> (Atom) blocks
-  const blockRe = /<(?:item|entry)[\s>]([\s\S]*?)<\/(?:item|entry)>/gi;
-  let m;
-  while ((m = blockRe.exec(xml)) !== null) {
-    const block = m[1];
+    if (country === 'world') {
+      url = `https://news.google.com/rss/headlines/section/topic/${gnCategory}?hl=en-US&gl=US&ceid=US:en`;
+    } else {
+      // For country + category, use Google News search for better results
+      const countryName = COUNTRY_NAMES[country] || country;
+      const demonym = COUNTRY_DEMONYMS[country];
+      const catNouns = CATEGORY_QUERY_NOUNS[category] || [category];
+      const queryTerms = catNouns.slice(0, 3).join(' OR ');
 
-    // Extract text content of a named tag, unwrapping CDATA and decoding entities
-    const get = (tag) => {
-      const cdataM = block.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]>`, 'i'));
-      if (cdataM) return cdataM[1].trim();
-      const plainM = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'));
-      if (!plainM) return null;
-      return plainM[1]
-        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
-        .replace(/<[^>]+>/g, '') // strip any inline HTML tags
-        .trim();
-    };
-
-    // Atom feeds use <link rel="alternate" href="..."/> rather than a text node
-    const getAtomLink = () => {
-      const hrefM = block.match(/<link[^>]+href="([^"]+)"/i);
-      return hrefM ? hrefM[1] : null;
-    };
-
-    const title = get('title');
-    const link = get('link') || getAtomLink();
-    // description/summary/content — prefer longer of description vs summary
-    const desc = get('description') || '';
-    const summary = get('summary') || '';
-    const description = desc.length >= summary.length ? desc : summary;
-    const pubDate = get('pubDate') || get('published') || get('updated') || get('dc:date');
-
-    if (title && link) {
-      items.push({ title, link, description, pubDate: pubDate || null });
-    }
-  }
-  return items;
-}
-
-// RSS feed result cache — prevents re-fetching the same feed URL within the TTL window.
-// Most feeds update at most hourly; a 5-hour in-process cache dramatically reduces
-// redundant network calls across multiple country/category pair requests.
-// Override the TTL via RSS_CACHE_TTL_MINUTES env var (default: 300 = 5 hours).
-const RSS_CACHE = {};
-const RSS_CACHE_TTL_MS = parseInt(process.env.RSS_CACHE_TTL_MINUTES || '300', 10) * 60 * 1000;
-
-// Fetch an RSS/Atom feed and return parsed items.
-// Sends a browser-like User-Agent and Accept header — many feed servers
-// return 403 for bare fetch() calls without these.
-async function fetchRSSFeed(url) {
-  // Return cached result if still within TTL
-  const cached = RSS_CACHE[url];
-  if (cached && (Date.now() - cached.timestamp) < RSS_CACHE_TTL_MS) {
-    return cached.items;
-  }
-
-  const response = await fetchWithTimeout(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; RSS reader)',
-      'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
-    },
-  });
-  if (!response.ok) throw new Error(`RSS ${response.status}: ${url}`);
-  const xml = await response.text();
-  const items = parseRSSFeed(xml);
-
-  RSS_CACHE[url] = { timestamp: Date.now(), items };
-  return items;
-}
-
-// ── Keyword query expansion ────────────────────────────────────────────────
-// Maps a normalised search term to an array of related terms that are ORed
-// together in the API query. This solves cases where articles use an alternate
-// name (e.g. "UFC" instead of "MMA") that the user didn't type.
-//
-// Multi-word phrases are quoted ("mixed martial arts") so APIs treat them as
-// phrases. Single-word/acronym terms are unquoted. Both directions of an alias
-// are listed so users get consistent results regardless of which name they use.
-//
-// To add a new topic: add an entry to _EXP and map each alias to it below.
-
-// Shared expansion arrays — referenced by multiple alias keys to avoid duplication
-const _EXP = {
-  MMA: ['MMA', 'UFC', 'Bellator', '"mixed martial arts"'],
-  NBA: ['NBA', 'basketball', '"National Basketball Association"'],
-  NFL: ['NFL', '"American football"', '"National Football League"'],
-  MLB: ['MLB', 'baseball', '"Major League Baseball"'],
-  NHL: ['NHL', 'hockey', '"National Hockey League"'],
-  F1: ['F1', '"Formula 1"', '"Formula One"', '"Grand Prix"'],
-  EPL: ['"Premier League"', 'EPL', '"English Premier League"'],
-  FIFA: ['FIFA', 'football', 'soccer', '"World Cup"'],
-  TENNIS: ['tennis', 'ATP', 'WTA', 'Wimbledon', '"US Open"', '"French Open"', '"Australian Open"'],
-  WWE: ['WWE', '"World Wrestling Entertainment"', 'wrestling', 'AEW'],
-  PGA: ['PGA', 'golf', '"PGA Tour"', '"Masters Tournament"'],
-  OLYMPICS: ['Olympics', '"Olympic Games"', '"Summer Games"', '"Winter Games"'],
-  CRYPTO: ['crypto', 'cryptocurrency', 'bitcoin', 'ethereum', 'blockchain'],
-  BITCOIN: ['bitcoin', 'cryptocurrency', 'crypto', 'BTC'],
-  CHATGPT: ['ChatGPT', 'OpenAI', '"GPT-4"', '"large language model"'],
-  EV: ['"electric vehicle"', '"electric car"', 'Tesla', 'EV'],
-  NATO: ['NATO', '"North Atlantic Treaty"', '"Alliance"'],
-  WHO: ['WHO', '"World Health Organization"', '"World Health Organisation"'],
-  UN: ['UN', '"United Nations"', '"Security Council"', '"General Assembly"'],
-};
-
-const KEYWORD_EXPANSION_MAP = {
-  // ── Combat sports ───────────────────────────────────────────────────────
-  'mma': _EXP.MMA,
-  'ufc': _EXP.MMA,
-  'bellator': _EXP.MMA,
-  'mixed martial arts': _EXP.MMA,
-  // ── Basketball ──────────────────────────────────────────────────────────
-  'nba': _EXP.NBA,
-  'basketball': _EXP.NBA,
-  // ── American football ────────────────────────────────────────────────────
-  'nfl': _EXP.NFL,
-  // ── Baseball ─────────────────────────────────────────────────────────────
-  'mlb': _EXP.MLB,
-  'baseball': _EXP.MLB,
-  // ── Ice hockey ──────────────────────────────────────────────────────────
-  'nhl': _EXP.NHL,
-  'hockey': _EXP.NHL,
-  'ice hockey': _EXP.NHL,
-  // ── Formula 1 ───────────────────────────────────────────────────────────
-  'f1': _EXP.F1,
-  'formula 1': _EXP.F1,
-  'formula one': _EXP.F1,
-  'formula1': _EXP.F1,
-  // ── Soccer / Football ───────────────────────────────────────────────────
-  'premier league': _EXP.EPL,
-  'epl': _EXP.EPL,
-  'fifa': _EXP.FIFA,
-  'world cup': _EXP.FIFA,
-  // ── Tennis ──────────────────────────────────────────────────────────────
-  'tennis': _EXP.TENNIS,
-  'atp': _EXP.TENNIS,
-  'wta': _EXP.TENNIS,
-  'wimbledon': _EXP.TENNIS,
-  // ── Wrestling ───────────────────────────────────────────────────────────
-  'wwe': _EXP.WWE,
-  'wrestling': _EXP.WWE,
-  'aew': _EXP.WWE,
-  // ── Golf ────────────────────────────────────────────────────────────────
-  'pga': _EXP.PGA,
-  'golf': _EXP.PGA,
-  // ── Olympics ────────────────────────────────────────────────────────────
-  'olympics': _EXP.OLYMPICS,
-  'olympic games': _EXP.OLYMPICS,
-  // ── Crypto ──────────────────────────────────────────────────────────────
-  'crypto': _EXP.CRYPTO,
-  'cryptocurrency': _EXP.CRYPTO,
-  'bitcoin': _EXP.BITCOIN,
-  'btc': _EXP.BITCOIN,
-  // ── AI / Tech ───────────────────────────────────────────────────────────
-  'chatgpt': _EXP.CHATGPT,
-  'openai': _EXP.CHATGPT,
-  // ── Electric vehicles ───────────────────────────────────────────────────
-  'ev': _EXP.EV,
-  'electric vehicle': _EXP.EV,
-  'electric car': _EXP.EV,
-  // ── International organisations ─────────────────────────────────────────
-  'nato': _EXP.NATO,
-  'who': _EXP.WHO,
-  'united nations': _EXP.UN,
-};
-
-// Build the actual query string to send to APIs.
-// If the keyword has a known expansion, returns an OR query covering all related terms.
-// Multi-word phrases not in the map are auto-quoted for precision (reduces noise).
-function buildSearchQuery(rawKeyword) {
-  const normalized = rawKeyword.trim().toLowerCase();
-  const expansions = KEYWORD_EXPANSION_MAP[normalized];
-  if (expansions && expansions.length > 0) {
-    return expansions.join(' OR ');
-  }
-  // Auto-quote multi-word phrases to avoid partial-word noise
-  const kw = rawKeyword.trim();
-  if (kw.includes(' ') && !kw.startsWith('"')) {
-    return `"${kw}"`;
-  }
-  return kw;
-}
-
-// ── LLM-powered dynamic query expansion ────────────────────────────────────
-// For keywords not in the static KEYWORD_EXPANSION_MAP, use an LLM to generate
-// related search terms. This dramatically improves recall for long-tail queries
-// (e.g. "tariffs" → "tariffs OR trade war OR import duties OR customs").
-// Results are cached in-memory so the same keyword only triggers one LLM call.
-const EXPANSION_CACHE = {};
-const EXPANSION_PROMPT = (keyword) =>
-  `You are a search query expansion tool. Given the news search keyword "${keyword}", output 3-5 closely related search terms or synonyms that a journalist might use when writing about this topic. Output ONLY a comma-separated list of terms, nothing else. Do NOT include the original keyword. Example: for "electric cars" you might output: electric vehicles, EV, Tesla, battery vehicles, zero-emission cars`;
-
-// Precision-focused expansion prompt for keyword monitoring mode.
-// Generates tight, specific synonyms instead of broad ones. Avoids generic
-// terms that would match unrelated articles from other countries/sectors.
-const KEYWORD_MONITOR_EXPANSION_PROMPT = (keyword) =>
-  `You are a precision search query expansion tool for a news monitoring service. Given the keyword "${keyword}", output 2-4 highly specific alternative terms or phrases that journalists would use IN THE HEADLINE when writing about this exact topic. Be precise — do NOT output broad or generic synonyms. Each term must be specific enough that an article using it in the headline is almost certainly about "${keyword}". Output ONLY a comma-separated list, nothing else. Do NOT include the original keyword.`;
-
-function parseExpansionResponse(text, originalKeyword) {
-  if (!text) return null;
-  const terms = text
-    .split(/[,\n]/)
-    .map(t => t.trim().replace(/^["']+|["']+$/g, ''))
-    .filter(t => t.length > 1 && t.length < 60 && t.toLowerCase() !== originalKeyword.toLowerCase());
-  if (terms.length === 0) return null;
-  // Quote multi-word terms for precise API matching
-  return terms.slice(0, 5).map(t => t.includes(' ') ? `"${t}"` : t);
-}
-
-async function expandQueryWithLLM(keyword, llmKeys, useKeywordMonitorPrompt = false) {
-  const cacheKey = (useKeywordMonitorPrompt ? 'kwm:' : '') + keyword.trim().toLowerCase();
-  if (EXPANSION_CACHE[cacheKey]) return EXPANSION_CACHE[cacheKey];
-
-  // Check Supabase persistent cache before calling the LLM.
-  // This survives serverless cold starts and is shared across all instances.
-  const SB_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-  if (SB_URL && SB_KEY) {
-    try {
-      const sbRes = await fetch(
-        `${SB_URL}/rest/v1/keyword_expansions?cache_key=eq.${encodeURIComponent(cacheKey)}&select=terms,expires_at`,
-        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
-      );
-      if (sbRes.ok) {
-        const [row] = await sbRes.json();
-        if (row && new Date(row.expires_at) > new Date()) {
-          EXPANSION_CACHE[cacheKey] = row.terms;
-          return row.terms;
-        }
+      let searchQuery;
+      if (demonym) {
+        searchQuery = `(${demonym} OR "${countryName}") AND (${queryTerms})`;
+      } else {
+        searchQuery = `"${countryName}" AND (${queryTerms})`;
       }
-    } catch { /* non-fatal — fall through to LLM */ }
-  }
 
-  const prompt = useKeywordMonitorPrompt
-    ? KEYWORD_MONITOR_EXPANSION_PROMPT(keyword)
-    : EXPANSION_PROMPT(keyword);
-  // Try Gemini first (fastest/cheapest), then Groq
-  const providers = [
-    llmKeys.gemini && (async () => {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${llmKeys.gemini}`;
-      const res = await fetchWithTimeout(url, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 100 }
-        })
-      }, 4000); // tight 4s timeout — expansion shouldn't delay the search
-      const data = await res.json();
-      if (res.status === 429 || data.error?.code === 429) return null;
-      if (!res.ok) return null;
-      return data.candidates?.[0]?.content?.parts?.[0]?.text;
-    }),
-    llmKeys.groq && (async () => {
-      const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${llmKeys.groq}` },
-        body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.3, max_tokens: 100
-        })
-      }, 4000);
-      const data = await res.json();
-      if (res.status === 429) return null;
-      if (!res.ok) return null;
-      return data.choices?.[0]?.message?.content;
-    }),
-  ].filter(Boolean);
-
-  for (const attempt of providers) {
-    try {
-      const text = await attempt();
-      const terms = parseExpansionResponse(text, keyword);
-      if (terms) {
-        EXPANSION_CACHE[cacheKey] = terms;
-        // Persist to Supabase so future cold starts skip the LLM call.
-        if (SB_URL && SB_KEY) {
-          fetch(`${SB_URL}/rest/v1/keyword_expansions`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              apikey: SB_KEY,
-              Authorization: `Bearer ${SB_KEY}`,
-              Prefer: 'resolution=merge-duplicates,return=minimal',
-            },
-            body: JSON.stringify({
-              cache_key: cacheKey,
-              terms,
-              expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-            }),
-          }).catch(() => {});
-        }
-        return terms;
-      }
-    } catch (err) {
-      console.warn(`[expansion] LLM expansion failed: ${err.message}`);
+      const encodedQ = encodeURIComponent(searchQuery);
+      const gl = country.toUpperCase();
+      url = `https://news.google.com/rss/search?q=${encodedQ}&hl=en-US&gl=${gl}&ceid=${gl}:en`;
     }
-  }
-  return null; // fallback: no expansion
-}
 
-// Detect user-supplied boolean operators (AND, OR, NOT in uppercase by convention).
-// When present the query is passed as-is to search APIs — no expansion is applied
-// since the user has already expressed their intent explicitly.
-function hasBooleanSyntax(keyword) {
-  return / AND | OR | NOT /i.test(keyword);
-}
-
-// Build the final search query, using LLM expansion if available.
-// Called with await since LLM expansion is async.
-// opts.keywordMode: when true, uses the precision expansion prompt (fewer, tighter synonyms)
-async function buildExpandedSearchQuery(rawKeyword, llmKeys, opts = {}) {
-  const normalized = rawKeyword.trim().toLowerCase();
-
-  // 0. Boolean query: user wrote AND/OR/NOT — pass through without expansion
-  if (hasBooleanSyntax(rawKeyword)) {
-    return { query: rawKeyword.trim(), source: 'boolean' };
+    // Use the RSS fetcher to get items
+    const items = await fetchRSSFeed(url).catch(() => []);
+    return items;
   }
 
-  // 1. Check static expansion map first (instant, no LLM call needed)
-  const staticExpansion = KEYWORD_EXPANSION_MAP[normalized];
-  if (staticExpansion && staticExpansion.length > 0) {
-    return { query: staticExpansion.join(' OR '), source: 'static' };
-  }
+  // â”€â”€ RSS support â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Minimal RSS 2.0 / Atom parser â€” no external XML library needed.
+  // Handles CDATA sections, HTML entities, and both RSS <link> (text node)
+  // and Atom <link href="..."> (attribute) formats.
 
-  // 2. Try LLM-powered expansion for unknown terms
-  if (llmKeys && Object.values(llmKeys).some(Boolean)) {
-    const dynamicTerms = await expandQueryWithLLM(rawKeyword, llmKeys, opts.keywordMode);
-    if (dynamicTerms) {
-      const kw = rawKeyword.trim();
-      const quotedOriginal = kw.includes(' ') ? `"${kw}"` : kw;
-      // In keyword monitor mode, limit to 3 expansion terms max for precision
-      const limitedTerms = opts.keywordMode ? dynamicTerms.slice(0, 3) : dynamicTerms;
-      const expanded = [quotedOriginal, ...limitedTerms].join(' OR ');
-      return { query: expanded, source: 'llm' };
-    }
-  }
+  function parseRSSFeed(xml) {
+    const items = [];
+    // Match <item> (RSS 2.0) or <entry> (Atom) blocks
+    const blockRe = /<(?:item|entry)[\s>]([\s\S]*?)<\/(?:item|entry)>/gi;
+    let m;
+    while ((m = blockRe.exec(xml)) !== null) {
+      const block = m[1];
 
-  // 3. Fallback: auto-quote multi-word phrases
-  const kw = rawKeyword.trim();
-  if (kw.includes(' ') && !kw.startsWith('"')) {
-    return { query: `"${kw}"`, source: 'quoted' };
-  }
-  return { query: kw, source: 'raw' };
-}
+      // Extract text content of a named tag, unwrapping CDATA and decoding entities
+      const get = (tag) => {
+        const cdataM = block.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]>`, 'i'));
+        if (cdataM) return cdataM[1].trim();
+        const plainM = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'));
+        if (!plainM) return null;
+        return plainM[1]
+          .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+          .replace(/<[^>]+>/g, '') // strip any inline HTML tags
+          .trim();
+      };
 
-// ── Keyword relevance scoring ──────────────────────────────────────────────
+      // Atom feeds use <link rel="alternate" href="..."/> rather than a text node
+      const getAtomLink = () => {
+        const hrefM = block.match(/<link[^>]+href="([^"]+)"/i);
+        return hrefM ? hrefM[1] : null;
+      };
 
-// Simple English suffix stemmer — allows "running" to match "run", "runner" etc.
-// Only strips when the result is still >= 3 chars to avoid over-stemming short words.
-function stemWord(word) {
-  if (word.length < 5) return word;
-  const rules = [
-    [/ational$/, 'ate'], [/tional$/, 'tion'], [/ations?$/, 'ate'],
-    [/izing$/, 'ize'], [/ising$/, 'ise'], [/ness$/, ''],
-    [/ment$/, ''], [/ings?$/, ''], [/edly$/, ''],
-    [/ingly$/, ''], [/ated?$/, ''], [/iers?$/, 'y'],
-    [/ies$/, 'y'], [/ers?$/, ''], [/ed$/, ''],
-    [/ly$/, ''], [/es$/, ''], [/s$/, ''],
-  ];
-  for (const [pattern, replacement] of rules) {
-    const result = word.replace(pattern, replacement);
-    if (result !== word && result.length >= 3) return result;
-  }
-  return word;
-}
+      const title = get('title');
+      const link = get('link') || getAtomLink();
+      // description/summary/content â€” prefer longer of description vs summary
+      const desc = get('description') || '';
+      const summary = get('summary') || '';
+      const description = desc.length >= summary.length ? desc : summary;
+      const pubDate = get('pubDate') || get('published') || get('updated') || get('dc:date');
 
-// Scores how strongly an article matches the user's search keyword (0-1).
-// Improvements over v1:
-//   - Exact phrase bonus: multi-word keyword appearing verbatim in title/desc scores extra
-//   - Stemming: "running" matches articles about "run", "runner", etc.
-//   - Cumulative field scoring: a term found in both title and description scores higher
-//     than a title-only match, rewarding articles with deep keyword coverage
-// This becomes Signal 7 in the ranking engine for keyword searches.
-function keywordRelevanceScore(article, searchTerms, rawKeyword) {
-  if (!searchTerms || searchTerms.length === 0) return 0;
-  const title = (article.title || '').toLowerCase();
-  const desc = (article.description || '').toLowerCase();
-  const content = (article.content || '').toLowerCase();
-
-  let score = 0;
-
-  // Exact phrase bonus: if the original multi-word keyword appears verbatim, reward it
-  // strongly — this is almost certainly the article the user is looking for.
-  // Skip for boolean queries (they contain AND/OR/NOT which aren't literal phrases).
-  if (rawKeyword) {
-    const phrase = rawKeyword.trim().toLowerCase();
-    if (phrase.includes(' ') && !/\b(and|or|not)\b/i.test(phrase)) {
-      if (title.includes(phrase)) score += 5;
-      else if (desc.includes(phrase)) score += 2.5;
-    }
-  }
-
-  for (const term of searchTerms) {
-    const t = term.toLowerCase().replace(/^["'(]+|["')]+$/g, '');
-    if (t.length < 2) continue;
-    const tStem = stemWord(t);
-
-    const inTitle = title.includes(t) || (tStem !== t && title.includes(tStem));
-    const inDesc = desc.includes(t) || (tStem !== t && desc.includes(tStem));
-    const inContent = content.includes(t) || (tStem !== t && content.includes(tStem));
-
-    // Cumulative: each field that contains the term contributes independently.
-    // Title is worth most (3), desc adds signal (1), content adds a small bump (0.5).
-    if (inTitle) score += 3;
-    if (inDesc) score += 1;
-    if (inContent) score += 0.5;
-  }
-
-  // Normalise to 0-1. Ceiling raised to 8 to accommodate phrase bonus + cumulative scoring.
-  return Math.min(score / 8, 1);
-}
-
-// ── Keyword search helpers ─────────────────────────────────────────────────
-// These search APIs directly by keyword rather than by country/category top-headlines.
-
-async function searchNewsAPIByKeyword(keyword, apiKey, domains, opts = {}) {
-  const params = new URLSearchParams({
-    q: keyword, domains: domains || TRUSTED_DOMAINS, language: 'en',
-    sortBy: opts.sortByPopularity ? 'popularity' : 'publishedAt', pageSize: '50', apiKey,
-  });
-  if (opts.from) params.set('from', opts.from);
-  const response = await fetchWithTimeout(`https://newsapi.org/v2/everything?${params}`);
-  if (!response.ok) throw new Error(`NewsAPI keyword error: ${response.status}`);
-  const data = await response.json();
-  if (data.status !== 'ok') throw new Error(`NewsAPI keyword error: ${data.message}`);
-  return data.articles || [];
-}
-
-async function searchWorldNewsAPIByKeyword(keyword, apiKey, opts = {}) {
-  const params = new URLSearchParams({
-    text: keyword, language: 'en', number: '50',
-    sort: opts.sortByPopularity ? 'relevance' : 'publish-time', 'sort-direction': 'DESC', 'api-key': apiKey,
-  });
-  if (opts.from) params.set('earliest-publish-date', opts.from);
-  const response = await fetchWithTimeout(`https://api.worldnewsapi.com/search-news?${params}`);
-  if (!response.ok) throw new Error(`WorldNewsAPI keyword error: ${response.status}`);
-  const data = await response.json();
-  return data.news || [];
-}
-
-async function searchNewsDataByKeyword(keyword, apiKey, opts = {}) {
-  const params = new URLSearchParams({ q: keyword, language: 'en', size: '50', apikey: apiKey });
-  if (opts.from) params.set('from_date', opts.from);
-  const response = await fetchWithTimeout(`https://newsdata.io/api/1/latest?${params}`);
-  if (!response.ok) throw new Error(`NewsData keyword error: ${response.status}`);
-  const data = await response.json();
-  if (data.status !== 'success') throw new Error(`NewsData keyword error: ${data.message}`);
-  return data.results || [];
-}
-
-async function searchGuardianByKeyword(keyword, apiKey, opts = {}) {
-  const params = new URLSearchParams({
-    q: keyword, 'show-fields': 'trailText,thumbnail,byline,bodyText',
-    'page-size': '50', 'order-by': 'newest', 'api-key': apiKey || 'test',
-  });
-  if (opts.from) params.set('from-date', opts.from);
-  const response = await fetchWithTimeout(`https://content.guardianapis.com/search?${params}`);
-  if (!response.ok) throw new Error(`Guardian keyword error: ${response.status}`);
-  const data = await response.json();
-  if (data.response?.status !== 'ok') throw new Error(`Guardian keyword error: ${data.response?.message}`);
-  return data.response?.results || [];
-}
-
-async function searchGNewsByKeyword(keyword, apiKey, opts = {}) {
-  const params = new URLSearchParams({
-    q: keyword, lang: 'en', max: '10', token: apiKey,
-    sortby: opts.sortByPopularity ? 'relevance' : 'publishedAt',
-  });
-  if (opts.from) params.set('from', opts.from);
-  if (opts.country && opts.country !== 'world') params.set('country', opts.country);
-  const response = await fetchWithTimeout(`https://gnews.io/api/v4/search?${params}`);
-  if (!response.ok) throw new Error(`GNews keyword error: ${response.status}`);
-  const data = await response.json();
-  if (data.errors) throw new Error(`GNews keyword error: ${JSON.stringify(data.errors)}`);
-  return data.articles || [];
-}
-
-// ── AI Summarisation — multi-provider fallback chain ─────────────────────────
-// Order: Gemini → Groq → OpenAI → Cohere
-// Each provider throws QuotaExceededError on 429/quota so the next is tried.
-
-class QuotaExceededError extends Error {
-  constructor(provider) {
-    super(`${provider} quota exceeded`);
-    this.name = 'QuotaExceededError';
-  }
-}
-
-const SUMMARY_PROMPT = (content) =>
-  `You are a factual news summarizer. Based ONLY on the provided article text, write 2-3 concise bullet points covering the key facts. Do NOT add information that is not in the text.\n\n• Key point 1\n• Key point 2\n• Key point 3 (if warranted)\n\nArticle:\n${content}`;
-
-// Shared: prepare article text (strip truncation markers, cap length)
-function prepareArticleContent(article) {
-  // Strip NewsAPI "[+XXXX chars]" truncation markers before comparing lengths so a
-  // "200-char stub [+2800 chars]" doesn't incorrectly win over a full description.
-  const strippedContent = (article.content || '').replace(/\s*\[\+\d+ chars\].*$/s, '').trim();
-  const desc = (article.description || '').replace(/\s*\[\+\d+ chars\].*$/s, '').trim();
-  const body = strippedContent.length >= desc.length ? strippedContent : desc;
-  let content = body || article.title || '';
-  if (article.title && !content.toLowerCase().includes(article.title.slice(0, 20).toLowerCase())) {
-    content = `${article.title}. ${content}`;
-  }
-  return content.slice(0, 3000);
-}
-
-// Shared: extract bullet points from any LLM response text
-function parseBullets(text) {
-  if (!text) return null;
-  let bullets = text.split('\n')
-    .filter(line => /^[\s]*[•*\-–—]/.test(line))
-    .map(line => line.replace(/^[\s]*[•*\-–—]+\s*/, '').trim())
-    .filter(Boolean);
-  if (bullets.length === 0) {
-    // Only treat lines as numbered bullets when they actually start with a digit marker
-    bullets = text.split('\n')
-      .filter(line => /^[\s]*\d+[\.\)]/.test(line))
-      .map(line => line.replace(/^[\s]*\d+[\.\)]\s*/, '').trim())
-      .filter(line => line.length > 10);
-  }
-  return bullets.length > 0 ? bullets.slice(0, 3) : null;
-}
-
-async function summarizeWithGemini(content, key) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${key}`;
-  const res = await fetchWithTimeout(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: SUMMARY_PROMPT(content) }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 500 }
-    })
-  });
-  const data = await res.json();
-  if (res.status === 429 || data.error?.code === 429 || data.error?.status === 'RESOURCE_EXHAUSTED') {
-    throw new QuotaExceededError('Gemini');
-  }
-  if (!res.ok) { console.error(`Gemini error: ${data.error?.message?.slice(0, 100)}`); return null; }
-  return parseBullets(data.candidates?.[0]?.content?.parts?.[0]?.text);
-}
-
-async function summarizeWithGroq(content, key) {
-  const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-    body: JSON.stringify({
-      model: 'llama-3.1-8b-instant',
-      messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
-      temperature: 0.2,
-      max_tokens: 500
-    })
-  });
-  const data = await res.json();
-  if (res.status === 429 || data.error?.code === 'rate_limit_exceeded') {
-    throw new QuotaExceededError('Groq');
-  }
-  if (!res.ok) { console.error(`Groq error: ${data.error?.message?.slice(0, 100)}`); return null; }
-  return parseBullets(data.choices?.[0]?.message?.content);
-}
-
-async function summarizeWithOpenAI(content, key) {
-  const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
-      temperature: 0.2,
-      max_tokens: 500
-    })
-  });
-  const data = await res.json();
-  if (res.status === 429 || data.error?.type === 'insufficient_quota' || data.error?.type === 'rate_limit_exceeded') {
-    throw new QuotaExceededError('OpenAI');
-  }
-  if (!res.ok) { console.error(`OpenAI error: ${data.error?.message?.slice(0, 100)}`); return null; }
-  return parseBullets(data.choices?.[0]?.message?.content);
-}
-
-async function summarizeWithCohere(content, key) {
-  const res = await fetchWithTimeout('https://api.cohere.com/v2/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-    body: JSON.stringify({
-      model: 'command-r-08-2024',
-      messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
-      temperature: 0.2,
-      max_tokens: 500
-    })
-  });
-  const data = await res.json();
-  if (res.status === 429) { throw new QuotaExceededError('Cohere'); }
-  if (!res.ok) { console.error(`Cohere error: ${JSON.stringify(data).slice(0, 100)}`); return null; }
-  return parseBullets(data.message?.content?.[0]?.text);
-}
-
-// Per-article summary cache — avoids re-generating LLM summaries for the same article
-// across multiple cache refreshes. TTL of 36 hours is longer than the 12-hour news
-// cache since article content doesn't change after publication.
-const SUMMARY_CACHE = new Map();
-const SUMMARY_CACHE_TTL_MS = 36 * 60 * 60 * 1000; // 36 hours
-
-// Main: try each configured provider in order; skip to next on quota exhaustion
-async function generateSummary(article, llmKeys) {
-  const content = prepareArticleContent(article);
-  const providers = [
-    llmKeys.gemini && (() => summarizeWithGemini(content, llmKeys.gemini)),
-    llmKeys.groq && (() => summarizeWithGroq(content, llmKeys.groq)),
-    llmKeys.openai && (() => summarizeWithOpenAI(content, llmKeys.openai)),
-    llmKeys.cohere && (() => summarizeWithCohere(content, llmKeys.cohere)),
-  ].filter(Boolean);
-
-  for (const attempt of providers) {
-    try {
-      const result = await attempt();
-      if (result) return result;
-    } catch (err) {
-      if (err.name === 'QuotaExceededError') {
-        console.warn(`[summary] ${err.message} — trying next provider`);
-        continue;
-      }
-      console.error('[summary] unexpected error:', err.message);
-    }
-  }
-  return null;
-}
-
-/**
- * Cached wrapper around generateSummary. Returns a previously-generated summary
- * for the same article URL when still within SUMMARY_CACHE_TTL_MS, avoiding
- * redundant LLM calls across cache refreshes or concurrent requests.
- */
-async function generateSummaryCached(article, llmKeys) {
-  const key = article.url;
-  if (!key) return generateSummary(article, llmKeys);
-
-  const cached = SUMMARY_CACHE.get(key);
-  if (cached && (Date.now() - cached.timestamp) < SUMMARY_CACHE_TTL_MS) {
-    return cached.points;
-  }
-
-  const points = await generateSummary(article, llmKeys);
-  if (points) {
-    SUMMARY_CACHE.set(key, { points, timestamp: Date.now() });
-    // Evict oldest entry when cache exceeds 2000 articles
-    if (SUMMARY_CACHE.size > 2000) {
-      const oldest = [...SUMMARY_CACHE.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
-      SUMMARY_CACHE.delete(oldest[0]);
-    }
-  }
-  return points;
-}
-
-// Helper: human-readable time ago (e.g. "2h ago", "3d ago")
-function timeAgo(dateStr) {
-  if (!dateStr) return 'Today';
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return `${Math.floor(days / 7)}w ago`;
-}
-
-// ── Source-country inference ─────────────────────────────────────────────────
-// Map common country-code TLDs to our country codes.
-// Used to infer a source's home country from its domain (e.g. smh.com.au → au).
-const TLD_TO_COUNTRY = {
-  au: 'au', uk: 'gb', nz: 'nz', ca: 'ca', de: 'de', fr: 'fr', jp: 'jp',
-  in: 'in', br: 'br', mx: 'mx', it: 'it', es: 'es', nl: 'nl', se: 'se',
-  no: 'no', pl: 'pl', ch: 'ch', be: 'be', at: 'at', ie: 'ie', pt: 'pt',
-  dk: 'dk', fi: 'fi', gr: 'gr', za: 'za', ng: 'ng', eg: 'eg', ke: 'ke',
-  tr: 'tr', il: 'il', ae: 'ae', sa: 'sa', ar: 'ar', cl: 'cl', co: 'co',
-  id: 'id', th: 'th', my: 'my', ph: 'ph', vn: 'vn', pk: 'pk', sg: 'sg',
-  hk: 'hk', tw: 'tw', cn: 'cn', kr: 'kr', ua: 'ua', ro: 'ro', hu: 'hu',
-  cz: 'cz', rs: 'rs', hr: 'hr', bg: 'bg', sk: 'sk', ps: 'ps',
-};
-
-// International wire services and global outlets — these cover ALL countries
-// and should NOT give a meta-country boost to their HQ country. Articles from
-// reuters.com about India should not get +2 for UK just because Reuters is UK-based.
-const INTERNATIONAL_SOURCES = new Set([
-  'reuters.com', 'apnews.com', 'bbc.co.uk', 'bbc.com',
-  'aljazeera.com', 'france24.com', 'dw.com',
-  'theconversation.com',
-]);
-
-// Map well-known source domains to their home countries.
-// More reliable than TLD for domains like aljazeera.com (Qatar-based, English service).
-// NOTE: International sources are still mapped here (needed for non-country queries),
-// but the country scoring logic treats them differently — see articleCountryScore().
-const DOMAIN_TO_COUNTRY = {
-  'reuters.com': 'gb', 'bbc.co.uk': 'gb', 'bbc.com': 'gb',
-  'theguardian.com': 'gb', 'ft.com': 'gb', 'economist.com': 'gb',
-  'nytimes.com': 'us', 'washingtonpost.com': 'us', 'cnn.com': 'us',
-  'abcnews.go.com': 'us', 'cbsnews.com': 'us', 'nbcnews.com': 'us',
-  'npr.org': 'us', 'pbs.org': 'us', 'politico.com': 'us',
-  'wsj.com': 'us', 'bloomberg.com': 'us', 'apnews.com': 'us',
-  'arstechnica.com': 'us', 'wired.com': 'us', 'techcrunch.com': 'us',
-  'theverge.com': 'us', 'engadget.com': 'us', 'espn.com': 'us',
-  'ign.com': 'us', 'polygon.com': 'us', 'ew.com': 'us',
-  'buzzfeed.com': 'us',
-  'abc.net.au': 'au', 'smh.com.au': 'au', 'theaustralian.com.au': 'au',
-  'aljazeera.com': 'qa', 'france24.com': 'fr', 'dw.com': 'de',
-  'scmp.com': 'hk', 'thenextweb.com': 'nl',
-  'timesofindia.indiatimes.com': 'in', 'thehindu.com': 'in',
-  'japantimes.co.jp': 'jp', 'straitstimes.com': 'sg',
-  'theconversation.com': 'au',
-  'nationalgeographic.com': 'us', 'newscientist.com': 'gb',
-};
-
-// Guardian section IDs that map directly to countries
-const GUARDIAN_SECTION_TO_COUNTRY = {
-  'australia-news': 'au', 'uk-news': 'gb', 'us-news': 'us',
-  'world': null, // global
-};
-
-// Infer source country from a URL's domain
-function inferCountryFromUrl(url) {
-  if (!url) return null;
-  try {
-    const hostname = new URL(url).hostname.replace(/^www\./, '');
-    // Check explicit domain map first
-    if (DOMAIN_TO_COUNTRY[hostname]) return DOMAIN_TO_COUNTRY[hostname];
-    // Check subdomains (e.g. news.com.au → au)
-    for (const [domain, country] of Object.entries(DOMAIN_TO_COUNTRY)) {
-      if (hostname.endsWith('.' + domain) || hostname === domain) return country;
-    }
-    // Fall back to TLD
-    const parts = hostname.split('.');
-    const tld = parts[parts.length - 1];
-    if (TLD_TO_COUNTRY[tld]) return TLD_TO_COUNTRY[tld];
-    // Handle compound TLDs: .co.uk, .com.au, .co.nz, .co.jp, .com.br etc.
-    // The country code is the last part; the second-to-last is the generic (.co, .com)
-    if (parts.length >= 3) {
-      const secondToLast = parts[parts.length - 2];
-      if ((secondToLast === 'co' || secondToLast === 'com' || secondToLast === 'org' || secondToLast === 'net') && TLD_TO_COUNTRY[tld]) {
-        return TLD_TO_COUNTRY[tld];
+      if (title && link) {
+        items.push({ title, link, description, pubDate: pubDate || null });
       }
     }
-  } catch { }
-  return null;
-}
+    return items;
+  }
 
-// Check if a source domain is an international/wire service
-function isInternationalSource(article) {
-  const domain = getSourceDomain(article);
-  return INTERNATIONAL_SOURCES.has(domain);
-}
+  // RSS feed result cache â€” prevents re-fetching the same feed URL within the TTL window.
+  // Most feeds update at most hourly; a 5-hour in-process cache dramatically reduces
+  // redundant network calls across multiple country/category pair requests.
+  // Override the TTL via RSS_CACHE_TTL_MINUTES env var (default: 300 = 5 hours).
+  const RSS_CACHE = {};
+  const RSS_CACHE_TTL_MS = parseInt(process.env.RSS_CACHE_TTL_MINUTES || '300', 10) * 60 * 1000;
 
-// Formatters — normalise each API's shape to our app format.
-// Each includes a `_meta` object with source-country inference signals
-// used by the relevance filter (stripped before sending to the client).
-function formatNewsAPIArticle(article, country, category) {
-  const sourceUrl = article.url || '#';
-  return {
-    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    title: article.title || 'No title',
-    description: article.description || '',
-    content: article.content || article.description || '',
-    url: sourceUrl,
-    image_url: article.urlToImage || null,
-    source: article.source?.name || 'Unknown',
-    publishedAt: article.publishedAt || new Date().toISOString(),
-    time_ago: timeAgo(article.publishedAt),
-    country, category,
-    language: 'en', // NewsAPI is called with language=en (or no filter for non-English mode)
-    summary_points: null,
-    _meta: {
-      sourceCountry: inferCountryFromUrl(sourceUrl),
-    },
-  };
-}
+  // Fetch an RSS/Atom feed and return parsed items.
+  // Sends a browser-like User-Agent and Accept header â€” many feed servers
+  // return 403 for bare fetch() calls without these.
+  async function fetchRSSFeed(url) {
+    // Return cached result if still within TTL
+    const cached = RSS_CACHE[url];
+    if (cached && (Date.now() - cached.timestamp) < RSS_CACHE_TTL_MS) {
+      return cached.items;
+    }
 
-function formatWorldNewsAPIArticle(article, country, category, nativeCategory = false) {
-  return {
-    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    title: article.title || 'No title',
-    description: article.text ? article.text.slice(0, 200) : '',
-    content: article.text || '',
-    url: article.url || '#',
-    image_url: article.image || null,
-    source: article.source_country ? `World News (${article.source_country.toUpperCase()})` : 'World News API',
-    publishedAt: article.publish_date || new Date().toISOString(),
-    time_ago: timeAgo(article.publish_date),
-    country, category,
-    language: article.language || 'en', // WorldNewsAPI returns language per article
-    summary_points: null,
-    _nativeCategory: nativeCategory,
-    _meta: {
-      // WorldNewsAPI provides explicit source_country — most reliable signal
-      sourceCountry: article.source_country?.toLowerCase() || inferCountryFromUrl(article.url),
-    },
-  };
-}
-
-function formatNewsDataArticle(article, country, category, nativeCategory = false) {
-  const sourceUrl = article.link || '#';
-  return {
-    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    title: article.title || 'No title',
-    description: article.description || article.content?.slice(0, 200) || '',
-    content: article.content || article.description || '',
-    url: sourceUrl,
-    image_url: article.image_url || null,
-    source: article.source_id || 'NewsData',
-    publishedAt: article.pubDate || new Date().toISOString(),
-    time_ago: timeAgo(article.pubDate),
-    country, category,
-    language: article.language || 'en', // NewsData.io returns language per article
-    summary_points: null,
-    _nativeCategory: nativeCategory,
-    _meta: {
-      sourceCountry: inferCountryFromUrl(sourceUrl),
-    },
-  };
-}
-
-function formatGuardianArticle(result, country, category, nativeCategory = false) {
-  const fields = result.fields || {};
-  // bodyText is the full article body; trailText is a short teaser
-  const bodyText = fields.bodyText ? fields.bodyText.slice(0, 3000) : '';
-  return {
-    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    title: result.webTitle || 'No title',
-    description: fields.trailText || '',
-    content: bodyText || fields.trailText || '',
-    url: result.webUrl || '#',
-    image_url: fields.thumbnail || null,
-    source: 'The Guardian',
-    publishedAt: result.webPublicationDate || new Date().toISOString(),
-    time_ago: timeAgo(result.webPublicationDate),
-    country, category,
-    language: 'en', // Guardian only publishes in English
-    summary_points: null,
-    _nativeCategory: nativeCategory,
-    _meta: {
-      // Guardian sectionId often encodes country (e.g. 'australia-news')
-      sourceCountry: GUARDIAN_SECTION_TO_COUNTRY[result.sectionId] ?? inferCountryFromUrl(result.webUrl),
-      sectionId: result.sectionId || null,
-    },
-  };
-}
-
-function formatGNewsArticle(article, country, category, nativeCategory = false) {
-  const sourceUrl = article.url || '#';
-  return {
-    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    title: article.title || 'No title',
-    description: article.description || '',
-    content: article.content || article.description || '',
-    url: sourceUrl,
-    image_url: article.image || null,
-    source: article.source?.name || 'GNews',
-    publishedAt: article.publishedAt || new Date().toISOString(),
-    time_ago: timeAgo(article.publishedAt),
-    country, category,
-    language: article.language || 'en', // GNews returns language per article
-    summary_points: null,
-    _nativeCategory: nativeCategory,
-    _meta: {
-      sourceCountry: inferCountryFromUrl(article.source?.url || sourceUrl),
-    },
-  };
-}
-
-function formatRSSArticle(item, feedSource, country, category) {
-  const publishedAt = item.pubDate
-    ? new Date(item.pubDate).toISOString()
-    : new Date().toISOString();
-  return {
-    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    title: item.title,
-    description: item.description || '',
-    content: item.description || '',  // RSS items rarely carry full body text
-    url: item.link,
-    image_url: null,
-    source: feedSource.name,
-    publishedAt,
-    time_ago: timeAgo(publishedAt),
-    country, category,
-    language: feedSource.language || 'en', // RSS feeds in our registry are English
-    summary_points: null,
-    _meta: {
-      sourceCountry: inferCountryFromUrl(item.link),
-    },
-  };
-}
-
-// ── Search analytics ───────────────────────────────────────────────────────
-// Fire-and-forget logging to Supabase. Requires the search_analytics table:
-//
-//   CREATE TABLE search_analytics (
-//     id               uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
-//     keyword          text        NOT NULL,
-//     user_id          text,
-//     expansion_source text,
-//     result_count     integer,
-//     is_boolean       boolean     DEFAULT false,
-//     created_at       timestamptz DEFAULT now()
-//   );
-//
-// Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_ANON_KEY) to enable.
-async function logSearchAnalytics(supabaseUrl, supabaseKey, { keyword, userId, expansionSource, resultCount, isBoolean }) {
-  if (!supabaseUrl || !supabaseKey) return;
-  try {
-    await fetch(`${supabaseUrl}/rest/v1/search_analytics`, {
-      method: 'POST',
+    const response = await fetchWithTimeout(url, {
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabaseKey}`,
-        'apikey': supabaseKey,
-        'Prefer': 'return=minimal',
+        'User-Agent': 'Mozilla/5.0 (compatible; RSS reader)',
+        'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
       },
-      body: JSON.stringify({
-        keyword,
-        user_id: userId || null,
-        expansion_source: expansionSource,
-        result_count: resultCount,
-        is_boolean: isBoolean,
-      }),
     });
-  } catch (err) {
-    console.warn('[analytics] Failed to log search:', err.message);
-  }
-}
+    if (!response.ok) throw new Error(`RSS ${response.status}: ${url}`);
+    const xml = await response.text();
+    const items = parseRSSFeed(xml);
 
-// Main handler
-export default async function handler(req, res) {
-  const allowedOrigin = process.env.APP_ORIGIN || 'https://shortform.news';
-  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-  res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-
-  // GET requests without user-specific params are publicly cacheable at the
-  // Vercel Edge CDN (s-maxage=300 = 5-min fresh, stale-while-revalidate=600).
-  // This means subsequent visitors with the same filters get a response from
-  // the nearest edge node in ~20ms instead of hitting the serverless function.
-  // We set this header early so it applies to all early-return paths below.
-  const isPubliclyCacheable = req.method === 'GET'
-    && !req.query.searchQuery
-    && !req.query.userId
-    && !req.query.mode;
-  if (isPubliclyCacheable) {
-    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    RSS_CACHE[url] = { timestamp: Date.now(), items };
+    return items;
   }
 
-  // Rate limiting — 30 requests per IP per minute
-  if (applyRateLimit(req, res)) return;
+  // â”€â”€ Keyword query expansion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Maps a normalised search term to an array of related terms that are ORed
+  // together in the API query. This solves cases where articles use an alternate
+  // name (e.g. "UFC" instead of "MMA") that the user didn't type.
+  //
+  // Multi-word phrases are quoted ("mixed martial arts") so APIs treat them as
+  // phrases. Single-word/acronym terms are unquoted. Both directions of an alias
+  // are listed so users get consistent results regardless of which name they use.
+  //
+  // To add a new topic: add an entry to _EXP and map each alias to it below.
 
-  // Validate required environment variables up front
-  const { valid: envValid } = validateEnv(res, {
-    required: ['NEWS_API_KEY'],
-    optional: ['GUARDIAN_API_KEY', 'WORLD_NEWS_API_KEY', 'NEWS_DATA_API_KEY', 'GNEWS_API_KEY',
-      'MEDIASTACK_API_KEY', 'CURRENTS_API_KEY',
-      'GEMINI_API_KEY', 'GROQ_API_KEY', 'OPENAI_API_KEY', 'COHERE_API_KEY',
-      'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'],
-  });
-  if (!envValid) return;
-
-  const { countries, categories, searchQuery, dateRange, sources: userSources, language: langParam, userId, mode, strictMode, threshold } = req.method === 'POST' ? req.body : req.query;
-  const isKeywordMode = mode === 'keyword';
-  // showNonEnglish=true removes the language=en filter from all API calls, allowing
-  // native-language articles to surface for non-English-dominant countries.
-  const showNonEnglish = langParam === 'all' || langParam === true || langParam === 'true';
-
-  // Build per-request domain/source-ID strings when the user has selected specific sources
-  const activeDomains = (userSources && userSources.length > 0)
-    ? buildTrustedDomains(userSources)
-    : TRUSTED_DOMAINS;
-  const activeSourceIds = (userSources && userSources.length > 0)
-    ? buildTrustedSourceIds(userSources)
-    : TRUSTED_SOURCE_IDS;
-
-  // ── Date range → ISO "from" date ─────────────────────────────────────────
-  const dateRangeHours = { '24h': 24, '3d': 72, 'week': 168, 'month': 720 };
-  const rangeHours = dateRangeHours[dateRange] || null; // null = no date restriction (e.g. 'all')
-  const fromDate = rangeHours ? new Date(Date.now() - rangeHours * 60 * 60 * 1000) : null;
-  const fromISO = fromDate ? fromDate.toISOString() : null; // full ISO for APIs that accept it
-  const fromDateOnly = fromISO ? fromISO.split('T')[0] : null; // YYYY-MM-DD for APIs that want a date
-
-  // For wider time windows (or no date filter), sort by popularity instead of recency.
-  // This surfaces the biggest stories rather than just the latest.
-  const usePopularitySort = !rangeHours || rangeHours > 24;
-
-  const NEWS_API_KEY = process.env.VITE_NEWS_API_KEY || process.env.NEWS_API_KEY;
-  const GUARDIAN_API_KEY = process.env.GUARDIAN_API_KEY || null;
-  const WORLD_NEWS_API_KEY = process.env.WORLD_NEWS_API_KEY || null;
-  const NEWS_DATA_API_KEY = process.env.NEWS_DATA_API_KEY || null;
-  const GNEWS_API_KEY = process.env.GNEWS_API_KEY || null;
-  const MEDIASTACK_API_KEY = process.env.MEDIASTACK_API_KEY || null;
-  const CURRENTS_API_KEY = process.env.CURRENTS_API_KEY || null;
-  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || null;
-  const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || null;
-
-  // LLM summarisation — collect all configured keys; generateSummary tries them in order
-  const LLM_KEYS = {
-    gemini: process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || null,
-    groq: process.env.GROQ_API_KEY || null,
-    openai: process.env.OPENAI_API_KEY || null,
-    cohere: process.env.COHERE_API_KEY || null,
+  // Shared expansion arrays â€” referenced by multiple alias keys to avoid duplication
+  const _EXP = {
+    MMA: ['MMA', 'UFC', 'Bellator', '"mixed martial arts"'],
+    NBA: ['NBA', 'basketball', '"National Basketball Association"'],
+    NFL: ['NFL', '"American football"', '"National Football League"'],
+    MLB: ['MLB', 'baseball', '"Major League Baseball"'],
+    NHL: ['NHL', 'hockey', '"National Hockey League"'],
+    F1: ['F1', '"Formula 1"', '"Formula One"', '"Grand Prix"'],
+    EPL: ['"Premier League"', 'EPL', '"English Premier League"'],
+    FIFA: ['FIFA', 'football', 'soccer', '"World Cup"'],
+    TENNIS: ['tennis', 'ATP', 'WTA', 'Wimbledon', '"US Open"', '"French Open"', '"Australian Open"'],
+    WWE: ['WWE', '"World Wrestling Entertainment"', 'wrestling', 'AEW'],
+    PGA: ['PGA', 'golf', '"PGA Tour"', '"Masters Tournament"'],
+    OLYMPICS: ['Olympics', '"Olympic Games"', '"Summer Games"', '"Winter Games"'],
+    CRYPTO: ['crypto', 'cryptocurrency', 'bitcoin', 'ethereum', 'blockchain'],
+    BITCOIN: ['bitcoin', 'cryptocurrency', 'crypto', 'BTC'],
+    CHATGPT: ['ChatGPT', 'OpenAI', '"GPT-4"', '"large language model"'],
+    EV: ['"electric vehicle"', '"electric car"', 'Tesla', 'EV'],
+    NATO: ['NATO', '"North Atlantic Treaty"', '"Alliance"'],
+    WHO: ['WHO', '"World Health Organization"', '"World Health Organisation"'],
+    UN: ['UN', '"United Nations"', '"Security Council"', '"General Assembly"'],
   };
-  const HAS_LLM = Object.values(LLM_KEYS).some(Boolean);
 
-  // ── Keyword search: search APIs directly when a searchQuery is provided ────
-  // Now country/category-aware: if the user has filters active, results are
-  // tagged with the correct country/category and the ranking engine applies
-  // country relevance scoring. Also uses LLM-powered query expansion,
-  // keyword relevance scoring (Signal 7), result caching, and GNews.
-  if (searchQuery) {
-    const keyword = searchQuery.trim();
-    const sourceFingerprint = getSourceFingerprint(userSources);
+  const KEYWORD_EXPANSION_MAP = {
+    // â”€â”€ Combat sports â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    'mma': _EXP.MMA,
+    'ufc': _EXP.MMA,
+    'bellator': _EXP.MMA,
+    'mixed martial arts': _EXP.MMA,
+    // â”€â”€ Basketball â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    'nba': _EXP.NBA,
+    'basketball': _EXP.NBA,
+    // â”€â”€ American football â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    'nfl': _EXP.NFL,
+    // â”€â”€ Baseball â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    'mlb': _EXP.MLB,
+    'baseball': _EXP.MLB,
+    // â”€â”€ Ice hockey â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    'nhl': _EXP.NHL,
+    'hockey': _EXP.NHL,
+    'ice hockey': _EXP.NHL,
+    // â”€â”€ Formula 1 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    'f1': _EXP.F1,
+    'formula 1': _EXP.F1,
+    'formula one': _EXP.F1,
+    'formula1': _EXP.F1,
+    // â”€â”€ Soccer / Football â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    'premier league': _EXP.EPL,
+    'epl': _EXP.EPL,
+    'fifa': _EXP.FIFA,
+    'world cup': _EXP.FIFA,
+    // â”€â”€ Tennis â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    'tennis': _EXP.TENNIS,
+    'atp': _EXP.TENNIS,
+    'wta': _EXP.TENNIS,
+    'wimbledon': _EXP.TENNIS,
+    // â”€â”€ Wrestling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    'wwe': _EXP.WWE,
+    'wrestling': _EXP.WWE,
+    'aew': _EXP.WWE,
+    // â”€â”€ Golf â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    'pga': _EXP.PGA,
+    'golf': _EXP.PGA,
+    // â”€â”€ Olympics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    'olympics': _EXP.OLYMPICS,
+    'olympic games': _EXP.OLYMPICS,
+    // â”€â”€ Crypto â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    'crypto': _EXP.CRYPTO,
+    'cryptocurrency': _EXP.CRYPTO,
+    'bitcoin': _EXP.BITCOIN,
+    'btc': _EXP.BITCOIN,
+    // â”€â”€ AI / Tech â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    'chatgpt': _EXP.CHATGPT,
+    'openai': _EXP.CHATGPT,
+    // â”€â”€ Electric vehicles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    'ev': _EXP.EV,
+    'electric vehicle': _EXP.EV,
+    'electric car': _EXP.EV,
+    // â”€â”€ International organisations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    'nato': _EXP.NATO,
+    'who': _EXP.WHO,
+    'united nations': _EXP.UN,
+  };
 
-    // Determine country/category context from the request
-    const countryList = Array.isArray(countries) && countries.length > 0 ? countries : ['world'];
-    const categoryList = Array.isArray(categories) && categories.length > 0 ? categories : ['world'];
-    const hasCountryFilter = countryList.some(c => c !== 'world');
-    const hasCategoryFilter = categoryList.some(c => c !== 'world');
+  // Build the actual query string to send to APIs.
+  // If the keyword has a known expansion, returns an OR query covering all related terms.
+  // Multi-word phrases not in the map are auto-quoted for precision (reduces noise).
+  function buildSearchQuery(rawKeyword) {
+    const normalized = rawKeyword.trim().toLowerCase();
+    const expansions = KEYWORD_EXPANSION_MAP[normalized];
+    if (expansions && expansions.length > 0) {
+      return expansions.join(' OR ');
+    }
+    // Auto-quote multi-word phrases to avoid partial-word noise
+    const kw = rawKeyword.trim();
+    if (kw.includes(' ') && !kw.startsWith('"')) {
+      return `"${kw}"`;
+    }
+    return kw;
+  }
 
-    // Check cache (keyed on keyword + filters + dateRange + sources + mode)
-    const modeTag = isKeywordMode ? (strictMode ? 'kw-strict' : 'kw-monitor') : 'kw';
-    const kwCacheKey = `${modeTag}-${keyword.toLowerCase()}-${countryList.sort().join(',')}-${categoryList.sort().join(',')}-${dateRange || 'all'}-${sourceFingerprint}`;
-    const kwCached = await getCache(kwCacheKey);
-    if (kwCached) {
-      console.log(`Keyword cache HIT: "${keyword}"`);
-      return res.status(200).json({ status: 'ok', articles: kwCached.articles, totalResults: kwCached.articles.length, cached: true });
+  // â”€â”€ LLM-powered dynamic query expansion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // For keywords not in the static KEYWORD_EXPANSION_MAP, use an LLM to generate
+  // related search terms. This dramatically improves recall for long-tail queries
+  // (e.g. "tariffs" â†’ "tariffs OR trade war OR import duties OR customs").
+  // Results are cached in-memory so the same keyword only triggers one LLM call.
+  const EXPANSION_CACHE = {};
+  const EXPANSION_PROMPT = (keyword) =>
+    `You are a search query expansion tool. Given the news search keyword "${keyword}", output 3-5 closely related search terms or synonyms that a journalist might use when writing about this topic. Output ONLY a comma-separated list of terms, nothing else. Do NOT include the original keyword. Example: for "electric cars" you might output: electric vehicles, EV, Tesla, battery vehicles, zero-emission cars`;
+
+  // Precision-focused expansion prompt for keyword monitoring mode.
+  // Generates tight, specific synonyms instead of broad ones. Avoids generic
+  // terms that would match unrelated articles from other countries/sectors.
+  const KEYWORD_MONITOR_EXPANSION_PROMPT = (keyword) =>
+    `You are a precision search query expansion tool for a news monitoring service. Given the keyword "${keyword}", output 2-4 highly specific alternative terms or phrases that journalists would use IN THE HEADLINE when writing about this exact topic. Be precise â€” do NOT output broad or generic synonyms. Each term must be specific enough that an article using it in the headline is almost certainly about "${keyword}". Output ONLY a comma-separated list, nothing else. Do NOT include the original keyword.`;
+
+  function parseExpansionResponse(text, originalKeyword) {
+    if (!text) return null;
+    const terms = text
+      .split(/[,\n]/)
+      .map(t => t.trim().replace(/^["']+|["']+$/g, ''))
+      .filter(t => t.length > 1 && t.length < 60 && t.toLowerCase() !== originalKeyword.toLowerCase());
+    if (terms.length === 0) return null;
+    // Quote multi-word terms for precise API matching
+    return terms.slice(0, 5).map(t => t.includes(' ') ? `"${t}"` : t);
+  }
+
+  async function expandQueryWithLLM(keyword, llmKeys, useKeywordMonitorPrompt = false) {
+    const cacheKey = (useKeywordMonitorPrompt ? 'kwm:' : '') + keyword.trim().toLowerCase();
+    if (EXPANSION_CACHE[cacheKey]) return EXPANSION_CACHE[cacheKey];
+
+    // Check Supabase persistent cache before calling the LLM.
+    // This survives serverless cold starts and is shared across all instances.
+    const SB_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+    if (SB_URL && SB_KEY) {
+      try {
+        const sbRes = await fetch(
+          `${SB_URL}/rest/v1/keyword_expansions?cache_key=eq.${encodeURIComponent(cacheKey)}&select=terms,expires_at`,
+          { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+        );
+        if (sbRes.ok) {
+          const [row] = await sbRes.json();
+          if (row && new Date(row.expires_at) > new Date()) {
+            EXPANSION_CACHE[cacheKey] = row.terms;
+            return row.terms;
+          }
+        }
+      } catch { /* non-fatal â€” fall through to LLM */ }
     }
 
-    // Build expanded query — tries static map first, then LLM, then raw
-    // In keyword monitor mode, use the precision prompt for tighter synonyms
-    const { query: expandedQuery, source: expansionSource } = await buildExpandedSearchQuery(keyword, LLM_KEYS, { keywordMode: isKeywordMode });
-    console.log(`Keyword search${isKeywordMode ? ' [monitor]' : ''}: "${keyword}" → ${expansionSource}: ${expandedQuery}`);
-
-    // Extract search terms for keyword relevance scoring (Signal 7).
-    // For boolean queries split on all operators; for OR-expanded queries split on OR only.
-    const searchTerms = expandedQuery
-      .split(expansionSource === 'boolean' ? / AND | OR | NOT /i : / OR /i)
-      .map(t => t.trim().replace(/^["'(]+|["')]+$/g, ''))
-      .filter(t => t.length > 1);
-
-    try {
-      // Fire all keyword searches in parallel across all sources
-      const searchPromises = [];
-
-      // 1. NewsAPI — keyword search with trusted domains
-      searchPromises.push(
-        searchNewsAPIByKeyword(expandedQuery, NEWS_API_KEY, activeDomains, { from: fromISO, sortByPopularity: usePopularitySort })
-          .then(raw => {
-            const valid = raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com');
-            console.log(`  [1] NewsAPI keyword: ${valid.length} articles`);
-            return valid.map(a => formatNewsAPIArticle(a, countryList[0], categoryList[0]));
+    const prompt = useKeywordMonitorPrompt
+      ? KEYWORD_MONITOR_EXPANSION_PROMPT(keyword)
+      : EXPANSION_PROMPT(keyword);
+    // Try Gemini first (fastest/cheapest), then Groq
+    const providers = [
+      llmKeys.gemini && (async () => {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${llmKeys.gemini}`;
+        const res = await fetchWithTimeout(url, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.3, maxOutputTokens: 100 }
           })
-          .catch(err => { console.error('  NewsAPI keyword search failed:', err.message); return []; })
-      );
+        }, 4000); // tight 4s timeout â€” expansion shouldn't delay the search
+        const data = await res.json();
+        if (res.status === 429 || data.error?.code === 429) return null;
+        if (!res.ok) return null;
+        return data.candidates?.[0]?.content?.parts?.[0]?.text;
+      }),
+      llmKeys.groq && (async () => {
+        const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${llmKeys.groq}` },
+          body: JSON.stringify({
+            model: 'llama-3.1-8b-instant',
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.3, max_tokens: 100
+          })
+        }, 4000);
+        const data = await res.json();
+        if (res.status === 429) return null;
+        if (!res.ok) return null;
+        return data.choices?.[0]?.message?.content;
+      }),
+    ].filter(Boolean);
 
-      // 2. WorldNewsAPI
-      if (WORLD_NEWS_API_KEY) {
-        searchPromises.push(
-          searchWorldNewsAPIByKeyword(expandedQuery, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort })
-            .then(raw => { console.log(`  [2] WorldNewsAPI keyword: ${raw.length} articles`); return raw.map(a => formatWorldNewsAPIArticle(a, countryList[0], categoryList[0])); })
-            .catch(err => { console.error('  WorldNewsAPI keyword search failed:', err.message); return []; })
-        );
+    for (const attempt of providers) {
+      try {
+        const text = await attempt();
+        const terms = parseExpansionResponse(text, keyword);
+        if (terms) {
+          EXPANSION_CACHE[cacheKey] = terms;
+          // Persist to Supabase so future cold starts skip the LLM call.
+          if (SB_URL && SB_KEY) {
+            fetch(`${SB_URL}/rest/v1/keyword_expansions`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                apikey: SB_KEY,
+                Authorization: `Bearer ${SB_KEY}`,
+                Prefer: 'resolution=merge-duplicates,return=minimal',
+              },
+              body: JSON.stringify({
+                cache_key: cacheKey,
+                terms,
+                expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+              }),
+            }).catch(() => { });
+          }
+          return terms;
+        }
+      } catch (err) {
+        console.warn(`[expansion] LLM expansion failed: ${err.message}`);
+      }
+    }
+    return null; // fallback: no expansion
+  }
+
+  // Detect user-supplied boolean operators (AND, OR, NOT in uppercase by convention).
+  // When present the query is passed as-is to search APIs â€” no expansion is applied
+  // since the user has already expressed their intent explicitly.
+  function hasBooleanSyntax(keyword) {
+    return / AND | OR | NOT /i.test(keyword);
+  }
+
+  // Build the final search query, using LLM expansion if available.
+  // Called with await since LLM expansion is async.
+  // opts.keywordMode: when true, uses the precision expansion prompt (fewer, tighter synonyms)
+  async function buildExpandedSearchQuery(rawKeyword, llmKeys, opts = {}) {
+    const normalized = rawKeyword.trim().toLowerCase();
+
+    // 0. Boolean query: user wrote AND/OR/NOT â€” pass through without expansion
+    if (hasBooleanSyntax(rawKeyword)) {
+      return { query: rawKeyword.trim(), source: 'boolean' };
+    }
+
+    // 1. Check static expansion map first (instant, no LLM call needed)
+    const staticExpansion = KEYWORD_EXPANSION_MAP[normalized];
+    if (staticExpansion && staticExpansion.length > 0) {
+      return { query: staticExpansion.join(' OR '), source: 'static' };
+    }
+
+    // 2. Try LLM-powered expansion for unknown terms
+    if (llmKeys && Object.values(llmKeys).some(Boolean)) {
+      const dynamicTerms = await expandQueryWithLLM(rawKeyword, llmKeys, opts.keywordMode);
+      if (dynamicTerms) {
+        const kw = rawKeyword.trim();
+        const quotedOriginal = kw.includes(' ') ? `"${kw}"` : kw;
+        // In keyword monitor mode, limit to 3 expansion terms max for precision
+        const limitedTerms = opts.keywordMode ? dynamicTerms.slice(0, 3) : dynamicTerms;
+        const expanded = [quotedOriginal, ...limitedTerms].join(' OR ');
+        return { query: expanded, source: 'llm' };
+      }
+    }
+
+    // 3. Fallback: auto-quote multi-word phrases
+    const kw = rawKeyword.trim();
+    if (kw.includes(' ') && !kw.startsWith('"')) {
+      return { query: `"${kw}"`, source: 'quoted' };
+    }
+    return { query: kw, source: 'raw' };
+  }
+
+  // â”€â”€ Keyword relevance scoring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  // Simple English suffix stemmer â€” allows "running" to match "run", "runner" etc.
+  // Only strips when the result is still >= 3 chars to avoid over-stemming short words.
+  function stemWord(word) {
+    if (word.length < 5) return word;
+    const rules = [
+      [/ational$/, 'ate'], [/tional$/, 'tion'], [/ations?$/, 'ate'],
+      [/izing$/, 'ize'], [/ising$/, 'ise'], [/ness$/, ''],
+      [/ment$/, ''], [/ings?$/, ''], [/edly$/, ''],
+      [/ingly$/, ''], [/ated?$/, ''], [/iers?$/, 'y'],
+      [/ies$/, 'y'], [/ers?$/, ''], [/ed$/, ''],
+      [/ly$/, ''], [/es$/, ''], [/s$/, ''],
+    ];
+    for (const [pattern, replacement] of rules) {
+      const result = word.replace(pattern, replacement);
+      if (result !== word && result.length >= 3) return result;
+    }
+    return word;
+  }
+
+  // Scores how strongly an article matches the user's search keyword (0-1).
+  // Improvements over v1:
+  //   - Exact phrase bonus: multi-word keyword appearing verbatim in title/desc scores extra
+  //   - Stemming: "running" matches articles about "run", "runner", etc.
+  //   - Cumulative field scoring: a term found in both title and description scores higher
+  //     than a title-only match, rewarding articles with deep keyword coverage
+  // This becomes Signal 7 in the ranking engine for keyword searches.
+  function keywordRelevanceScore(article, searchTerms, rawKeyword) {
+    if (!searchTerms || searchTerms.length === 0) return 0;
+    const title = (article.title || '').toLowerCase();
+    const desc = (article.description || '').toLowerCase();
+    const content = (article.content || '').toLowerCase();
+
+    let score = 0;
+
+    // Exact phrase bonus: if the original multi-word keyword appears verbatim, reward it
+    // strongly â€” this is almost certainly the article the user is looking for.
+    // Skip for boolean queries (they contain AND/OR/NOT which aren't literal phrases).
+    if (rawKeyword) {
+      const phrase = rawKeyword.trim().toLowerCase();
+      if (phrase.includes(' ') && !/\b(and|or|not)\b/i.test(phrase)) {
+        if (title.includes(phrase)) score += 5;
+        else if (desc.includes(phrase)) score += 2.5;
+      }
+    }
+
+    for (const term of searchTerms) {
+      const t = term.toLowerCase().replace(/^["'(]+|["')]+$/g, '');
+      if (t.length < 2) continue;
+      const tStem = stemWord(t);
+
+      const inTitle = title.includes(t) || (tStem !== t && title.includes(tStem));
+      const inDesc = desc.includes(t) || (tStem !== t && desc.includes(tStem));
+      const inContent = content.includes(t) || (tStem !== t && content.includes(tStem));
+
+      // Cumulative: each field that contains the term contributes independently.
+      // Title is worth most (3), desc adds signal (1), content adds a small bump (0.5).
+      if (inTitle) score += 3;
+      if (inDesc) score += 1;
+      if (inContent) score += 0.5;
+    }
+
+    // Normalise to 0-1. Ceiling raised to 8 to accommodate phrase bonus + cumulative scoring.
+    return Math.min(score / 8, 1);
+  }
+
+  // â”€â”€ Keyword search helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // These search APIs directly by keyword rather than by country/category top-headlines.
+
+  async function searchNewsAPIByKeyword(keyword, apiKey, domains, opts = {}) {
+    const params = new URLSearchParams({
+      q: keyword, domains: domains || TRUSTED_DOMAINS, language: 'en',
+      sortBy: opts.sortByPopularity ? 'popularity' : 'publishedAt', pageSize: '50', apiKey,
+    });
+    if (opts.from) params.set('from', opts.from);
+    const response = await fetchWithTimeout(`https://newsapi.org/v2/everything?${params}`);
+    if (!response.ok) throw new Error(`NewsAPI keyword error: ${response.status}`);
+    const data = await response.json();
+    if (data.status !== 'ok') throw new Error(`NewsAPI keyword error: ${data.message}`);
+    return data.articles || [];
+  }
+
+  async function searchWorldNewsAPIByKeyword(keyword, apiKey, opts = {}) {
+    const params = new URLSearchParams({
+      text: keyword, language: 'en', number: '50',
+      sort: opts.sortByPopularity ? 'relevance' : 'publish-time', 'sort-direction': 'DESC', 'api-key': apiKey,
+    });
+    if (opts.from) params.set('earliest-publish-date', opts.from);
+    const response = await fetchWithTimeout(`https://api.worldnewsapi.com/search-news?${params}`);
+    if (!response.ok) throw new Error(`WorldNewsAPI keyword error: ${response.status}`);
+    const data = await response.json();
+    return data.news || [];
+  }
+
+  async function searchNewsDataByKeyword(keyword, apiKey, opts = {}) {
+    const params = new URLSearchParams({ q: keyword, language: 'en', size: '50', apikey: apiKey });
+    if (opts.from) params.set('from_date', opts.from);
+    const response = await fetchWithTimeout(`https://newsdata.io/api/1/latest?${params}`);
+    if (!response.ok) throw new Error(`NewsData keyword error: ${response.status}`);
+    const data = await response.json();
+    if (data.status !== 'success') throw new Error(`NewsData keyword error: ${data.message}`);
+    return data.results || [];
+  }
+
+  async function searchGuardianByKeyword(keyword, apiKey, opts = {}) {
+    const params = new URLSearchParams({
+      q: keyword, 'show-fields': 'trailText,thumbnail,byline,bodyText',
+      'page-size': '50', 'order-by': 'newest', 'api-key': apiKey || 'test',
+    });
+    if (opts.from) params.set('from-date', opts.from);
+    const response = await fetchWithTimeout(`https://content.guardianapis.com/search?${params}`);
+    if (!response.ok) throw new Error(`Guardian keyword error: ${response.status}`);
+    const data = await response.json();
+    if (data.response?.status !== 'ok') throw new Error(`Guardian keyword error: ${data.response?.message}`);
+    return data.response?.results || [];
+  }
+
+  async function searchGNewsByKeyword(keyword, apiKey, opts = {}) {
+    const params = new URLSearchParams({
+      q: keyword, lang: 'en', max: '10', token: apiKey,
+      sortby: opts.sortByPopularity ? 'relevance' : 'publishedAt',
+    });
+    if (opts.from) params.set('from', opts.from);
+    if (opts.country && opts.country !== 'world') params.set('country', opts.country);
+    const response = await fetchWithTimeout(`https://gnews.io/api/v4/search?${params}`);
+    if (!response.ok) throw new Error(`GNews keyword error: ${response.status}`);
+    const data = await response.json();
+    if (data.errors) throw new Error(`GNews keyword error: ${JSON.stringify(data.errors)}`);
+    return data.articles || [];
+  }
+
+  async function searchGoogleNewsByKeyword(keyword, opts = {}) {
+    const encodedQ = encodeURIComponent(keyword);
+    const gl = opts.country && opts.country !== 'world' ? opts.country.toUpperCase() : 'US';
+    const url = `https://news.google.com/rss/search?q=${encodedQ}&hl=en-US&gl=${gl}&ceid=${gl}:en`;
+    const items = await fetchRSSFeed(url).catch(() => []);
+    return items;
+  }
+
+  // â”€â”€ AI Summarisation â€” multi-provider fallback chain â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Order: Gemini â†’ Groq â†’ OpenAI â†’ Cohere
+  // Each provider throws QuotaExceededError on 429/quota so the next is tried.
+
+  class QuotaExceededError extends Error {
+    constructor(provider) {
+      super(`${provider} quota exceeded`);
+      this.name = 'QuotaExceededError';
+    }
+  }
+
+  const SUMMARY_PROMPT = (content) =>
+    `You are a factual news summarizer. Based ONLY on the provided article text, write 2-3 concise bullet points covering the key facts. Do NOT add information that is not in the text.\n\nâ€¢ Key point 1\nâ€¢ Key point 2\nâ€¢ Key point 3 (if warranted)\n\nArticle:\n${content}`;
+
+  // Shared: prepare article text (strip truncation markers, cap length)
+  function prepareArticleContent(article) {
+    // Strip NewsAPI "[+XXXX chars]" truncation markers before comparing lengths so a
+    // "200-char stub [+2800 chars]" doesn't incorrectly win over a full description.
+    const strippedContent = (article.content || '').replace(/\s*\[\+\d+ chars\].*$/s, '').trim();
+    const desc = (article.description || '').replace(/\s*\[\+\d+ chars\].*$/s, '').trim();
+    const body = strippedContent.length >= desc.length ? strippedContent : desc;
+    let content = body || article.title || '';
+    if (article.title && !content.toLowerCase().includes(article.title.slice(0, 20).toLowerCase())) {
+      content = `${article.title}. ${content}`;
+    }
+    return content.slice(0, 3000);
+  }
+
+  // Shared: extract bullet points from any LLM response text
+  function parseBullets(text) {
+    if (!text) return null;
+    let bullets = text.split('\n')
+      .filter(line => /^[\s]*[â€¢*\-â€“â€”]/.test(line))
+      .map(line => line.replace(/^[\s]*[â€¢*\-â€“â€”]+\s*/, '').trim())
+      .filter(Boolean);
+    if (bullets.length === 0) {
+      // Only treat lines as numbered bullets when they actually start with a digit marker
+      bullets = text.split('\n')
+        .filter(line => /^[\s]*\d+[.)]/.test(line))
+        .map(line => line.replace(/^[\s]*\d+[.)]\s*/, '').trim())
+        .filter(line => line.length > 10);
+    }
+    return bullets.length > 0 ? bullets.slice(0, 3) : null;
+  }
+
+  async function summarizeWithGemini(content, key) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${key}`;
+    const res = await fetchWithTimeout(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: SUMMARY_PROMPT(content) }] }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 500 }
+      })
+    });
+    const data = await res.json();
+    if (res.status === 429 || data.error?.code === 429 || data.error?.status === 'RESOURCE_EXHAUSTED') {
+      throw new QuotaExceededError('Gemini');
+    }
+    if (!res.ok) { console.error(`Gemini error: ${data.error?.message?.slice(0, 100)}`); return null; }
+    return parseBullets(data.candidates?.[0]?.content?.parts?.[0]?.text);
+  }
+
+  async function summarizeWithGroq(content, key) {
+    const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
+        temperature: 0.2,
+        max_tokens: 500
+      })
+    });
+    const data = await res.json();
+    if (res.status === 429 || data.error?.code === 'rate_limit_exceeded') {
+      throw new QuotaExceededError('Groq');
+    }
+    if (!res.ok) { console.error(`Groq error: ${data.error?.message?.slice(0, 100)}`); return null; }
+    return parseBullets(data.choices?.[0]?.message?.content);
+  }
+
+  async function summarizeWithOpenAI(content, key) {
+    const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
+        temperature: 0.2,
+        max_tokens: 500
+      })
+    });
+    const data = await res.json();
+    if (res.status === 429 || data.error?.type === 'insufficient_quota' || data.error?.type === 'rate_limit_exceeded') {
+      throw new QuotaExceededError('OpenAI');
+    }
+    if (!res.ok) { console.error(`OpenAI error: ${data.error?.message?.slice(0, 100)}`); return null; }
+    return parseBullets(data.choices?.[0]?.message?.content);
+  }
+
+  async function summarizeWithCohere(content, key) {
+    const res = await fetchWithTimeout('https://api.cohere.com/v2/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({
+        model: 'command-r-08-2024',
+        messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
+        temperature: 0.2,
+        max_tokens: 500
+      })
+    });
+    const data = await res.json();
+    if (res.status === 429) { throw new QuotaExceededError('Cohere'); }
+    if (!res.ok) { console.error(`Cohere error: ${JSON.stringify(data).slice(0, 100)}`); return null; }
+    return parseBullets(data.message?.content?.[0]?.text);
+  }
+
+  // Per-article summary cache â€” avoids re-generating LLM summaries for the same article
+  // across multiple cache refreshes. TTL of 36 hours is longer than the 12-hour news
+  // cache since article content doesn't change after publication.
+  const SUMMARY_CACHE = new Map();
+  const SUMMARY_CACHE_TTL_MS = 36 * 60 * 60 * 1000; // 36 hours
+
+  // Main: try each configured provider in order; skip to next on quota exhaustion
+  async function generateSummary(article, llmKeys) {
+    const content = prepareArticleContent(article);
+    const providers = [
+      llmKeys.gemini && (() => summarizeWithGemini(content, llmKeys.gemini)),
+      llmKeys.groq && (() => summarizeWithGroq(content, llmKeys.groq)),
+      llmKeys.openai && (() => summarizeWithOpenAI(content, llmKeys.openai)),
+      llmKeys.cohere && (() => summarizeWithCohere(content, llmKeys.cohere)),
+    ].filter(Boolean);
+
+    for (const attempt of providers) {
+      try {
+        const result = await attempt();
+        if (result) return result;
+      } catch (err) {
+        if (err.name === 'QuotaExceededError') {
+          console.warn(`[summary] ${err.message} â€” trying next provider`);
+          continue;
+        }
+        console.error('[summary] unexpected error:', err.message);
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Cached wrapper around generateSummary. Returns a previously-generated summary
+   * for the same article URL when still within SUMMARY_CACHE_TTL_MS, avoiding
+   * redundant LLM calls across cache refreshes or concurrent requests.
+   */
+  async function generateSummaryCached(article, llmKeys) {
+    const key = article.url;
+    if (!key) return generateSummary(article, llmKeys);
+
+    const cached = SUMMARY_CACHE.get(key);
+    if (cached && (Date.now() - cached.timestamp) < SUMMARY_CACHE_TTL_MS) {
+      return cached.points;
+    }
+
+    const points = await generateSummary(article, llmKeys);
+    if (points) {
+      SUMMARY_CACHE.set(key, { points, timestamp: Date.now() });
+      // Evict oldest entry when cache exceeds 2000 articles
+      if (SUMMARY_CACHE.size > 2000) {
+        const oldest = [...SUMMARY_CACHE.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
+        SUMMARY_CACHE.delete(oldest[0]);
+      }
+    }
+    return points;
+  }
+
+  // Helper: human-readable time ago (e.g. "2h ago", "3d ago")
+  function timeAgo(dateStr) {
+    if (!dateStr) return 'Today';
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+    return `${Math.floor(days / 7)}w ago`;
+  }
+
+  // â”€â”€ Source-country inference â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Map common country-code TLDs to our country codes.
+  // Used to infer a source's home country from its domain (e.g. smh.com.au â†’ au).
+  const TLD_TO_COUNTRY = {
+    au: 'au', uk: 'gb', nz: 'nz', ca: 'ca', de: 'de', fr: 'fr', jp: 'jp',
+    in: 'in', br: 'br', mx: 'mx', it: 'it', es: 'es', nl: 'nl', se: 'se',
+    no: 'no', pl: 'pl', ch: 'ch', be: 'be', at: 'at', ie: 'ie', pt: 'pt',
+    dk: 'dk', fi: 'fi', gr: 'gr', za: 'za', ng: 'ng', eg: 'eg', ke: 'ke',
+    tr: 'tr', il: 'il', ae: 'ae', sa: 'sa', ar: 'ar', cl: 'cl', co: 'co',
+    id: 'id', th: 'th', my: 'my', ph: 'ph', vn: 'vn', pk: 'pk', sg: 'sg',
+    hk: 'hk', tw: 'tw', cn: 'cn', kr: 'kr', ua: 'ua', ro: 'ro', hu: 'hu',
+    cz: 'cz', rs: 'rs', hr: 'hr', bg: 'bg', sk: 'sk', ps: 'ps',
+  };
+
+  // International wire services and global outlets â€” these cover ALL countries
+  // and should NOT give a meta-country boost to their HQ country. Articles from
+  // reuters.com about India should not get +2 for UK just because Reuters is UK-based.
+  const INTERNATIONAL_SOURCES = new Set([
+    'reuters.com', 'apnews.com', 'bbc.co.uk', 'bbc.com',
+    'aljazeera.com', 'france24.com', 'dw.com',
+    'theconversation.com',
+  ]);
+
+  // Map well-known source domains to their home countries.
+  // More reliable than TLD for domains like aljazeera.com (Qatar-based, English service).
+  // NOTE: International sources are still mapped here (needed for non-country queries),
+  // but the country scoring logic treats them differently â€” see articleCountryScore().
+  const DOMAIN_TO_COUNTRY = {
+    'reuters.com': 'gb', 'bbc.co.uk': 'gb', 'bbc.com': 'gb',
+    'theguardian.com': 'gb', 'ft.com': 'gb', 'economist.com': 'gb',
+    'nytimes.com': 'us', 'washingtonpost.com': 'us', 'cnn.com': 'us',
+    'abcnews.go.com': 'us', 'cbsnews.com': 'us', 'nbcnews.com': 'us',
+    'npr.org': 'us', 'pbs.org': 'us', 'politico.com': 'us',
+    'wsj.com': 'us', 'bloomberg.com': 'us', 'apnews.com': 'us',
+    'arstechnica.com': 'us', 'wired.com': 'us', 'techcrunch.com': 'us',
+    'theverge.com': 'us', 'engadget.com': 'us', 'espn.com': 'us',
+    'ign.com': 'us', 'polygon.com': 'us', 'ew.com': 'us',
+    'buzzfeed.com': 'us',
+    'abc.net.au': 'au', 'smh.com.au': 'au', 'theaustralian.com.au': 'au',
+    'aljazeera.com': 'qa', 'france24.com': 'fr', 'dw.com': 'de',
+    'scmp.com': 'hk', 'thenextweb.com': 'nl',
+    'timesofindia.indiatimes.com': 'in', 'thehindu.com': 'in',
+    'japantimes.co.jp': 'jp', 'straitstimes.com': 'sg',
+    'theconversation.com': 'au',
+    'nationalgeographic.com': 'us', 'newscientist.com': 'gb',
+  };
+
+  // Guardian section IDs that map directly to countries
+  const GUARDIAN_SECTION_TO_COUNTRY = {
+    'australia-news': 'au', 'uk-news': 'gb', 'us-news': 'us',
+    'world': null, // global
+  };
+
+  // Infer source country from a URL's domain
+  function inferCountryFromUrl(url) {
+    if (!url) return null;
+    try {
+      const hostname = new URL(url).hostname.replace(/^www\./, '');
+      // Check explicit domain map first
+      if (DOMAIN_TO_COUNTRY[hostname]) return DOMAIN_TO_COUNTRY[hostname];
+      // Check subdomains (e.g. news.com.au â†’ au)
+      for (const [domain, country] of Object.entries(DOMAIN_TO_COUNTRY)) {
+        if (hostname.endsWith('.' + domain) || hostname === domain) return country;
+      }
+      // Fall back to TLD
+      const parts = hostname.split('.');
+      const tld = parts[parts.length - 1];
+      if (TLD_TO_COUNTRY[tld]) return TLD_TO_COUNTRY[tld];
+      // Handle compound TLDs: .co.uk, .com.au, .co.nz, .co.jp, .com.br etc.
+      // The country code is the last part; the second-to-last is the generic (.co, .com)
+      if (parts.length >= 3) {
+        const secondToLast = parts[parts.length - 2];
+        if ((secondToLast === 'co' || secondToLast === 'com' || secondToLast === 'org' || secondToLast === 'net') && TLD_TO_COUNTRY[tld]) {
+          return TLD_TO_COUNTRY[tld];
+        }
+      }
+    } catch { }
+    return null;
+  }
+
+  // Check if a source domain is an international/wire service
+  function isInternationalSource(article) {
+    const domain = getSourceDomain(article);
+    return INTERNATIONAL_SOURCES.has(domain);
+  }
+
+  // Formatters â€” normalise each API's shape to our app format.
+  // Each includes a `_meta` object with source-country inference signals
+  // used by the relevance filter (stripped before sending to the client).
+  function formatNewsAPIArticle(article, country, category) {
+    const sourceUrl = article.url || '#';
+    return {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      title: article.title || 'No title',
+      description: article.description || '',
+      content: article.content || article.description || '',
+      url: sourceUrl,
+      image_url: article.urlToImage || null,
+      source: article.source?.name || 'Unknown',
+      publishedAt: article.publishedAt || new Date().toISOString(),
+      time_ago: timeAgo(article.publishedAt),
+      country, category,
+      language: 'en', // NewsAPI is called with language=en (or no filter for non-English mode)
+      summary_points: null,
+      _meta: {
+        sourceCountry: inferCountryFromUrl(sourceUrl),
+      },
+    };
+  }
+
+  function formatWorldNewsAPIArticle(article, country, category, nativeCategory = false) {
+    return {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      title: article.title || 'No title',
+      description: article.text ? article.text.slice(0, 200) : '',
+      content: article.text || '',
+      url: article.url || '#',
+      image_url: article.image || null,
+      source: article.source_country ? `World News (${article.source_country.toUpperCase()})` : 'World News API',
+      publishedAt: article.publish_date || new Date().toISOString(),
+      time_ago: timeAgo(article.publish_date),
+      country, category,
+      language: article.language || 'en', // WorldNewsAPI returns language per article
+      summary_points: null,
+      _nativeCategory: nativeCategory,
+      _meta: {
+        // WorldNewsAPI provides explicit source_country â€” most reliable signal
+        sourceCountry: article.source_country?.toLowerCase() || inferCountryFromUrl(article.url),
+      },
+    };
+  }
+
+  function formatNewsDataArticle(article, country, category, nativeCategory = false) {
+    const sourceUrl = article.link || '#';
+    return {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      title: article.title || 'No title',
+      description: article.description || article.content?.slice(0, 200) || '',
+      content: article.content || article.description || '',
+      url: sourceUrl,
+      image_url: article.image_url || null,
+      source: article.source_id || 'NewsData',
+      publishedAt: article.pubDate || new Date().toISOString(),
+      time_ago: timeAgo(article.pubDate),
+      country, category,
+      language: article.language || 'en', // NewsData.io returns language per article
+      summary_points: null,
+      _nativeCategory: nativeCategory,
+      _meta: {
+        sourceCountry: inferCountryFromUrl(sourceUrl),
+      },
+    };
+  }
+
+  function formatGuardianArticle(result, country, category, nativeCategory = false) {
+    const fields = result.fields || {};
+    // bodyText is the full article body; trailText is a short teaser
+    const bodyText = fields.bodyText ? fields.bodyText.slice(0, 3000) : '';
+    return {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      title: result.webTitle || 'No title',
+      description: fields.trailText || '',
+      content: bodyText || fields.trailText || '',
+      url: result.webUrl || '#',
+      image_url: fields.thumbnail || null,
+      source: 'The Guardian',
+      publishedAt: result.webPublicationDate || new Date().toISOString(),
+      time_ago: timeAgo(result.webPublicationDate),
+      country, category,
+      language: 'en', // Guardian only publishes in English
+      summary_points: null,
+      _nativeCategory: nativeCategory,
+      _meta: {
+        // Guardian sectionId often encodes country (e.g. 'australia-news')
+        sourceCountry: GUARDIAN_SECTION_TO_COUNTRY[result.sectionId] ?? inferCountryFromUrl(result.webUrl),
+        sectionId: result.sectionId || null,
+      },
+    };
+  }
+
+  function formatGNewsArticle(article, country, category, nativeCategory = false) {
+    const sourceUrl = article.url || '#';
+    return {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      title: article.title || 'No title',
+      description: article.description || '',
+      content: article.content || article.description || '',
+      url: sourceUrl,
+      image_url: article.image || null,
+      source: article.source?.name || 'GNews',
+      publishedAt: article.publishedAt || new Date().toISOString(),
+      time_ago: timeAgo(article.publishedAt),
+      country, category,
+      language: article.language || 'en', // GNews returns language per article
+      summary_points: null,
+      _nativeCategory: nativeCategory,
+      _meta: {
+        sourceCountry: inferCountryFromUrl(article.source?.url || sourceUrl),
+      },
+    };
+  }
+
+  function formatGoogleNewsArticle(item, country, category) {
+    const publishedAt = item.pubDate
+      ? new Date(item.pubDate).toISOString()
+      : new Date().toISOString();
+
+    // Try to extract source name from Google News title format "Title - Source"
+    let source = 'Google News';
+    let title = item.title;
+    if (title) {
+      const parts = title.split(' - ');
+      if (parts.length > 1) {
+        source = parts.pop();
+        title = parts.join(' - ');
+      }
+    }
+
+    return {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      title: title || 'No title',
+      description: item.description || '',
+      content: item.description || '',
+      url: item.link,
+      image_url: null,
+      source: source,
+      publishedAt,
+      time_ago: timeAgo(publishedAt),
+      country, category,
+      language: 'en',
+      summary_points: null,
+      _meta: {
+        sourceCountry: inferCountryFromUrl(item.link),
+      },
+    };
+  }
+
+  function formatRSSArticle(item, feedSource, country, category) {
+    const publishedAt = item.pubDate
+      ? new Date(item.pubDate).toISOString()
+      : new Date().toISOString();
+    return {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      title: item.title,
+      description: item.description || '',
+      content: item.description || '',  // RSS items rarely carry full body text
+      url: item.link,
+      image_url: null,
+      source: feedSource.name,
+      publishedAt,
+      time_ago: timeAgo(publishedAt),
+      country, category,
+      language: feedSource.language || 'en', // RSS feeds in our registry are English
+      summary_points: null,
+      _meta: {
+        sourceCountry: inferCountryFromUrl(item.link),
+      },
+    };
+  }
+
+  // â”€â”€ Search analytics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Fire-and-forget logging to Supabase. Requires the search_analytics table:
+  //
+  //   CREATE TABLE search_analytics (
+  //     id               uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  //     keyword          text        NOT NULL,
+  //     user_id          text,
+  //     expansion_source text,
+  //     result_count     integer,
+  //     is_boolean       boolean     DEFAULT false,
+  //     created_at       timestamptz DEFAULT now()
+  //   );
+  //
+  // Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_ANON_KEY) to enable.
+  async function logSearchAnalytics(supabaseUrl, supabaseKey, { keyword, userId, expansionSource, resultCount, isBoolean }) {
+    if (!supabaseUrl || !supabaseKey) return;
+    try {
+      await fetch(`${supabaseUrl}/rest/v1/search_analytics`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseKey}`,
+          'apikey': supabaseKey,
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({
+          keyword,
+          user_id: userId || null,
+          expansion_source: expansionSource,
+          result_count: resultCount,
+          is_boolean: isBoolean,
+        }),
+      });
+    } catch (err) {
+      console.warn('[analytics] Failed to log search:', err.message);
+    }
+  }
+
+  // Main handler
+  async function fetchNews(req, res) {
+    const allowedOrigin = process.env.APP_ORIGIN || 'https://shortform.news';
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+    // GET requests without user-specific params are publicly cacheable at the
+    // Vercel Edge CDN (s-maxage=300 = 5-min fresh, stale-while-revalidate=600).
+    // This means subsequent visitors with the same filters get a response from
+    // the nearest edge node in ~20ms instead of hitting the serverless function.
+    // We set this header early so it applies to all early-return paths below.
+    const isPubliclyCacheable = req.method === 'GET'
+      && !req.query.searchQuery
+      && !req.query.userId
+      && !req.query.mode;
+    if (isPubliclyCacheable) {
+      res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    }
+
+    // Rate limiting â€” 30 requests per IP per minute
+    if (applyRateLimit(req, res)) return;
+
+    // Validate required environment variables up front
+    const { valid: envValid } = validateEnv(res, {
+      required: ['NEWS_API_KEY'],
+      optional: ['GUARDIAN_API_KEY', 'WORLD_NEWS_API_KEY', 'NEWS_DATA_API_KEY', 'GNEWS_API_KEY',
+        'MEDIASTACK_API_KEY', 'CURRENTS_API_KEY',
+        'GEMINI_API_KEY', 'GROQ_API_KEY', 'OPENAI_API_KEY', 'COHERE_API_KEY',
+        'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'],
+    });
+    if (!envValid) return;
+
+    const { countries, categories, searchQuery, dateRange, sources: userSources, language: langParam, userId, mode, strictMode, threshold } = req.method === 'POST' ? req.body : req.query;
+    const isKeywordMode = mode === 'keyword';
+    // showNonEnglish=true removes the language=en filter from all API calls, allowing
+    // native-language articles to surface for non-English-dominant countries.
+    const showNonEnglish = langParam === 'all' || langParam === true || langParam === 'true';
+
+    // Build per-request domain/source-ID strings when the user has selected specific sources
+    const activeDomains = (userSources && userSources.length > 0)
+      ? buildTrustedDomains(userSources)
+      : TRUSTED_DOMAINS;
+    const activeSourceIds = (userSources && userSources.length > 0)
+      ? buildTrustedSourceIds(userSources)
+      : TRUSTED_SOURCE_IDS;
+
+    // â”€â”€ Date range â†’ ISO "from" date â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const dateRangeHours = { '24h': 24, '3d': 72, 'week': 168, 'month': 720 };
+    const rangeHours = dateRangeHours[dateRange] || null; // null = no date restriction (e.g. 'all')
+    const fromDate = rangeHours ? new Date(Date.now() - rangeHours * 60 * 60 * 1000) : null;
+    const fromISO = fromDate ? fromDate.toISOString() : null; // full ISO for APIs that accept it
+    const fromDateOnly = fromISO ? fromISO.split('T')[0] : null; // YYYY-MM-DD for APIs that want a date
+
+    // For wider time windows (or no date filter), sort by popularity instead of recency.
+    // This surfaces the biggest stories rather than just the latest.
+    const usePopularitySort = !rangeHours || rangeHours > 24;
+
+    const NEWS_API_KEY = process.env.VITE_NEWS_API_KEY || process.env.NEWS_API_KEY;
+    const GUARDIAN_API_KEY = process.env.GUARDIAN_API_KEY || null;
+    const WORLD_NEWS_API_KEY = process.env.WORLD_NEWS_API_KEY || null;
+    const NEWS_DATA_API_KEY = process.env.NEWS_DATA_API_KEY || null;
+    const GNEWS_API_KEY = process.env.GNEWS_API_KEY || null;
+    const MEDIASTACK_API_KEY = process.env.MEDIASTACK_API_KEY || null;
+    const CURRENTS_API_KEY = process.env.CURRENTS_API_KEY || null;
+    const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || null;
+    const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || null;
+
+    // LLM summarisation â€” collect all configured keys; generateSummary tries them in order
+    const LLM_KEYS = {
+      gemini: process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || null,
+      groq: process.env.GROQ_API_KEY || null,
+      openai: process.env.OPENAI_API_KEY || null,
+      cohere: process.env.COHERE_API_KEY || null,
+    };
+    const HAS_LLM = Object.values(LLM_KEYS).some(Boolean);
+
+    // â”€â”€ Keyword search: search APIs directly when a searchQuery is provided â”€â”€â”€â”€
+    // Now country/category-aware: if the user has filters active, results are
+    // tagged with the correct country/category and the ranking engine applies
+    // country relevance scoring. Also uses LLM-powered query expansion,
+    // keyword relevance scoring (Signal 7), result caching, and GNews.
+    if (searchQuery) {
+      const keyword = searchQuery.trim();
+      const sourceFingerprint = getSourceFingerprint(userSources);
+
+      // Determine country/category context from the request
+      const countryList = Array.isArray(countries) && countries.length > 0 ? countries : ['world'];
+      const categoryList = Array.isArray(categories) && categories.length > 0 ? categories : ['world'];
+      const hasCountryFilter = countryList.some(c => c !== 'world');
+      const hasCategoryFilter = categoryList.some(c => c !== 'world');
+
+      // Check cache (keyed on keyword + filters + dateRange + sources + mode)
+      const modeTag = isKeywordMode ? (strictMode ? 'kw-strict' : 'kw-monitor') : 'kw';
+      const kwCacheKey = `${modeTag}-${keyword.toLowerCase()}-${countryList.sort().join(',')}-${categoryList.sort().join(',')}-${dateRange || 'all'}-${sourceFingerprint}`;
+      const kwCached = await getCache(kwCacheKey);
+      if (kwCached) {
+        console.log(`Keyword cache HIT: "${keyword}"`);
+        return res.status(200).json({ status: 'ok', articles: kwCached.articles, totalResults: kwCached.articles.length, cached: true });
       }
 
-      // 3. NewsData.io
-      if (NEWS_DATA_API_KEY) {
-        searchPromises.push(
-          searchNewsDataByKeyword(expandedQuery, NEWS_DATA_API_KEY, { from: fromDateOnly })
-            .then(raw => { const valid = raw.filter(a => a.title); console.log(`  [3] NewsData keyword: ${valid.length} articles`); return valid.map(a => formatNewsDataArticle(a, countryList[0], categoryList[0])); })
-            .catch(err => { console.error('  NewsData keyword search failed:', err.message); return []; })
-        );
-      }
+      // Build expanded query â€” tries static map first, then LLM, then raw
+      // In keyword monitor mode, use the precision prompt for tighter synonyms
+      const { query: expandedQuery, source: expansionSource } = await buildExpandedSearchQuery(keyword, LLM_KEYS, { keywordMode: isKeywordMode });
+      console.log(`Keyword search${isKeywordMode ? ' [monitor]' : ''}: "${keyword}" â†’ ${expansionSource}: ${expandedQuery}`);
 
-      // 4. Guardian
-      if (GUARDIAN_API_KEY) {
-        searchPromises.push(
-          searchGuardianByKeyword(expandedQuery, GUARDIAN_API_KEY, { from: fromDateOnly })
-            .then(raw => { console.log(`  [4] Guardian keyword: ${raw.length} articles`); return raw.map(r => formatGuardianArticle(r, countryList[0], categoryList[0])); })
-            .catch(err => { console.error('  Guardian keyword search failed:', err.message); return []; })
-        );
-      }
+      // Extract search terms for keyword relevance scoring (Signal 7).
+      // For boolean queries split on all operators; for OR-expanded queries split on OR only.
+      const searchTerms = expandedQuery
+        .split(expansionSource === 'boolean' ? / AND | OR | NOT /i : / OR /i)
+        .map(t => t.trim().replace(/^["'(]+|["')]+$/g, ''))
+        .filter(t => t.length > 1);
 
-      // 5. GNews — now included in keyword search (supports country filtering natively)
-      if (GNEWS_API_KEY) {
-        searchPromises.push(
-          searchGNewsByKeyword(expandedQuery, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, country: countryList[0] })
-            .then(raw => { const valid = raw.filter(a => a.title); console.log(`  [5] GNews keyword: ${valid.length} articles`); return valid.map(a => formatGNewsArticle(a, countryList[0], categoryList[0])); })
-            .catch(err => { console.error('  GNews keyword search failed:', err.message); return []; })
-        );
-      }
+      try {
+        // Fire all keyword searches in parallel across all sources
+        const searchPromises = [];
 
-      // 6. RSS feeds — check if any apply to the selected countries
-      const rssPromises = [];
-      for (const country of countryList) {
-        const applicableFeeds = RSS_SOURCES.filter(f => f.url && f.countries.has(country));
-        for (const feed of applicableFeeds) {
-          rssPromises.push(
-            fetchRSSFeed(feed.url)
-              .then(items => {
-                // Filter RSS items using expanded search terms + stemming,
-                // consistent with how API sources are filtered.
-                const kwLower = keyword.toLowerCase();
-                const matched = items.filter(item => {
-                  const text = `${item.title || ''} ${item.description || ''}`.toLowerCase();
-                  if (text.includes(kwLower)) return true;
-                  for (const term of searchTerms) {
-                    const t = term.toLowerCase().replace(/^["'(]+|["')]+$/g, '');
-                    if (t.length < 2) continue;
-                    if (text.includes(t)) return true;
-                    const stemmed = stemWord(t);
-                    if (stemmed !== t && stemmed.length >= 3 && text.includes(stemmed)) return true;
-                  }
-                  return false;
-                });
-                return matched.map(item => formatRSSArticle(item, feed, country, categoryList[0]));
-              })
-              .catch(() => [])
+        // 1. NewsAPI â€” keyword search with trusted domains
+        searchPromises.push(
+          searchNewsAPIByKeyword(expandedQuery, NEWS_API_KEY, activeDomains, { from: fromISO, sortByPopularity: usePopularitySort })
+            .then(raw => {
+              const valid = raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com');
+              console.log(`  [1] NewsAPI keyword: ${valid.length} articles`);
+              return valid.map(a => formatNewsAPIArticle(a, countryList[0], categoryList[0]));
+            })
+            .catch(err => { console.error('  NewsAPI keyword search failed:', err.message); return []; })
+        );
+
+        // 2. WorldNewsAPI
+        if (WORLD_NEWS_API_KEY) {
+          searchPromises.push(
+            searchWorldNewsAPIByKeyword(expandedQuery, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort })
+              .then(raw => { console.log(`  [2] WorldNewsAPI keyword: ${raw.length} articles`); return raw.map(a => formatWorldNewsAPIArticle(a, countryList[0], categoryList[0])); })
+              .catch(err => { console.error('  WorldNewsAPI keyword search failed:', err.message); return []; })
           );
         }
-      }
-      if (rssPromises.length > 0) {
+
+        // 3. NewsData.io
+        if (NEWS_DATA_API_KEY) {
+          searchPromises.push(
+            searchNewsDataByKeyword(expandedQuery, NEWS_DATA_API_KEY, { from: fromDateOnly })
+              .then(raw => { const valid = raw.filter(a => a.title); console.log(`  [3] NewsData keyword: ${valid.length} articles`); return valid.map(a => formatNewsDataArticle(a, countryList[0], categoryList[0])); })
+              .catch(err => { console.error('  NewsData keyword search failed:', err.message); return []; })
+          );
+        }
+
+        // 4. Guardian
+        if (GUARDIAN_API_KEY) {
+          searchPromises.push(
+            searchGuardianByKeyword(expandedQuery, GUARDIAN_API_KEY, { from: fromDateOnly })
+              .then(raw => { console.log(`  [4] Guardian keyword: ${raw.length} articles`); return raw.map(r => formatGuardianArticle(r, countryList[0], categoryList[0])); })
+              .catch(err => { console.error('  Guardian keyword search failed:', err.message); return []; })
+          );
+        }
+
+        // 5. GNews â€” now included in keyword search (supports country filtering natively)
+        if (GNEWS_API_KEY) {
+          searchPromises.push(
+            searchGNewsByKeyword(expandedQuery, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, country: countryList[0] })
+              .then(raw => { const valid = raw.filter(a => a.title); console.log(`  [5] GNews keyword: ${valid.length} articles`); return valid.map(a => formatGNewsArticle(a, countryList[0], categoryList[0])); })
+              .catch(err => { console.error('  GNews keyword search failed:', err.message); return []; })
+          );
+        }
+
+        // 5.5 Google News RSS â€” free, no limits, always included
         searchPromises.push(
-          Promise.all(rssPromises).then(results => {
-            const flat = results.flat();
-            if (flat.length > 0) console.log(`  [6] RSS keyword: ${flat.length} articles`);
-            return flat;
-          })
+          searchGoogleNewsByKeyword(expandedQuery, { country: countryList[0] })
+            .then(raw => { const valid = raw.filter(a => a.title); console.log(`  [5.5] Google News RSS keyword: ${valid.length} articles`); return valid.map(a => formatGoogleNewsArticle(a, countryList[0], categoryList[0])); })
+            .catch(err => { console.error('  Google News RSS keyword error:', err.message); return []; })
         );
-      }
 
-      const searchResults = await Promise.all(searchPromises);
-      let results = searchResults.flat();
-
-      // ── Category relevance filter ────────────────────────────────────
-      // When the user has specific categories selected (not just "world"),
-      // boost articles matching those categories and demote off-topic ones.
-      // We use a soft filter: articles matching ANY selected category are
-      // kept at full weight; others are kept but scored lower by Signal 5.
-      if (hasCategoryFilter) {
-        const beforeCatFilter = results.length;
-        // Score each article against ALL selected categories (not just the first)
-        results = results.map(a => {
-          const matchesAny = categoryList.some(cat => articleMatchesCategory(a, cat));
-          // Tag the article's best-matching category so Signal 5 can score it
-          if (matchesAny) {
-            // Find which selected category matches best
-            let bestCat = categoryList[0];
-            let bestScore = 0;
-            for (const cat of categoryList) {
-              const s = categoryRelevanceScore(a, cat);
-              if (s > bestScore) { bestScore = s; bestCat = cat; }
-            }
-            a.category = bestCat;
+        // 6. RSS feeds â€” check if any apply to the selected countries
+        const rssPromises = [];
+        for (const country of countryList) {
+          const applicableFeeds = RSS_SOURCES.filter(f => f.url && f.countries.has(country));
+          for (const feed of applicableFeeds) {
+            rssPromises.push(
+              fetchRSSFeed(feed.url)
+                .then(items => {
+                  // Filter RSS items using expanded search terms + stemming,
+                  // consistent with how API sources are filtered.
+                  const kwLower = keyword.toLowerCase();
+                  const matched = items.filter(item => {
+                    const text = `${item.title || ''} ${item.description || ''}`.toLowerCase();
+                    if (text.includes(kwLower)) return true;
+                    for (const term of searchTerms) {
+                      const t = term.toLowerCase().replace(/^["'(]+|["')]+$/g, '');
+                      if (t.length < 2) continue;
+                      if (text.includes(t)) return true;
+                      const stemmed = stemWord(t);
+                      if (stemmed !== t && stemmed.length >= 3 && text.includes(stemmed)) return true;
+                    }
+                    return false;
+                  });
+                  return matched.map(item => formatRSSArticle(item, feed, country, categoryList[0]));
+                })
+                .catch(() => [])
+            );
           }
-          a._matchesCategory = matchesAny;
-          return a;
-        });
-        // Separate matched and unmatched, but keep unmatched as filler
-        // (they might still be relevant via keyword — the ranking engine
-        // will naturally push them down via low Signal 5 scores)
-        const matched = results.filter(a => a._matchesCategory);
-        const unmatched = results.filter(a => !a._matchesCategory);
-        results = [...matched, ...unmatched];
-        if (matched.length < beforeCatFilter) {
-          console.log(`  Category filter: ${matched.length}/${beforeCatFilter} match [${categoryList.join(',')}], keeping ${unmatched.length} as filler`);
         }
-      }
-
-      // ── Country relevance scoring ─────────────────────────────────────
-      // When user has country filters active, score each article for
-      // country relevance so Signal 6 can rank them appropriately.
-      // Uses articleCountryScore() which considers title mentions, body mentions,
-      // term frequency, and source-country metadata (wire service aware).
-      if (hasCountryFilter) {
-        results = results.map(a => {
-          let bestScore = 0;
-          for (const country of countryList) {
-            // Pass best-matching category so the combined title bonus can apply
-            const bestCat = categoryList.length === 1 ? categoryList[0] : (a.category || null);
-            const score = articleCountryScore(a, country, bestCat);
-            bestScore = Math.max(bestScore, score);
-          }
-          a._countryScore = bestScore;
-          return a;
-        });
-      }
-
-      // Rank with keyword relevance (Signal 7), category (Signal 5), and country (Signal 6)
-      const ranked = rankAndDeduplicateArticles(results, {
-        usePopularity: usePopularitySort,
-        category: categoryList.length === 1 ? categoryList[0] : null,
-        searchTerms,
-        rawKeyword: keyword,
-        keywordMode: isKeywordMode,
-        rangeHours,
-      });
-
-      // ── Keyword monitoring mode: post-ranking quality filters ──────────
-      let filtered = ranked;
-      if (isKeywordMode) {
-        const kwLower = keyword.toLowerCase();
-        const kwTerms = searchTerms.map(t => t.toLowerCase().replace(/^["'(]+|["')]+$/g, ''));
-
-        // Option A: Minimum relevance threshold — drop articles that barely
-        // mention the keyword. Default 0.05; can be tuned per-keyword via the
-        // `threshold` request param (clamped to [0, 1]).
-        const MIN_KW_RELEVANCE = (threshold !== undefined && threshold !== null && !isNaN(parseFloat(threshold)))
-          ? Math.min(Math.max(parseFloat(threshold), 0), 1)
-          : 0.05;
-        const beforeThreshold = filtered.length;
-        filtered = filtered.filter(a => {
-          const score = keywordRelevanceScore(a, searchTerms, keyword);
-          return score >= MIN_KW_RELEVANCE;
-        });
-        if (filtered.length < beforeThreshold) {
-          console.log(`  [monitor] Relevance threshold: ${filtered.length}/${beforeThreshold} articles passed (min ${MIN_KW_RELEVANCE})`);
+        if (rssPromises.length > 0) {
+          searchPromises.push(
+            Promise.all(rssPromises).then(results => {
+              const flat = results.flat();
+              if (flat.length > 0) console.log(`  [6] RSS keyword: ${flat.length} articles`);
+              return flat;
+            })
+          );
         }
 
-        // Option D: Strict/headline-match mode — only keep articles where
-        // at least one search term (or the raw keyword) appears in the title.
-        // This mirrors Streem/Isentia headline-focused monitoring.
-        if (strictMode) {
-          const beforeStrict = filtered.length;
-          filtered = filtered.filter(a => {
-            const title = (a.title || '').toLowerCase();
-            // Check raw keyword first (exact phrase)
-            if (title.includes(kwLower)) return true;
-            // Then check individual search terms (including expanded synonyms)
-            for (const term of kwTerms) {
-              if (term.length >= 3 && title.includes(term)) return true;
-              // Also try stemmed version
-              const stemmed = stemWord(term);
-              if (stemmed !== term && stemmed.length >= 3 && title.includes(stemmed)) return true;
+        const searchResults = await Promise.all(searchPromises);
+        let results = searchResults.flat();
+
+        // â”€â”€ Category relevance filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // When the user has specific categories selected (not just "world"),
+        // boost articles matching those categories and demote off-topic ones.
+        // We use a soft filter: articles matching ANY selected category are
+        // kept at full weight; others are kept but scored lower by Signal 5.
+        if (hasCategoryFilter) {
+          const beforeCatFilter = results.length;
+          // Score each article against ALL selected categories (not just the first)
+          results = results.map(a => {
+            const matchesAny = categoryList.some(cat => articleMatchesCategory(a, cat));
+            // Tag the article's best-matching category so Signal 5 can score it
+            if (matchesAny) {
+              // Find which selected category matches best
+              let bestCat = categoryList[0];
+              let bestScore = 0;
+              for (const cat of categoryList) {
+                const s = categoryRelevanceScore(a, cat);
+                if (s > bestScore) { bestScore = s; bestCat = cat; }
+              }
+              a.category = bestCat;
             }
-            return false;
+            a._matchesCategory = matchesAny;
+            return a;
           });
-          if (filtered.length < beforeStrict) {
-            console.log(`  [monitor] Strict headline filter: ${filtered.length}/${beforeStrict} articles have keyword in title`);
+          // Separate matched and unmatched, but keep unmatched as filler
+          // (they might still be relevant via keyword â€” the ranking engine
+          // will naturally push them down via low Signal 5 scores)
+          const matched = results.filter(a => a._matchesCategory);
+          const unmatched = results.filter(a => !a._matchesCategory);
+          results = [...matched, ...unmatched];
+          if (matched.length < beforeCatFilter) {
+            console.log(`  Category filter: ${matched.length}/${beforeCatFilter} match [${categoryList.join(',')}], keeping ${unmatched.length} as filler`);
           }
+        }
+
+        // â”€â”€ Country relevance scoring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // When user has country filters active, score each article for
+        // country relevance so Signal 6 can rank them appropriately.
+        // Uses articleCountryScore() which considers title mentions, body mentions,
+        // term frequency, and source-country metadata (wire service aware).
+        if (hasCountryFilter) {
+          results = results.map(a => {
+            let bestScore = 0;
+            for (const country of countryList) {
+              // Pass best-matching category so the combined title bonus can apply
+              const bestCat = categoryList.length === 1 ? categoryList[0] : (a.category || null);
+              const score = articleCountryScore(a, country, bestCat);
+              bestScore = Math.max(bestScore, score);
+            }
+            a._countryScore = bestScore;
+            return a;
+          });
+        }
+
+        // Rank with keyword relevance (Signal 7), category (Signal 5), and country (Signal 6)
+        const ranked = rankAndDeduplicateArticles(results, {
+          usePopularity: usePopularitySort,
+          category: categoryList.length === 1 ? categoryList[0] : null,
+          searchTerms,
+          rawKeyword: keyword,
+          keywordMode: isKeywordMode,
+          rangeHours,
+        });
+
+        // â”€â”€ Keyword monitoring mode: post-ranking quality filters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        let filtered = ranked;
+        if (isKeywordMode) {
+          const kwLower = keyword.toLowerCase();
+          const kwTerms = searchTerms.map(t => t.toLowerCase().replace(/^["'(]+|["')]+$/g, ''));
+
+          // Option A: Minimum relevance threshold â€” drop articles that barely
+          // mention the keyword. Default 0.05; can be tuned per-keyword via the
+          // `threshold` request param (clamped to [0, 1]).
+          const MIN_KW_RELEVANCE = (threshold !== undefined && threshold !== null && !isNaN(parseFloat(threshold)))
+            ? Math.min(Math.max(parseFloat(threshold), 0), 1)
+            : 0.05;
+          const beforeThreshold = filtered.length;
+          filtered = filtered.filter(a => {
+            const score = keywordRelevanceScore(a, searchTerms, keyword);
+            return score >= MIN_KW_RELEVANCE;
+          });
+          if (filtered.length < beforeThreshold) {
+            console.log(`  [monitor] Relevance threshold: ${filtered.length}/${beforeThreshold} articles passed (min ${MIN_KW_RELEVANCE})`);
+          }
+
+          // Option D: Strict/headline-match mode â€” only keep articles where
+          // at least one search term (or the raw keyword) appears in the title.
+          // This mirrors Streem/Isentia headline-focused monitoring.
+          if (strictMode) {
+            const beforeStrict = filtered.length;
+            filtered = filtered.filter(a => {
+              const title = (a.title || '').toLowerCase();
+              // Check raw keyword first (exact phrase)
+              if (title.includes(kwLower)) return true;
+              // Then check individual search terms (including expanded synonyms)
+              for (const term of kwTerms) {
+                if (term.length >= 3 && title.includes(term)) return true;
+                // Also try stemmed version
+                const stemmed = stemWord(term);
+                if (stemmed !== term && stemmed.length >= 3 && title.includes(stemmed)) return true;
+              }
+              return false;
+            });
+            if (filtered.length < beforeStrict) {
+              console.log(`  [monitor] Strict headline filter: ${filtered.length}/${beforeStrict} articles have keyword in title`);
+            }
+          }
+        }
+
+        const clean = filtered.map(({ _meta, _coverage, _countryScore, _matchesCategory, _nativeCategory, ...rest }) => rest);
+
+        // AI summaries for top ranked articles (up to MAX_SUMMARY_ARTICLES)
+        if (HAS_LLM && clean.length > 0) {
+          await Promise.all(clean.slice(0, MAX_SUMMARY_ARTICLES).map(async (article) => {
+            try {
+              const summary = await generateSummaryCached(article, LLM_KEYS);
+              if (summary) article.summary_points = summary;
+            } catch (err) {
+              console.error('Summary failed:', err.message);
+            }
+          }));
+        }
+
+        // Cache keyword results (1-hour TTL since keyword results are more time-sensitive)
+        await setCache(kwCacheKey, { timestamp: Date.now(), articles: clean });
+        evictCacheIfNeeded();
+
+        // Fire-and-forget analytics (non-blocking â€” never delays the response)
+        logSearchAnalytics(SUPABASE_URL, SUPABASE_KEY, {
+          keyword,
+          userId: userId || null,
+          expansionSource,
+          resultCount: clean.length,
+          isBoolean: expansionSource === 'boolean',
+        });
+
+        return res.status(200).json({ status: 'ok', articles: clean, totalResults: clean.length, cached: false });
+      } catch (error) {
+        console.error('Keyword search error:', error);
+        return res.status(500).json({ error: 'Failed to search news' });
+      }
+    }
+
+    // â”€â”€ Trending: single broad fetch across all topics, top 10 by rank â”€â”€â”€â”€â”€â”€
+    // Previously made 9 separate per-category NewsAPI calls (one per trending category).
+    // Now uses one call with a combined query â€” reduces API spend from 9 calls â†’ 1,
+    // and uses an 8-hour TTL (3 refreshes/day) instead of the default 12 hours.
+    const isTrending = Array.isArray(categories)
+      ? categories.includes('trending')
+      : categories === 'trending';
+
+    if (isTrending) {
+      const trendingCacheKey = getCacheKey('world', 'trending', dateRange, 'all');
+      // Custom 8-hour TTL check (isCacheValid uses 12h by default)
+      const trendingEntry = CACHE[trendingCacheKey];
+      if (trendingEntry && (Date.now() - trendingEntry.timestamp) / 3600000 < 8) {
+        console.log(`Cache HIT: ${trendingCacheKey}`);
+        return res.status(200).json({ status: 'ok', articles: trendingEntry.articles, totalResults: trendingEntry.articles.length, cached: true });
+      }
+
+      try {
+        console.log('Fetching trending articles â€” single broad query');
+
+        // Currents API fallback before Guardian for trending â€” 600/day vs Guardian's 5000
+        if (trendingArticles.length < 10 && CURRENTS_API_KEY) {
+          console.log('  Trending Currents API fallback');
+          incrementApiCounter('currents');
+          const cRaw = await fetchFromCurrentsAPI('world', 'world', CURRENTS_API_KEY, {}).catch(err => { console.error('  Trending Currents failed:', err.message); return []; });
+          const cExtra = cRaw.filter(a => a.title).map(a => formatCurrentsAPIArticle(a, 'world', 'trending')).filter(a => !seenUrls.has(a.url));
+          for (const extra of cExtra) seenUrls.add(extra.url);
+          trendingArticles = [...trendingArticles, ...cExtra];
+        }
+
+        // Guardian fallback when results are too few
+        if (trendingArticles.length < 10 && GUARDIAN_API_KEY) {
+          console.log('  Trending Guardian fallback');
+          incrementApiCounter('guardian');
+          const gRaw = await fetchFromGuardian('world', 'politics', GUARDIAN_API_KEY, {}).catch(() => []);
+          const gExtra = gRaw.map(r => formatGuardianArticle(r, 'world', 'trending')).filter(a => !seenUrls.has(a.url));
+          trendingArticles = [...trendingArticles, ...gExtra];
+        }
+
+        if (trendingArticles.length === 0) {
+          return res.status(200).json({ status: 'ok', articles: [], totalResults: 0, cached: false });
+        }
+
+        // Rank by authority + coverage, dedup similar stories, take top 10
+        const top10 = rankAndDeduplicateArticles(trendingArticles, { usePopularity: true })
+          .map(({ _coverage, ...rest }) => rest)
+          .slice(0, 10);
+
+        // Generate AI summaries (with per-article cache to avoid re-generating on refresh)
+        if (HAS_LLM && top10.length > 0) {
+          await Promise.all(top10.slice(0, MAX_SUMMARY_ARTICLES).map(async (article) => {
+            try {
+              const summary = await generateSummaryCached(article, LLM_KEYS);
+              if (summary) article.summary_points = summary;
+            } catch (err) {
+              console.error('Trending summary failed:', err.message);
+            }
+          }));
+        }
+
+        CACHE[trendingCacheKey] = { timestamp: Date.now(), articles: top10 };
+        await setCache(trendingCacheKey, { timestamp: Date.now(), articles: top10 }, 8 * 3600);
+        return res.status(200).json({ status: 'ok', articles: top10, totalResults: top10.length, cached: false });
+      } catch (error) {
+        console.error('Trending fetch error:', error);
+        return res.status(500).json({ error: 'Failed to fetch trending news' });
+      }
+    }
+
+    const countryList = Array.isArray(countries) ? countries : [countries || 'us'];
+    const categoryList = Array.isArray(categories) ? categories : [categories || 'technology'];
+    const sourceFingerprint = getSourceFingerprint(userSources);
+
+    // Expand the 'all' wildcard category to every real category so that existing
+    // per-pair fetching, caching, and filtering logic works without modification.
+    const ALL_REAL_CATEGORIES = ['health-tech-science', 'business', 'sports', 'entertainment', 'politics'];
+    const effectiveCategoryList = [...new Set(categoryList.flatMap(c => c === 'all' ? ALL_REAL_CATEGORIES : [c]))];
+
+    try {
+      // â”€â”€ Fetch all country/category pairs in PARALLEL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // Previously sequential: each pair waited for the previous to finish.
+      // With 3 countries Ã— 3 categories = 9 pairs of up to 6 API calls each,
+      // parallelization dramatically reduces total response time.
+      const pairs = [];
+      for (const country of countryList) {
+        for (const category of effectiveCategoryList) {
+          pairs.push({ country, category });
         }
       }
 
-      const clean = filtered.map(({ _meta, _coverage, _countryScore, _matchesCategory, _nativeCategory, ...rest }) => rest);
+      const pairResults = await Promise.allSettled(
+        pairs.map(({ country, category }) =>
+          fetchCountryCategoryPair(country, category, {
+            NEWS_API_KEY, WORLD_NEWS_API_KEY, NEWS_DATA_API_KEY, GUARDIAN_API_KEY, GNEWS_API_KEY,
+            MEDIASTACK_API_KEY, CURRENTS_API_KEY,
+            activeDomains, activeSourceIds, fromISO, fromDateOnly, usePopularitySort,
+            rangeHours, dateRange, sourceFingerprint, showNonEnglish,
+          })
+        )
+      );
 
-      // AI summaries for top ranked articles (up to MAX_SUMMARY_ARTICLES)
-      if (HAS_LLM && clean.length > 0) {
-        await Promise.all(clean.slice(0, MAX_SUMMARY_ARTICLES).map(async (article) => {
+      const allArticles = [];
+      // Track country/category pairs that returned very few articles (coverage gaps)
+      const lowCoverage = [];
+      const LOW_COVERAGE_THRESHOLD = 3;
+      for (let i = 0; i < pairResults.length; i++) {
+        const result = pairResults[i];
+        if (result.status === 'fulfilled' && Array.isArray(result.value)) {
+          const count = result.value.length;
+          // Flag non-world pairs with very few articles as low-coverage
+          if (count <= LOW_COVERAGE_THRESHOLD && pairs[i].country !== 'world') {
+            lowCoverage.push({ country: pairs[i].country, category: pairs[i].category, count });
+          }
+          allArticles.push(...result.value);
+        } else if (result.status === 'rejected') {
+          console.error('Pair fetch failed:', result.reason?.message);
+        }
+      }
+
+      // Rank ALL articles together by authority + coverage + freshness + depth + category
+      const singleCategory = effectiveCategoryList.length === 1 ? effectiveCategoryList[0] : null;
+      let rankedArticles = rankAndDeduplicateArticles(allArticles, { usePopularity: usePopularitySort, category: singleCategory, rangeHours });
+
+      // Post-dedup fill-back: if deduplication reduced the count below 10, add back
+      // the highest-quality dedup-losers (articles from merged clusters that weren't
+      // chosen as the cluster representative) until we reach 10.
+      const DISPLAY_MIN = 10;
+      if (rankedArticles.length < DISPLAY_MIN && allArticles.length > rankedArticles.length) {
+        const rankedUrls = new Set(rankedArticles.map(a => a.url).filter(Boolean));
+        const extras = allArticles
+          .filter(a => a.url && !rankedUrls.has(a.url))
+          .slice(0, DISPLAY_MIN - rankedArticles.length);
+        if (extras.length > 0) {
+          console.log(`  Post-dedup fill: adding ${extras.length} dedup-losers to reach ${DISPLAY_MIN}`);
+          rankedArticles = [...rankedArticles, ...extras];
+        }
+      }
+
+      // Strip internal fields before sending to the client
+      const cleanArticles = rankedArticles.map(({ _meta, _coverage, _countryScore, _matchesCategory, _nativeCategory, ...rest }) => rest);
+
+      // â”€â”€ Enforce requested date window â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // The per-pair backfill widens the time window (e.g. 24h â†’ 72h) to ensure
+      // enough articles are returned. After ranking across all pairs we re-apply
+      // the original date constraint so that stale articles don't appear in the
+      // "Last 24 Hours" feed.
+      // Threshold: for 24h queries enforce aggressively (â‰¥5 suffices); for wider
+      // windows keep the original â‰¥10 floor to avoid near-empty result sets.
+      let finalArticles = cleanArticles;
+      if (fromDate) {
+        const fromTime = fromDate.getTime();
+        const inWindow = cleanArticles.filter(a => {
+          if (!a.publishedAt) return true; // no date metadata â€” keep
+          return new Date(a.publishedAt).getTime() >= fromTime;
+        });
+        const ENFORCE_MIN = rangeHours && rangeHours <= 24 ? 5 : 10;
+        if (inWindow.length >= ENFORCE_MIN) {
+          finalArticles = inWindow;
+        } else if (inWindow.length > 0) {
+          // Some in-window articles exist but below the floor â€” use them and
+          // top up with the least-stale out-of-window articles to reach the floor.
+          const outside = cleanArticles
+            .filter(a => a.publishedAt && new Date(a.publishedAt).getTime() < fromTime)
+            .slice(0, ENFORCE_MIN - inWindow.length);
+          finalArticles = [...inWindow, ...outside];
+        }
+      }
+
+      // AI summaries for the top final ranked articles (up to MAX_SUMMARY_ARTICLES).
+      // Previously summaries were generated per-pair BEFORE ranking, wasting LLM calls
+      // on articles that would later be filtered, deduplicated, or ranked below the fold.
+      if (HAS_LLM && finalArticles.length > 0) {
+        await Promise.all(finalArticles.slice(0, MAX_SUMMARY_ARTICLES).map(async (article) => {
           try {
-            const summary = await generateSummaryCached(article, LLM_KEYS);
+            const summary = await generateSummary(article, LLM_KEYS);
             if (summary) article.summary_points = summary;
           } catch (err) {
             console.error('Summary failed:', err.message);
@@ -3788,747 +4083,559 @@ export default async function handler(req, res) {
         }));
       }
 
-      // Cache keyword results (1-hour TTL since keyword results are more time-sensitive)
-      await setCache(kwCacheKey, { timestamp: Date.now(), articles: clean });
       evictCacheIfNeeded();
 
-      // Fire-and-forget analytics (non-blocking — never delays the response)
-      logSearchAnalytics(SUPABASE_URL, SUPABASE_KEY, {
-        keyword,
-        userId: userId || null,
-        expansionSource,
-        resultCount: clean.length,
-        isBoolean: expansionSource === 'boolean',
+      return res.status(200).json({
+        status: 'ok',
+        articles: finalArticles,
+        totalResults: finalArticles.length,
+        cached: false,
+        lowCoverage: lowCoverage.length > 0 ? lowCoverage : undefined,
       });
 
-      return res.status(200).json({ status: 'ok', articles: clean, totalResults: clean.length, cached: false });
     } catch (error) {
-      console.error('Keyword search error:', error);
-      return res.status(500).json({ error: 'Failed to search news' });
+      console.error('News fetch error:', error);
+      return res.status(500).json({ error: 'Failed to fetch news' });
     }
   }
 
-  // ── Trending: single broad fetch across all topics, top 10 by rank ──────
-  // Previously made 9 separate per-category NewsAPI calls (one per trending category).
-  // Now uses one call with a combined query — reduces API spend from 9 calls → 1,
-  // and uses an 8-hour TTL (3 refreshes/day) instead of the default 12 hours.
-  const isTrending = Array.isArray(categories)
-    ? categories.includes('trending')
-    : categories === 'trending';
+  // â”€â”€ In-flight request deduplication â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // If two requests for the same country/category pair arrive simultaneously
+  // (e.g. at a cache-slot boundary), only one fires the API cascade â€” the
+  // second awaits the first promise instead of launching its own API calls.
+  const IN_FLIGHT_REQUESTS = new Map();
 
-  if (isTrending) {
-    const trendingCacheKey = getCacheKey('world', 'trending', dateRange, 'all');
-    // Custom 8-hour TTL check (isCacheValid uses 12h by default)
-    const trendingEntry = CACHE[trendingCacheKey];
-    if (trendingEntry && (Date.now() - trendingEntry.timestamp) / 3600000 < 8) {
-      console.log(`Cache HIT: ${trendingCacheKey}`);
-      return res.status(200).json({ status: 'ok', articles: trendingEntry.articles, totalResults: trendingEntry.articles.length, cached: true });
+  // â”€â”€ Fetch a single country/category pair â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Thin dispatcher: checks cache, deduplicates in-flight requests, delegates
+  // to _doFetchPair for the actual API work.
+  async function fetchCountryCategoryPair(country, category, ctx) {
+    const { dateRange, sourceFingerprint, showNonEnglish } = ctx;
+    const cacheKey = getCacheKey(country, category, dateRange, sourceFingerprint, showNonEnglish);
+
+    const cachedEntry = await getCache(cacheKey);
+
+    // If cache is valid AND no refresh is needed, return cached articles directly
+    if (cachedEntry && !isRefreshNeeded(cachedEntry)) {
+      console.log(`Cache HIT (fresh): ${cacheKey}`);
+      return cachedEntry.articles;
     }
 
-    try {
-      console.log('Fetching trending articles — single broad query');
-      incrementApiCounter('newsapi');
-      let trendingArticles = await fetchFromNewsAPI('world', 'trending', NEWS_API_KEY, activeDomains, activeSourceIds, { sortByPopularity: true })
-        .then(raw => raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com').map(a => formatNewsAPIArticle(a, 'world', 'trending')))
-        .catch(err => { console.error('  Trending NewsAPI failed:', err.message); return []; });
+    // Deduplicate: return the in-flight promise if one already exists for this key
+    if (IN_FLIGHT_REQUESTS.has(cacheKey)) {
+      console.log(`In-flight dedup HIT: ${cacheKey}`);
+      return IN_FLIGHT_REQUESTS.get(cacheKey);
+    }
 
-      // Currents API fallback before Guardian for trending — 600/day vs Guardian's 5000
-      if (trendingArticles.length < 10 && CURRENTS_API_KEY) {
-        console.log('  Trending Currents API fallback');
-        incrementApiCounter('currents');
-        const cRaw = await fetchFromCurrentsAPI('world', 'world', CURRENTS_API_KEY, {}).catch(err => { console.error('  Trending Currents failed:', err.message); return []; });
-        trendingArticles = [...trendingArticles, ...cRaw.filter(a => a.title).map(a => formatCurrentsAPIArticle(a, 'world', 'trending'))];
+    const reason = cachedEntry ? 'refresh needed' : 'cache miss';
+    console.log(`Cache ${reason}: ${cacheKey} â€” fetching fresh data`);
+    // Pass existing cached articles so _doFetchPair can merge into them
+    const existingArticles = cachedEntry ? cachedEntry.articles : [];
+    const promise = _doFetchPair(cacheKey, country, category, ctx, existingArticles);
+    IN_FLIGHT_REQUESTS.set(cacheKey, promise);
+    promise.finally(() => IN_FLIGHT_REQUESTS.delete(cacheKey));
+    return promise;
+  }
+
+  // Inner implementation â€” all API cascade logic lives here. Registered in
+  // IN_FLIGHT_REQUESTS so concurrent requests for the same key share one result.
+  async function _doFetchPair(cacheKey, country, category, ctx, existingArticles = []) {
+    const {
+      NEWS_API_KEY, WORLD_NEWS_API_KEY, NEWS_DATA_API_KEY, GUARDIAN_API_KEY, GNEWS_API_KEY,
+      MEDIASTACK_API_KEY, CURRENTS_API_KEY,
+      activeDomains, activeSourceIds, fromISO, fromDateOnly, usePopularitySort,
+      rangeHours, dateRange, showNonEnglish,
+    } = ctx;
+
+    // For non-English-primary countries, automatically include native-language articles
+    // alongside English coverage so users get local perspectives without needing a toggle.
+    // English-primary countries (US/GB/AU/CA/NZ/IE) remain English-only unless the
+    // caller explicitly requests all languages.
+    const effectiveShowNonEnglish = !ENGLISH_PRIMARY_COUNTRIES.has(country) ? true : showNonEnglish;
+
+    let formattedArticles = [];
+
+    // Track which secondary sources were consulted so the post-filter retry
+    // (Option A) can call only the ones that were skipped by the raw-count gate.
+    const calledSources = new Set();
+
+    // â”€â”€ Unified parallel first pass for ALL countries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // NewsAPI + WorldNewsAPI + GNews + NewsData.io fire simultaneously regardless
+    // of country type for maximum article coverage and source diversity.
+    // This replaces the old two-branch strategy (sequential for English-dominant
+    // countries, parallel for others) â€” the sequential approach was the root cause
+    // of underserved results: NewsAPI alone returning 15+ raw articles would skip
+    // WorldNewsAPI and GNews entirely, and those 15 raw articles could collapse to
+    // 0-3 after category+country filtering with no fallback left.
+    //
+    // NewsData.io is now included in the parallel pass (instead of a deferred
+    // waterfall step) to bolster article volume from the start â€” it covers 100+
+    // countries including many not supported by NewsAPI.
+    //
+    // English-dominant countries (US/GB/AU/CA/NZ/IE) keep the trusted-domain filter
+    // on NewsAPI so quality is maintained; non-English-dominant countries drop it
+    // (skipDomains) so NewsAPI searches its full index rather than being restricted
+    // to US/UK outlets that publish very few articles about smaller countries.
+    //
+    // Well-covered countries (NEWSAPI_FIRST_PASS_COUNTRIES) skip WorldNewsAPI/GNews
+    // in this pass to conserve their daily quotas â€” the post-filter retry below
+    // will call them as a safety net if article count falls below MIN_ARTICLES.
+    const guardianPriorityCountry = country === 'au' || country === 'gb' || country === 'us';
+    const skipDomains = !RSS_WELL_SERVED_COUNTRIES.has(country) && country !== 'world';
+    const skipSecondaryAPIs = NEWSAPI_FIRST_PASS_COUNTRIES.has(country);
+
+    console.log(`  [1+2+3+6+7+8+GN] Parallel fetch [${country}/${category}]${skipDomains ? ' (skipDomains)' : ''}${skipSecondaryAPIs ? ' (NewsAPI-first)' : ''}${effectiveShowNonEnglish ? ' (bilingual)' : ''}`);
+    // MediaStack: non-English specialist, very low quota (~16/day free).
+    // Only call when showNonEnglish=true and country is not an English-primary well-served country.
+    const useMediaStack = MEDIASTACK_API_KEY && effectiveShowNonEnglish && !RSS_WELL_SERVED_COUNTRIES.has(country);
+    const [newsApiRaw, worldNewsRaw, gNewsRaw, newsDataRaw, currentsRaw, mediaStackRaw, googleNewsRaw] = await Promise.all([
+      (country === 'world' || NEWS_API_SUPPORTED_COUNTRIES.has(country))
+        ? fetchFromNewsAPI(country, category, NEWS_API_KEY, activeDomains, activeSourceIds, { from: fromISO, sortByPopularity: usePopularitySort, skipDomains, showNonEnglish: effectiveShowNonEnglish })
+          .catch(err => { console.error('  NewsAPI failed:', err.message); return []; })
+        : Promise.resolve([]),
+      (!skipSecondaryAPIs && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country)))
+        ? fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
+          .catch(err => { console.error('  WorldNewsAPI failed:', err.message); return []; })
+        : Promise.resolve([]),
+      (!skipSecondaryAPIs && GNEWS_API_KEY)
+        ? fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
+          .catch(err => { console.error('  GNews failed:', err.message); return []; })
+        : Promise.resolve([]),
+      // NewsData.io in the parallel pass â€” broadest country coverage (100+), bolsters
+      // article volume especially for non-English and underserved markets.
+      (NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country)))
+        ? fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly, showNonEnglish: effectiveShowNonEnglish })
+          .catch(err => { console.error('  NewsData failed:', err.message); return []; })
+        : Promise.resolve([]),
+      // Currents API â€” 600 req/day free; general fallback for additional source diversity.
+      CURRENTS_API_KEY
+        ? fetchFromCurrentsAPI(country, category, CURRENTS_API_KEY, { from: fromISO, showNonEnglish: effectiveShowNonEnglish })
+          .catch(err => { console.error('  Currents failed:', err.message); return []; })
+        : Promise.resolve([]),
+      // MediaStack â€” ~16 req/day free; non-English specialist; skipped for English-primary countries.
+      useMediaStack
+        ? fetchFromMediaStack(country, category, MEDIASTACK_API_KEY, { from: fromISO })
+          .catch(err => { console.error('  MediaStack failed:', err.message); return []; })
+        : Promise.resolve([]),
+      // Google News API via RSS - free, no limits, always included
+      fetchFromGoogleNews(country, category, { showNonEnglish: effectiveShowNonEnglish })
+        .catch(err => { console.error('  Google News failed:', err.message); return []; }),
+    ]);
+
+    calledSources.add('newsapi');
+    incrementApiCounter('newsapi');
+    if (!skipSecondaryAPIs && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) {
+      calledSources.add('worldnews');
+      incrementApiCounter('worldnews');
+    }
+    if (!skipSecondaryAPIs && GNEWS_API_KEY) {
+      calledSources.add('gnews');
+      incrementApiCounter('gnews');
+    }
+    if (NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
+      calledSources.add('newsdata');
+      incrementApiCounter('newsdata');
+    }
+    if (CURRENTS_API_KEY) {
+      calledSources.add('currents');
+      incrementApiCounter('currents');
+    }
+    if (useMediaStack) {
+      calledSources.add('mediastack');
+      incrementApiCounter('mediastack');
+    }
+
+    const newsApiArticles = newsApiRaw
+      .filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com')
+      .map(a => formatNewsAPIArticle(a, country, category));
+    const worldNewsArticles = worldNewsRaw.map(a => formatWorldNewsAPIArticle(a, country, category, true));
+    const gNewsArticles = gNewsRaw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category, true));
+    const newsDataArticles = newsDataRaw.filter(a => a.title && a.title !== '[Removed]').map(a => formatNewsDataArticle(a, country, category, true));
+    const currentsArticles = currentsRaw.filter(a => a.title && a.url).map(a => formatCurrentsAPIArticle(a, country, category, true));
+    const mediaStackArticles = mediaStackRaw.filter(a => a.title && a.url).map(a => formatMediaStackArticle(a, country, category, MEDIASTACK_NATIVE_CATS.has(category)));
+    const googleNewsArticles = googleNewsRaw.filter(a => a.title).map(a => formatGoogleNewsArticle(a, country, category));
+
+    // Merge parallel results; dedup by URL so overlapping wire service articles aren't doubled
+    const seenUrls = new Set();
+    for (const batch of [newsApiArticles, worldNewsArticles, gNewsArticles, newsDataArticles, currentsArticles, mediaStackArticles, googleNewsArticles]) {
+      for (const article of batch) {
+        if (!seenUrls.has(article.url)) {
+          seenUrls.add(article.url);
+          formattedArticles.push(article);
+        }
       }
-      // Guardian fallback when other APIs return too few results
-      if (trendingArticles.length < 10 && GUARDIAN_API_KEY) {
-        console.log('  Trending Guardian fallback');
-        incrementApiCounter('guardian');
-        const gRaw = await fetchFromGuardian('world', 'politics', GUARDIAN_API_KEY, {}).catch(() => []);
-        trendingArticles = [...trendingArticles, ...gRaw.map(r => formatGuardianArticle(r, 'world', 'trending'))];
+    }
+
+    console.log(`  Parallel result: ${newsApiArticles.length} NewsAPI + ${worldNewsArticles.length} WorldNews + ${gNewsArticles.length} GNews + ${newsDataArticles.length} NewsData + ${currentsArticles.length} Currents + ${mediaStackArticles.length} MediaStack + ${googleNewsArticles.length} Google News = ${formattedArticles.length} unique`);
+
+    // â”€â”€ 4. Guardian (priority for AU/GB/US, fallback if < 12) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Threshold reduced from 20 â†’ 12 to limit Guardian's role as a de-facto primary
+    // source. Currents API and MediaStack now fill coverage gaps first (above), so
+    // Guardian is reserved for genuinely thin-coverage pairs.
+    // If Guardian articles are still dominating, check whether NewsAPI/WorldNewsAPI/
+    // NewsData/Currents keys are set and not exhausted.
+    if (GUARDIAN_API_KEY && (guardianPriorityCountry || formattedArticles.length < 12)) {
+      calledSources.add('guardian');
+      incrementApiCounter('guardian');
+      console.log(`  [4] Guardian [${country}/${category}] (have ${formattedArticles.length} so far)`);
+      try {
+        const results = await fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: fromDateOnly });
+        const extra = results.map(r => formatGuardianArticle(r, country, category, true)).filter(a => !seenUrls.has(a.url));
+        formattedArticles = [...formattedArticles, ...extra];
+      } catch (err) {
+        console.error(`  Guardian failed:`, err.message);
       }
+    }
 
-      if (trendingArticles.length === 0) {
-        return res.status(200).json({ status: 'ok', articles: [], totalResults: 0, cached: false });
-      }
-
-      // Rank by authority + coverage, dedup similar stories, take top 10
-      const top10 = rankAndDeduplicateArticles(trendingArticles, { usePopularity: true })
-        .map(({ _coverage, ...rest }) => rest)
-        .slice(0, 10);
-
-      // Generate AI summaries (with per-article cache to avoid re-generating on refresh)
-      if (HAS_LLM && top10.length > 0) {
-        await Promise.all(top10.slice(0, MAX_SUMMARY_ARTICLES).map(async (article) => {
-          try {
-            const summary = await generateSummaryCached(article, LLM_KEYS);
-            if (summary) article.summary_points = summary;
-          } catch (err) {
-            console.error('Trending summary failed:', err.message);
+    // â”€â”€ 5. RSS feeds (Caixin, Nikkei, MercoPress, Arab News, Japan Times â€¦) â”€â”€
+    {
+      const applicableFeeds = RSS_SOURCES.filter(f => {
+        if (!f.url || !f.countries.has(country)) return false;
+        if (RSS_WELL_SERVED_COUNTRIES.has(country) && formattedArticles.length >= 25) return false;
+        return true;
+      });
+      if (applicableFeeds.length > 0) {
+        console.log(`  [5] RSS [${country}/${category}]: ${applicableFeeds.map(f => f.name).join(', ')}`);
+        const rssResults = await Promise.allSettled(
+          applicableFeeds.map(f => fetchRSSFeed(f.url).then(items =>
+            items.map(item => formatRSSArticle(item, f, country, category))
+          ))
+        );
+        for (const result of rssResults) {
+          if (result.status === 'fulfilled') {
+            formattedArticles = [...formattedArticles, ...result.value];
+          } else {
+            console.error(`  RSS feed failed:`, result.reason?.message);
           }
-        }));
-      }
-
-      CACHE[trendingCacheKey] = { timestamp: Date.now(), articles: top10 };
-      await setCache(trendingCacheKey, { timestamp: Date.now(), articles: top10 }, 8 * 3600);
-      return res.status(200).json({ status: 'ok', articles: top10, totalResults: top10.length, cached: false });
-    } catch (error) {
-      console.error('Trending fetch error:', error);
-      return res.status(500).json({ error: 'Failed to fetch trending news' });
-    }
-  }
-
-  const countryList = Array.isArray(countries) ? countries : [countries || 'us'];
-  const categoryList = Array.isArray(categories) ? categories : [categories || 'technology'];
-  const sourceFingerprint = getSourceFingerprint(userSources);
-
-  // Expand the 'all' wildcard category to every real category so that existing
-  // per-pair fetching, caching, and filtering logic works without modification.
-  const ALL_REAL_CATEGORIES = ['health-tech-science', 'business', 'sports', 'entertainment', 'politics'];
-  const effectiveCategoryList = [...new Set(categoryList.flatMap(c => c === 'all' ? ALL_REAL_CATEGORIES : [c]))];
-
-  try {
-    // ── Fetch all country/category pairs in PARALLEL ──────────────────────
-    // Previously sequential: each pair waited for the previous to finish.
-    // With 3 countries × 3 categories = 9 pairs of up to 6 API calls each,
-    // parallelization dramatically reduces total response time.
-    const pairs = [];
-    for (const country of countryList) {
-      for (const category of effectiveCategoryList) {
-        pairs.push({ country, category });
-      }
-    }
-
-    const pairResults = await Promise.allSettled(
-      pairs.map(({ country, category }) =>
-        fetchCountryCategoryPair(country, category, {
-          NEWS_API_KEY, WORLD_NEWS_API_KEY, NEWS_DATA_API_KEY, GUARDIAN_API_KEY, GNEWS_API_KEY,
-          MEDIASTACK_API_KEY, CURRENTS_API_KEY,
-          activeDomains, activeSourceIds, fromISO, fromDateOnly, usePopularitySort,
-          rangeHours, dateRange, sourceFingerprint, showNonEnglish,
-        })
-      )
-    );
-
-    const allArticles = [];
-    // Track country/category pairs that returned very few articles (coverage gaps)
-    const lowCoverage = [];
-    const LOW_COVERAGE_THRESHOLD = 3;
-    for (let i = 0; i < pairResults.length; i++) {
-      const result = pairResults[i];
-      if (result.status === 'fulfilled' && Array.isArray(result.value)) {
-        const count = result.value.length;
-        // Flag non-world pairs with very few articles as low-coverage
-        if (count <= LOW_COVERAGE_THRESHOLD && pairs[i].country !== 'world') {
-          lowCoverage.push({ country: pairs[i].country, category: pairs[i].category, count });
         }
-        allArticles.push(...result.value);
-      } else if (result.status === 'rejected') {
-        console.error('Pair fetch failed:', result.reason?.message);
       }
     }
 
-    // Rank ALL articles together by authority + coverage + freshness + depth + category
-    const singleCategory = effectiveCategoryList.length === 1 ? effectiveCategoryList[0] : null;
-    let rankedArticles = rankAndDeduplicateArticles(allArticles, { usePopularity: usePopularitySort, category: singleCategory, rangeHours });
+    // â”€â”€ Relevance filter constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Defined here (before the category filter) so both the category rescue pass
+    // and the country filter section can reference them.
+    const MIN_ARTICLES = 15;
+    const MIN_COUNTRY_SCORE = 2;
+    // Below this threshold, the category rescue pass and retry/backfill use relaxed
+    // rules to recover articles that would otherwise be dropped for underserved pairs.
+    const LOW_COVERAGE_FLOOR = 8;
 
-    // Post-dedup fill-back: if deduplication reduced the count below 10, add back
-    // the highest-quality dedup-losers (articles from merged clusters that weren't
-    // chosen as the cluster representative) until we reach 10.
-    const DISPLAY_MIN = 10;
-    if (rankedArticles.length < DISPLAY_MIN && allArticles.length > rankedArticles.length) {
-      const rankedUrls = new Set(rankedArticles.map(a => a.url).filter(Boolean));
-      const extras = allArticles
-        .filter(a => a.url && !rankedUrls.has(a.url))
-        .slice(0, DISPLAY_MIN - rankedArticles.length);
-      if (extras.length > 0) {
-        console.log(`  Post-dedup fill: adding ${extras.length} dedup-losers to reach ${DISPLAY_MIN}`);
-        rankedArticles = [...rankedArticles, ...extras];
+    // â”€â”€ Category relevance filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const beforeCatFilter = formattedArticles.length;
+    // Snapshot pre-filter list so we can run a rescue pass below if coverage is thin.
+    const preFilterArticles = formattedArticles;
+    formattedArticles = formattedArticles.filter(a => {
+      if (articleMatchesCategory(a, category)) return true;
+      // Country-in-title bypass: allow articles that explicitly mention the country
+      // in the headline, but only if they also have at least one weak category signal.
+      // Previously any country-in-title article bypassed the category check entirely,
+      // allowing e.g. "Brazil economy" articles to appear in a sports feed.
+      if (country !== 'world' && category !== 'world') {
+        const { inTitle } = articleMentionsCountry(a, country);
+        if (!inTitle) return false;
+        const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
+        if (!catKeywords) return true; // unknown category â€” allow through
+        const text = `${(a.title || '')} ${(a.description || '')}`.toLowerCase();
+        return catKeywords.strong.some(kw => text.includes(kw)) ||
+          catKeywords.weak.some(kw => text.includes(kw));
       }
+      return false;
+    });
+    if (formattedArticles.length < beforeCatFilter) {
+      console.log(`  Category filter: kept ${formattedArticles.length}/${beforeCatFilter} for [${category}]`);
     }
 
-    // Strip internal fields before sending to the client
-    const cleanArticles = rankedArticles.map(({ _meta, _coverage, _countryScore, _matchesCategory, _nativeCategory, ...rest }) => rest);
-
-    // ── Enforce requested date window ────────────────────────────────────────
-    // The per-pair backfill widens the time window (e.g. 24h → 72h) to ensure
-    // enough articles are returned. After ranking across all pairs we re-apply
-    // the original date constraint so that stale articles don't appear in the
-    // "Last 24 Hours" feed.
-    // Threshold: for 24h queries enforce aggressively (≥5 suffices); for wider
-    // windows keep the original ≥10 floor to avoid near-empty result sets.
-    let finalArticles = cleanArticles;
-    if (fromDate) {
-      const fromTime = fromDate.getTime();
-      const inWindow = cleanArticles.filter(a => {
-        if (!a.publishedAt) return true; // no date metadata — keep
-        return new Date(a.publishedAt).getTime() >= fromTime;
+    // â”€â”€ Category rescue pass (low-coverage safety net) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // If the strict category filter left very few articles, recover articles that
+    // mention the country in the headline â€” the old bypass behaviour, but only for
+    // truly underserved pairs. This handles cases where domain-specific vocabulary
+    // (e.g. "malaria eradication programme" for health, or local political terms)
+    // doesn't match our generic keyword lists.
+    if (formattedArticles.length < LOW_COVERAGE_FLOOR && country !== 'world' && category !== 'world') {
+      const alreadyKept = new Set(formattedArticles.map(a => a.url).filter(Boolean));
+      const rescued = preFilterArticles.filter(a => {
+        if (a.url && alreadyKept.has(a.url)) return false;
+        const { inTitle } = articleMentionsCountry(a, country);
+        return inTitle; // country in title is enough when we're starved for coverage
       });
-      const ENFORCE_MIN = rangeHours && rangeHours <= 24 ? 5 : 10;
-      if (inWindow.length >= ENFORCE_MIN) {
-        finalArticles = inWindow;
-      } else if (inWindow.length > 0) {
-        // Some in-window articles exist but below the floor — use them and
-        // top up with the least-stale out-of-window articles to reach the floor.
-        const outside = cleanArticles
-          .filter(a => a.publishedAt && new Date(a.publishedAt).getTime() < fromTime)
-          .slice(0, ENFORCE_MIN - inWindow.length);
-        finalArticles = [...inWindow, ...outside];
+      if (rescued.length > 0) {
+        formattedArticles = [...formattedArticles, ...rescued];
+        console.log(`  Category rescue: added ${rescued.length} country-in-title articles (low-coverage pair)`);
       }
     }
 
-    // AI summaries for the top final ranked articles (up to MAX_SUMMARY_ARTICLES).
-    // Previously summaries were generated per-pair BEFORE ranking, wasting LLM calls
-    // on articles that would later be filtered, deduplicated, or ranked below the fold.
-    if (HAS_LLM && finalArticles.length > 0) {
-      await Promise.all(finalArticles.slice(0, MAX_SUMMARY_ARTICLES).map(async (article) => {
-        try {
-          const summary = await generateSummary(article, LLM_KEYS);
-          if (summary) article.summary_points = summary;
-        } catch (err) {
-          console.error('Summary failed:', err.message);
-        }
-      }));
-    }
-
-    evictCacheIfNeeded();
-
-    return res.status(200).json({
-      status: 'ok',
-      articles: finalArticles,
-      totalResults: finalArticles.length,
-      cached: false,
-      lowCoverage: lowCoverage.length > 0 ? lowCoverage : undefined,
-    });
-
-  } catch (error) {
-    console.error('News fetch error:', error);
-    return res.status(500).json({ error: 'Failed to fetch news' });
-  }
-}
-
-// ── In-flight request deduplication ───────────────────────────────────────
-// If two requests for the same country/category pair arrive simultaneously
-// (e.g. at a cache-slot boundary), only one fires the API cascade — the
-// second awaits the first promise instead of launching its own API calls.
-const IN_FLIGHT_REQUESTS = new Map();
-
-// ── Fetch a single country/category pair ──────────────────────────────────
-// Thin dispatcher: checks cache, deduplicates in-flight requests, delegates
-// to _doFetchPair for the actual API work.
-async function fetchCountryCategoryPair(country, category, ctx) {
-  const { dateRange, sourceFingerprint, showNonEnglish } = ctx;
-  const cacheKey = getCacheKey(country, category, dateRange, sourceFingerprint, showNonEnglish);
-
-  const cachedEntry = await getCache(cacheKey);
-
-  // If cache is valid AND no refresh is needed, return cached articles directly
-  if (cachedEntry && !isRefreshNeeded(cachedEntry)) {
-    console.log(`Cache HIT (fresh): ${cacheKey}`);
-    return cachedEntry.articles;
-  }
-
-  // Deduplicate: return the in-flight promise if one already exists for this key
-  if (IN_FLIGHT_REQUESTS.has(cacheKey)) {
-    console.log(`In-flight dedup HIT: ${cacheKey}`);
-    return IN_FLIGHT_REQUESTS.get(cacheKey);
-  }
-
-  const reason = cachedEntry ? 'refresh needed' : 'cache miss';
-  console.log(`Cache ${reason}: ${cacheKey} — fetching fresh data`);
-  // Pass existing cached articles so _doFetchPair can merge into them
-  const existingArticles = cachedEntry ? cachedEntry.articles : [];
-  const promise = _doFetchPair(cacheKey, country, category, ctx, existingArticles);
-  IN_FLIGHT_REQUESTS.set(cacheKey, promise);
-  promise.finally(() => IN_FLIGHT_REQUESTS.delete(cacheKey));
-  return promise;
-}
-
-// Inner implementation — all API cascade logic lives here. Registered in
-// IN_FLIGHT_REQUESTS so concurrent requests for the same key share one result.
-async function _doFetchPair(cacheKey, country, category, ctx, existingArticles = []) {
-  const {
-    NEWS_API_KEY, WORLD_NEWS_API_KEY, NEWS_DATA_API_KEY, GUARDIAN_API_KEY, GNEWS_API_KEY,
-    MEDIASTACK_API_KEY, CURRENTS_API_KEY,
-    activeDomains, activeSourceIds, fromISO, fromDateOnly, usePopularitySort,
-    rangeHours, dateRange, showNonEnglish,
-  } = ctx;
-
-  // For non-English-primary countries, automatically include native-language articles
-  // alongside English coverage so users get local perspectives without needing a toggle.
-  // English-primary countries (US/GB/AU/CA/NZ/IE) remain English-only unless the
-  // caller explicitly requests all languages.
-  const effectiveShowNonEnglish = !ENGLISH_PRIMARY_COUNTRIES.has(country) ? true : showNonEnglish;
-
-  let formattedArticles = [];
-
-  // Track which secondary sources were consulted so the post-filter retry
-  // (Option A) can call only the ones that were skipped by the raw-count gate.
-  const calledSources = new Set();
-
-  // ── Unified parallel first pass for ALL countries ────────────────────────
-  // NewsAPI + WorldNewsAPI + GNews + NewsData.io fire simultaneously regardless
-  // of country type for maximum article coverage and source diversity.
-  // This replaces the old two-branch strategy (sequential for English-dominant
-  // countries, parallel for others) — the sequential approach was the root cause
-  // of underserved results: NewsAPI alone returning 15+ raw articles would skip
-  // WorldNewsAPI and GNews entirely, and those 15 raw articles could collapse to
-  // 0-3 after category+country filtering with no fallback left.
-  //
-  // NewsData.io is now included in the parallel pass (instead of a deferred
-  // waterfall step) to bolster article volume from the start — it covers 100+
-  // countries including many not supported by NewsAPI.
-  //
-  // English-dominant countries (US/GB/AU/CA/NZ/IE) keep the trusted-domain filter
-  // on NewsAPI so quality is maintained; non-English-dominant countries drop it
-  // (skipDomains) so NewsAPI searches its full index rather than being restricted
-  // to US/UK outlets that publish very few articles about smaller countries.
-  //
-  // Well-covered countries (NEWSAPI_FIRST_PASS_COUNTRIES) skip WorldNewsAPI/GNews
-  // in this pass to conserve their daily quotas — the post-filter retry below
-  // will call them as a safety net if article count falls below MIN_ARTICLES.
-  const guardianPriorityCountry = country === 'au' || country === 'gb' || country === 'us';
-  const skipDomains = !RSS_WELL_SERVED_COUNTRIES.has(country) && country !== 'world';
-  const skipSecondaryAPIs = NEWSAPI_FIRST_PASS_COUNTRIES.has(country);
-
-  console.log(`  [1+2+3+6+7+8] Parallel fetch [${country}/${category}]${skipDomains ? ' (skipDomains)' : ''}${skipSecondaryAPIs ? ' (NewsAPI-first)' : ''}${effectiveShowNonEnglish ? ' (bilingual)' : ''}`);
-  // MediaStack: non-English specialist, very low quota (~16/day free).
-  // Only call when showNonEnglish=true and country is not an English-primary well-served country.
-  const useMediaStack = MEDIASTACK_API_KEY && effectiveShowNonEnglish && !RSS_WELL_SERVED_COUNTRIES.has(country);
-  const [newsApiRaw, worldNewsRaw, gNewsRaw, newsDataRaw, currentsRaw, mediaStackRaw] = await Promise.all([
-    (country === 'world' || NEWS_API_SUPPORTED_COUNTRIES.has(country))
-      ? fetchFromNewsAPI(country, category, NEWS_API_KEY, activeDomains, activeSourceIds, { from: fromISO, sortByPopularity: usePopularitySort, skipDomains, showNonEnglish: effectiveShowNonEnglish })
-        .catch(err => { console.error('  NewsAPI failed:', err.message); return []; })
-      : Promise.resolve([]),
-    (!skipSecondaryAPIs && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country)))
-      ? fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
-        .catch(err => { console.error('  WorldNewsAPI failed:', err.message); return []; })
-      : Promise.resolve([]),
-    (!skipSecondaryAPIs && GNEWS_API_KEY)
-      ? fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
-        .catch(err => { console.error('  GNews failed:', err.message); return []; })
-      : Promise.resolve([]),
-    // NewsData.io in the parallel pass — broadest country coverage (100+), bolsters
-    // article volume especially for non-English and underserved markets.
-    (NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country)))
-      ? fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly, showNonEnglish: effectiveShowNonEnglish })
-        .catch(err => { console.error('  NewsData failed:', err.message); return []; })
-      : Promise.resolve([]),
-    // Currents API — 600 req/day free; general fallback for additional source diversity.
-    CURRENTS_API_KEY
-      ? fetchFromCurrentsAPI(country, category, CURRENTS_API_KEY, { from: fromISO, showNonEnglish: effectiveShowNonEnglish })
-        .catch(err => { console.error('  Currents failed:', err.message); return []; })
-      : Promise.resolve([]),
-    // MediaStack — ~16 req/day free; non-English specialist; skipped for English-primary countries.
-    useMediaStack
-      ? fetchFromMediaStack(country, category, MEDIASTACK_API_KEY, { from: fromISO })
-        .catch(err => { console.error('  MediaStack failed:', err.message); return []; })
-      : Promise.resolve([]),
-  ]);
-
-  calledSources.add('newsapi');
-  incrementApiCounter('newsapi');
-  if (!skipSecondaryAPIs && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) {
-    calledSources.add('worldnews');
-    incrementApiCounter('worldnews');
-  }
-  if (!skipSecondaryAPIs && GNEWS_API_KEY) {
-    calledSources.add('gnews');
-    incrementApiCounter('gnews');
-  }
-  if (NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
-    calledSources.add('newsdata');
-    incrementApiCounter('newsdata');
-  }
-  if (CURRENTS_API_KEY) {
-    calledSources.add('currents');
-    incrementApiCounter('currents');
-  }
-  if (useMediaStack) {
-    calledSources.add('mediastack');
-    incrementApiCounter('mediastack');
-  }
-
-  const newsApiArticles = newsApiRaw
-    .filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com')
-    .map(a => formatNewsAPIArticle(a, country, category));
-  const worldNewsArticles = worldNewsRaw.map(a => formatWorldNewsAPIArticle(a, country, category, true));
-  const gNewsArticles = gNewsRaw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category, true));
-  const newsDataArticles = newsDataRaw.filter(a => a.title && a.title !== '[Removed]').map(a => formatNewsDataArticle(a, country, category, true));
-  const currentsArticles = currentsRaw.filter(a => a.title && a.url).map(a => formatCurrentsAPIArticle(a, country, category, true));
-  const mediaStackArticles = mediaStackRaw.filter(a => a.title && a.url).map(a => formatMediaStackArticle(a, country, category, MEDIASTACK_NATIVE_CATS.has(category)));
-
-  // Merge parallel results; dedup by URL so overlapping wire service articles aren't doubled
-  const seenUrls = new Set();
-  for (const batch of [newsApiArticles, worldNewsArticles, gNewsArticles, newsDataArticles, currentsArticles, mediaStackArticles]) {
-    for (const article of batch) {
-      if (!seenUrls.has(article.url)) {
-        seenUrls.add(article.url);
-        formattedArticles.push(article);
-      }
-    }
-  }
-  console.log(`  Parallel result: ${newsApiArticles.length} NewsAPI + ${worldNewsArticles.length} WorldNews + ${gNewsArticles.length} GNews + ${newsDataArticles.length} NewsData + ${currentsArticles.length} Currents + ${mediaStackArticles.length} MediaStack = ${formattedArticles.length} unique`);
-
-  // ── 4. Guardian (priority for AU/GB/US, fallback if < 12) ─────────────
-  // Threshold reduced from 20 → 12 to limit Guardian's role as a de-facto primary
-  // source. Currents API and MediaStack now fill coverage gaps first (above), so
-  // Guardian is reserved for genuinely thin-coverage pairs.
-  // If Guardian articles are still dominating, check whether NewsAPI/WorldNewsAPI/
-  // NewsData/Currents keys are set and not exhausted.
-  if (GUARDIAN_API_KEY && (guardianPriorityCountry || formattedArticles.length < 12)) {
-    calledSources.add('guardian');
-    incrementApiCounter('guardian');
-    console.log(`  [4] Guardian [${country}/${category}] (have ${formattedArticles.length} so far)`);
-    try {
-      const results = await fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: fromDateOnly });
-      const extra = results.map(r => formatGuardianArticle(r, country, category, true)).filter(a => !seenUrls.has(a.url));
-      formattedArticles = [...formattedArticles, ...extra];
-    } catch (err) {
-      console.error(`  Guardian failed:`, err.message);
-    }
-  }
-
-  // ── 5. RSS feeds (Caixin, Nikkei, MercoPress, Arab News, Japan Times …) ──
-  {
-    const applicableFeeds = RSS_SOURCES.filter(f => {
-      if (!f.url || !f.countries.has(country)) return false;
-      if (RSS_WELL_SERVED_COUNTRIES.has(country) && formattedArticles.length >= 25) return false;
-      return true;
-    });
-    if (applicableFeeds.length > 0) {
-      console.log(`  [5] RSS [${country}/${category}]: ${applicableFeeds.map(f => f.name).join(', ')}`);
-      const rssResults = await Promise.allSettled(
-        applicableFeeds.map(f => fetchRSSFeed(f.url).then(items =>
-          items.map(item => formatRSSArticle(item, f, country, category))
-        ))
-      );
-      for (const result of rssResults) {
-        if (result.status === 'fulfilled') {
-          formattedArticles = [...formattedArticles, ...result.value];
-        } else {
-          console.error(`  RSS feed failed:`, result.reason?.message);
-        }
-      }
-    }
-  }
-
-  // ── Relevance filter constants ────────────────────────────────────────
-  // Defined here (before the category filter) so both the category rescue pass
-  // and the country filter section can reference them.
-  const MIN_ARTICLES = 15;
-  const MIN_COUNTRY_SCORE = 2;
-  // Below this threshold, the category rescue pass and retry/backfill use relaxed
-  // rules to recover articles that would otherwise be dropped for underserved pairs.
-  const LOW_COVERAGE_FLOOR = 8;
-
-  // ── Category relevance filter ────────────────────────────────────────
-  const beforeCatFilter = formattedArticles.length;
-  // Snapshot pre-filter list so we can run a rescue pass below if coverage is thin.
-  const preFilterArticles = formattedArticles;
-  formattedArticles = formattedArticles.filter(a => {
-    if (articleMatchesCategory(a, category)) return true;
-    // Country-in-title bypass: allow articles that explicitly mention the country
-    // in the headline, but only if they also have at least one weak category signal.
-    // Previously any country-in-title article bypassed the category check entirely,
-    // allowing e.g. "Brazil economy" articles to appear in a sports feed.
-    if (country !== 'world' && category !== 'world') {
-      const { inTitle } = articleMentionsCountry(a, country);
-      if (!inTitle) return false;
-      const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
-      if (!catKeywords) return true; // unknown category — allow through
-      const text = `${(a.title || '')} ${(a.description || '')}`.toLowerCase();
-      return catKeywords.strong.some(kw => text.includes(kw)) ||
-        catKeywords.weak.some(kw => text.includes(kw));
-    }
-    return false;
-  });
-  if (formattedArticles.length < beforeCatFilter) {
-    console.log(`  Category filter: kept ${formattedArticles.length}/${beforeCatFilter} for [${category}]`);
-  }
-
-  // ── Category rescue pass (low-coverage safety net) ────────────────────
-  // If the strict category filter left very few articles, recover articles that
-  // mention the country in the headline — the old bypass behaviour, but only for
-  // truly underserved pairs. This handles cases where domain-specific vocabulary
-  // (e.g. "malaria eradication programme" for health, or local political terms)
-  // doesn't match our generic keyword lists.
-  if (formattedArticles.length < LOW_COVERAGE_FLOOR && country !== 'world' && category !== 'world') {
-    const alreadyKept = new Set(formattedArticles.map(a => a.url).filter(Boolean));
-    const rescued = preFilterArticles.filter(a => {
-      if (a.url && alreadyKept.has(a.url)) return false;
-      const { inTitle } = articleMentionsCountry(a, country);
-      return inTitle; // country in title is enough when we're starved for coverage
-    });
-    if (rescued.length > 0) {
-      formattedArticles = [...formattedArticles, ...rescued];
-      console.log(`  Category rescue: added ${rescued.length} country-in-title articles (low-coverage pair)`);
-    }
-  }
-
-  // ── Country relevance filter (multi-signal) ─────────────────────────
-  // Uses articleCountryScore() which considers title mentions, body mentions,
-  // term frequency (multiple distinct keywords), and source-country metadata
-  // (with special handling for international wire services).
-  // (MIN_ARTICLES, MIN_COUNTRY_SCORE, LOW_COVERAGE_FLOOR defined above)
-  if (country !== 'world' && formattedArticles.length > 0) {
-    const scored = formattedArticles.map(a => {
-      // Pass category to enable the combined country+category title bonus
-      const score = articleCountryScore(a, country, category);
-      a._countryScore = score;
-      return { article: a, score };
-    });
-    scored.sort((a, b) => b.score - a.score);
-    const relevant = scored.filter(s => s.score >= MIN_COUNTRY_SCORE);
-    const marginal = scored.filter(s => s.score > 0 && s.score < MIN_COUNTRY_SCORE);
-    const filler = scored.filter(s => s.score === 0);
-
-    if (relevant.length >= MIN_ARTICLES) {
-      formattedArticles = relevant.map(s => s.article);
-    } else {
-      // Pad with marginal (weak country mention) then true filler only as last resort.
-      // Mark padding with a depressed _countryScore so ranking doesn't over-reward them.
-      const needed = MIN_ARTICLES - relevant.length;
-      const padding = [...marginal, ...filler].slice(0, needed);
-      padding.forEach(s => { s.article._countryScore = 0.5; });
-      if (padding.length > 0) {
-        console.log(`  Country filter: ${relevant.length} relevant + ${padding.length} padding (marginal/filler) for [${country}]`);
-      }
-      formattedArticles = [...relevant, ...padding].map(s => s.article);
-    }
-    console.log(`  Country filter: ${relevant.length} relevant (score>=${MIN_COUNTRY_SCORE}) of ${scored.length} for [${country}]`);
-  }
-
-  // ── Post-filter source retry (Option A) ────────────────────────────────
-  // The waterfall above stops calling secondary sources once raw article count
-  // reaches 15. But for underserved countries (e.g. Brazil, Nigeria, Turkey)
-  // those 15 raw articles can collapse to 2–5 after category+country filtering.
-  // If that happens, call any sources that were skipped by the raw-count gate,
-  // giving the pipeline a second chance to gather more relevant material.
-  if (formattedArticles.length < MIN_ARTICLES) {
-    console.log(`  Post-filter retry: only ${formattedArticles.length} relevant — calling skipped sources`);
-    const existingUrls = new Set(formattedArticles.map(a => a.url));
-    const retryPromises = [];
-
-    if (!calledSources.has('worldnews') && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) {
-      retryPromises.push(
-        fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
-          .then(raw => raw.map(a => formatWorldNewsAPIArticle(a, country, category, true)))
-          .catch(() => [])
-      );
-    }
-    if (!calledSources.has('newsdata') && NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
-      retryPromises.push(
-        fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly, showNonEnglish: effectiveShowNonEnglish })
-          .then(raw => raw.filter(a => a.title && a.title !== '[Removed]').map(a => formatNewsDataArticle(a, country, category, true)))
-          .catch(() => [])
-      );
-    }
-    if (!calledSources.has('guardian') && GUARDIAN_API_KEY) {
-      retryPromises.push(
-        fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: fromDateOnly })
-          .then(r => r.map(r => formatGuardianArticle(r, country, category, true)))
-          .catch(() => [])
-      );
-    }
-    if (!calledSources.has('gnews') && GNEWS_API_KEY) {
-      retryPromises.push(
-        fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
-          .then(raw => raw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category, true)))
-          .catch(() => [])
-      );
-    }
-
-    if (retryPromises.length > 0) {
-      const retryResults = await Promise.all(retryPromises);
-      let retryArticles = retryResults.flat().filter(a => !existingUrls.has(a.url));
-
-      // Apply same category + country filters to retry batch
-      retryArticles = retryArticles.filter(a => {
-        if (articleMatchesCategory(a, category)) return true;
-        if (country !== 'world' && category !== 'world') {
-          const { inTitle } = articleMentionsCountry(a, country);
-          if (!inTitle) return false;
-          const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
-          if (!catKeywords) return true;
-          const text = `${(a.title || '')} ${(a.description || '')}`.toLowerCase();
-          return catKeywords.strong.some(kw => text.includes(kw)) ||
-            catKeywords.weak.some(kw => text.includes(kw));
-        }
-        return false;
+    // â”€â”€ Country relevance filter (multi-signal) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Uses articleCountryScore() which considers title mentions, body mentions,
+    // term frequency (multiple distinct keywords), and source-country metadata
+    // (with special handling for international wire services).
+    // (MIN_ARTICLES, MIN_COUNTRY_SCORE, LOW_COVERAGE_FLOOR defined above)
+    if (country !== 'world' && formattedArticles.length > 0) {
+      const scored = formattedArticles.map(a => {
+        // Pass category to enable the combined country+category title bonus
+        const score = articleCountryScore(a, country, category);
+        a._countryScore = score;
+        return { article: a, score };
       });
-      if (country !== 'world') {
-        // If already well below the floor, relax to score >= 1 so that score-1
-        // articles (single weak body mention) are included as last-resort coverage.
-        const retryScoreThreshold = formattedArticles.length < LOW_COVERAGE_FLOOR
-          ? 1
-          : MIN_COUNTRY_SCORE;
-        retryArticles = retryArticles.filter(a => {
-          const score = articleCountryScore(a, country, category);
-          a._countryScore = score;
-          return score >= retryScoreThreshold;
-        });
-      }
+      scored.sort((a, b) => b.score - a.score);
+      const relevant = scored.filter(s => s.score >= MIN_COUNTRY_SCORE);
+      const marginal = scored.filter(s => s.score > 0 && s.score < MIN_COUNTRY_SCORE);
+      const filler = scored.filter(s => s.score === 0);
 
-      if (retryArticles.length > 0) {
-        formattedArticles = [...formattedArticles, ...retryArticles];
-        console.log(`  Post-filter retry: added ${retryArticles.length} articles (total now ${formattedArticles.length})`);
+      if (relevant.length >= MIN_ARTICLES) {
+        formattedArticles = relevant.map(s => s.article);
+      } else {
+        // Pad with marginal (weak country mention) then true filler only as last resort.
+        // Mark padding with a depressed _countryScore so ranking doesn't over-reward them.
+        const needed = MIN_ARTICLES - relevant.length;
+        const padding = [...marginal, ...filler].slice(0, needed);
+        padding.forEach(s => { s.article._countryScore = 0.5; });
+        if (padding.length > 0) {
+          console.log(`  Country filter: ${relevant.length} relevant + ${padding.length} padding (marginal/filler) for [${country}]`);
+        }
+        formattedArticles = [...relevant, ...padding].map(s => s.article);
       }
+      console.log(`  Country filter: ${relevant.length} relevant (score>=${MIN_COUNTRY_SCORE}) of ${scored.length} for [${country}]`);
     }
-  }
 
-  // ── Time-window backfill ─────────────────────────────────────────────
-  if (formattedArticles.length < MIN_ARTICLES && rangeHours && rangeHours < 720) {
-    // For short windows (24h, 3d) only widen by 2× instead of 3× to avoid
-    // introducing articles that are clearly outside the requested timeframe.
-    // Post-ranking date enforcement will trim any stragglers, but a tighter
-    // backfill means fewer stale articles competing for the top slots.
-    const backfillMultiplier = rangeHours <= 72 ? 2 : 3;
-    const widerHours = Math.min(rangeHours * backfillMultiplier, 720);
-    const widerFrom = new Date(Date.now() - widerHours * 60 * 60 * 1000);
-    const widerFromISO = widerFrom.toISOString();
-    console.log(`  Backfill: widening ${rangeHours}h → ${widerHours}h (have ${formattedArticles.length}, need ${MIN_ARTICLES})`);
-
-    try {
+    // â”€â”€ Post-filter source retry (Option A) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // The waterfall above stops calling secondary sources once raw article count
+    // reaches 15. But for underserved countries (e.g. Brazil, Nigeria, Turkey)
+    // those 15 raw articles can collapse to 2â€“5 after category+country filtering.
+    // If that happens, call any sources that were skipped by the raw-count gate,
+    // giving the pipeline a second chance to gather more relevant material.
+    if (formattedArticles.length < MIN_ARTICLES) {
+      console.log(`  Post-filter retry: only ${formattedArticles.length} relevant â€” calling skipped sources`);
       const existingUrls = new Set(formattedArticles.map(a => a.url));
+      const retryPromises = [];
 
-      // Backfill sources in parallel
-      const backfillPromises = [];
-      if (country === 'world' || NEWS_API_SUPPORTED_COUNTRIES.has(country)) {
-        backfillPromises.push(
-          fetchFromNewsAPI(country, category, NEWS_API_KEY, activeDomains, activeSourceIds, { from: widerFromISO, sortByPopularity: true })
-            .then(raw => raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com').map(a => formatNewsAPIArticle(a, country, category)))
+      if (!calledSources.has('worldnews') && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) {
+        retryPromises.push(
+          fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
+            .then(raw => raw.map(a => formatWorldNewsAPIArticle(a, country, category, true)))
             .catch(() => [])
         );
       }
-      if (GUARDIAN_API_KEY) {
-        backfillPromises.push(
-          fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: widerFromISO.split('T')[0] })
+      if (!calledSources.has('newsdata') && NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
+        retryPromises.push(
+          fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly, showNonEnglish: effectiveShowNonEnglish })
+            .then(raw => raw.filter(a => a.title && a.title !== '[Removed]').map(a => formatNewsDataArticle(a, country, category, true)))
+            .catch(() => [])
+        );
+      }
+      if (!calledSources.has('guardian') && GUARDIAN_API_KEY) {
+        retryPromises.push(
+          fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: fromDateOnly })
             .then(r => r.map(r => formatGuardianArticle(r, country, category, true)))
             .catch(() => [])
         );
       }
-      if (GNEWS_API_KEY) {
-        backfillPromises.push(
-          fetchFromGNews(country, category, GNEWS_API_KEY, { from: widerFromISO, sortByPopularity: true })
+      if (!calledSources.has('gnews') && GNEWS_API_KEY) {
+        retryPromises.push(
+          fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
             .then(raw => raw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category, true)))
             .catch(() => [])
         );
       }
 
-      const backfillResults = await Promise.all(backfillPromises);
-      let backfill = backfillResults.flat();
+      if (retryPromises.length > 0) {
+        const retryResults = await Promise.all(retryPromises);
+        let retryArticles = retryResults.flat().filter(a => !existingUrls.has(a.url));
 
-      // Apply same relaxed filter to backfill
-      backfill = backfill.filter(a => {
-        if (articleMatchesCategory(a, category)) return true;
-        if (country !== 'world' && category !== 'world') {
-          const { inTitle } = articleMentionsCountry(a, country);
-          if (!inTitle) return false;
-          const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
-          if (!catKeywords) return true;
-          const text = `${(a.title || '')} ${(a.description || '')}`.toLowerCase();
-          return catKeywords.strong.some(kw => text.includes(kw)) ||
-            catKeywords.weak.some(kw => text.includes(kw));
-        }
-        return false;
-      });
-      backfill = backfill.filter(a => !existingUrls.has(a.url));
-
-      if (country !== 'world') {
-        // Same relaxation as the retry path: use score >= 1 when coverage is thin.
-        const backfillScoreThreshold = formattedArticles.length < LOW_COVERAGE_FLOOR
-          ? 1
-          : MIN_COUNTRY_SCORE;
-        backfill = backfill.filter(a => {
-          const score = articleCountryScore(a, country, category);
-          a._countryScore = score;
-          return score >= backfillScoreThreshold;
+        // Apply same category + country filters to retry batch
+        retryArticles = retryArticles.filter(a => {
+          if (articleMatchesCategory(a, category)) return true;
+          if (country !== 'world' && category !== 'world') {
+            const { inTitle } = articleMentionsCountry(a, country);
+            if (!inTitle) return false;
+            const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
+            if (!catKeywords) return true;
+            const text = `${(a.title || '')} ${(a.description || '')}`.toLowerCase();
+            return catKeywords.strong.some(kw => text.includes(kw)) ||
+              catKeywords.weak.some(kw => text.includes(kw));
+          }
+          return false;
         });
-      }
+        if (country !== 'world') {
+          // If already well below the floor, relax to score >= 1 so that score-1
+          // articles (single weak body mention) are included as last-resort coverage.
+          const retryScoreThreshold = formattedArticles.length < LOW_COVERAGE_FLOOR
+            ? 1
+            : MIN_COUNTRY_SCORE;
+          retryArticles = retryArticles.filter(a => {
+            const score = articleCountryScore(a, country, category);
+            a._countryScore = score;
+            return score >= retryScoreThreshold;
+          });
+        }
 
-      if (backfill.length > 0) {
-        formattedArticles.push(...backfill);
-        console.log(`  Backfill: added ${backfill.length} older articles`);
+        if (retryArticles.length > 0) {
+          formattedArticles = [...formattedArticles, ...retryArticles];
+          console.log(`  Post-filter retry: added ${retryArticles.length} articles (total now ${formattedArticles.length})`);
+        }
       }
-    } catch (err) {
-      console.error(`  Backfill fetch failed:`, err.message);
     }
 
-    // ── Second-stage backfill (last resort for very short windows) ──────
-    // If after the 2× backfill we still have fewer than 5 articles in a
-    // 24h or 3d window, widen once more to 3× (e.g. 24h → 72h) so that
-    // genuinely underserved country+category pairs have a final safety net.
-    // This does NOT fire for well-served pairs (they already have enough).
-    const MIN_PAIR_RESULT = 5;
-    if (formattedArticles.length < MIN_PAIR_RESULT && rangeHours && rangeHours <= 72) {
-      const widerHours2 = Math.min(rangeHours * 3, 168); // cap at 7 days
-      const widerFrom2 = new Date(Date.now() - widerHours2 * 60 * 60 * 1000);
-      const widerFromISO2 = widerFrom2.toISOString();
-      console.log(`  Backfill stage-2: widening to ${widerHours2}h (have ${formattedArticles.length})`);
+    // â”€â”€ Time-window backfill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    if (formattedArticles.length < MIN_ARTICLES && rangeHours && rangeHours < 720) {
+      // For short windows (24h, 3d) only widen by 2Ã— instead of 3Ã— to avoid
+      // introducing articles that are clearly outside the requested timeframe.
+      // Post-ranking date enforcement will trim any stragglers, but a tighter
+      // backfill means fewer stale articles competing for the top slots.
+      const backfillMultiplier = rangeHours <= 72 ? 2 : 3;
+      const widerHours = Math.min(rangeHours * backfillMultiplier, 720);
+      const widerFrom = new Date(Date.now() - widerHours * 60 * 60 * 1000);
+      const widerFromISO = widerFrom.toISOString();
+      console.log(`  Backfill: widening ${rangeHours}h â†’ ${widerHours}h (have ${formattedArticles.length}, need ${MIN_ARTICLES})`);
+
       try {
-        const existingUrls2 = new Set(formattedArticles.map(a => a.url));
-        const backfillPromises2 = [];
+        const existingUrls = new Set(formattedArticles.map(a => a.url));
+
+        // Backfill sources in parallel
+        const backfillPromises = [];
         if (country === 'world' || NEWS_API_SUPPORTED_COUNTRIES.has(country)) {
-          backfillPromises2.push(
-            fetchFromNewsAPI(country, category, NEWS_API_KEY, activeDomains, activeSourceIds, { from: widerFromISO2, sortByPopularity: true })
+          backfillPromises.push(
+            fetchFromNewsAPI(country, category, NEWS_API_KEY, activeDomains, activeSourceIds, { from: widerFromISO, sortByPopularity: true })
               .then(raw => raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com').map(a => formatNewsAPIArticle(a, country, category)))
               .catch(() => [])
           );
         }
         if (GUARDIAN_API_KEY) {
-          backfillPromises2.push(
-            fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: widerFromISO2.split('T')[0] })
+          backfillPromises.push(
+            fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: widerFromISO.split('T')[0] })
               .then(r => r.map(r => formatGuardianArticle(r, country, category, true)))
               .catch(() => [])
           );
         }
         if (GNEWS_API_KEY) {
-          backfillPromises2.push(
-            fetchFromGNews(country, category, GNEWS_API_KEY, { from: widerFromISO2, sortByPopularity: true })
+          backfillPromises.push(
+            fetchFromGNews(country, category, GNEWS_API_KEY, { from: widerFromISO, sortByPopularity: true })
               .then(raw => raw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category, true)))
               .catch(() => [])
           );
         }
-        const backfillResults2 = await Promise.all(backfillPromises2);
-        let backfill2 = backfillResults2.flat().filter(a => !existingUrls2.has(a.url));
-        // Apply category filter — use the country-in-title bypass since we're desperate
-        backfill2 = backfill2.filter(a => {
+
+        const backfillResults = await Promise.all(backfillPromises);
+        let backfill = backfillResults.flat();
+
+        // Apply same relaxed filter to backfill
+        backfill = backfill.filter(a => {
           if (articleMatchesCategory(a, category)) return true;
-          if (country !== 'world') {
+          if (country !== 'world' && category !== 'world') {
             const { inTitle } = articleMentionsCountry(a, country);
-            return inTitle; // old bypass: country in title is enough at this stage
+            if (!inTitle) return false;
+            const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
+            if (!catKeywords) return true;
+            const text = `${(a.title || '')} ${(a.description || '')}`.toLowerCase();
+            return catKeywords.strong.some(kw => text.includes(kw)) ||
+              catKeywords.weak.some(kw => text.includes(kw));
           }
           return false;
         });
-        // Apply minimum score >= 1 (already the relaxed threshold for low coverage)
+        backfill = backfill.filter(a => !existingUrls.has(a.url));
+
         if (country !== 'world') {
-          backfill2 = backfill2.filter(a => {
+          // Same relaxation as the retry path: use score >= 1 when coverage is thin.
+          const backfillScoreThreshold = formattedArticles.length < LOW_COVERAGE_FLOOR
+            ? 1
+            : MIN_COUNTRY_SCORE;
+          backfill = backfill.filter(a => {
             const score = articleCountryScore(a, country, category);
             a._countryScore = score;
-            return score >= 1;
+            return score >= backfillScoreThreshold;
           });
         }
-        if (backfill2.length > 0) {
-          formattedArticles.push(...backfill2);
-          console.log(`  Backfill stage-2: added ${backfill2.length} articles (total ${formattedArticles.length})`);
+
+        if (backfill.length > 0) {
+          formattedArticles.push(...backfill);
+          console.log(`  Backfill: added ${backfill.length} older articles`);
         }
       } catch (err) {
-        console.error(`  Backfill stage-2 failed:`, err.message);
+        console.error(`  Backfill fetch failed:`, err.message);
+      }
+
+      // â”€â”€ Second-stage backfill (last resort for very short windows) â”€â”€â”€â”€â”€â”€
+      // If after the 2Ã— backfill we still have fewer than 5 articles in a
+      // 24h or 3d window, widen once more to 3Ã— (e.g. 24h â†’ 72h) so that
+      // genuinely underserved country+category pairs have a final safety net.
+      // This does NOT fire for well-served pairs (they already have enough).
+      const MIN_PAIR_RESULT = 5;
+      if (formattedArticles.length < MIN_PAIR_RESULT && rangeHours && rangeHours <= 72) {
+        const widerHours2 = Math.min(rangeHours * 3, 168); // cap at 7 days
+        const widerFrom2 = new Date(Date.now() - widerHours2 * 60 * 60 * 1000);
+        const widerFromISO2 = widerFrom2.toISOString();
+        console.log(`  Backfill stage-2: widening to ${widerHours2}h (have ${formattedArticles.length})`);
+        try {
+          const existingUrls2 = new Set(formattedArticles.map(a => a.url));
+          const backfillPromises2 = [];
+          if (country === 'world' || NEWS_API_SUPPORTED_COUNTRIES.has(country)) {
+            backfillPromises2.push(
+              fetchFromNewsAPI(country, category, NEWS_API_KEY, activeDomains, activeSourceIds, { from: widerFromISO2, sortByPopularity: true })
+                .then(raw => raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com').map(a => formatNewsAPIArticle(a, country, category)))
+                .catch(() => [])
+            );
+          }
+          if (GUARDIAN_API_KEY) {
+            backfillPromises2.push(
+              fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: widerFromISO2.split('T')[0] })
+                .then(r => r.map(r => formatGuardianArticle(r, country, category, true)))
+                .catch(() => [])
+            );
+          }
+          if (GNEWS_API_KEY) {
+            backfillPromises2.push(
+              fetchFromGNews(country, category, GNEWS_API_KEY, { from: widerFromISO2, sortByPopularity: true })
+                .then(raw => raw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category, true)))
+                .catch(() => [])
+            );
+          }
+          const backfillResults2 = await Promise.all(backfillPromises2);
+          let backfill2 = backfillResults2.flat().filter(a => !existingUrls2.has(a.url));
+          // Apply category filter â€” use the country-in-title bypass since we're desperate
+          backfill2 = backfill2.filter(a => {
+            if (articleMatchesCategory(a, category)) return true;
+            if (country !== 'world') {
+              const { inTitle } = articleMentionsCountry(a, country);
+              return inTitle; // old bypass: country in title is enough at this stage
+            }
+            return false;
+          });
+          // Apply minimum score >= 1 (already the relaxed threshold for low coverage)
+          if (country !== 'world') {
+            backfill2 = backfill2.filter(a => {
+              const score = articleCountryScore(a, country, category);
+              a._countryScore = score;
+              return score >= 1;
+            });
+          }
+          if (backfill2.length > 0) {
+            formattedArticles.push(...backfill2);
+            console.log(`  Backfill stage-2: added ${backfill2.length} articles (total ${formattedArticles.length})`);
+          }
+        } catch (err) {
+          console.error(`  Backfill stage-2 failed:`, err.message);
+        }
       }
     }
+
+    // Strip _meta (internal inference data) before caching but KEEP _countryScore.
+    // The ranking engine reads `a._countryScore ?? -1` to apply Signal 6; stripping it
+    // would cause all cached articles to receive a neutral score (4) regardless of how
+    // strongly they actually mention the requested country â€” making cache hits rank
+    // differently from fresh fetches.
+    const cleanForCache = formattedArticles.map(({ _meta, ...rest }) => rest);
+
+    // Merge fresh articles into existing cached pool (accumulate, don't replace)
+    const mergedPool = mergeArticles(existingArticles, cleanForCache);
+
+    // When any API is near its daily quota, double the TTL to reduce further fetches.
+    await setCache(cacheKey, { timestamp: Date.now(), lastFetchedAt: Date.now(), articles: mergedPool }, getEffectiveCacheTTL());
+    return mergedPool;
   }
-
-  // Strip _meta (internal inference data) before caching but KEEP _countryScore.
-  // The ranking engine reads `a._countryScore ?? -1` to apply Signal 6; stripping it
-  // would cause all cached articles to receive a neutral score (4) regardless of how
-  // strongly they actually mention the requested country — making cache hits rank
-  // differently from fresh fetches.
-  const cleanForCache = formattedArticles.map(({ _meta, ...rest }) => rest);
-
-  // Merge fresh articles into existing cached pool (accumulate, don't replace)
-  const mergedPool = mergeArticles(existingArticles, cleanForCache);
-
-  // When any API is near its daily quota, double the TTL to reduce further fetches.
-  await setCache(cacheKey, { timestamp: Date.now(), lastFetchedAt: Date.now(), articles: mergedPool }, getEffectiveCacheTTL());
-  return mergedPool;
 }
+module.exports = {
+  fetchNews,
+  _doFetchPair,
+  fetchCountryCategoryPair,
+  clearNewsCache,
+  getCacheStats,
+  setRateLimits
+};
