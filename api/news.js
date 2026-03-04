@@ -2620,31 +2620,31 @@ const GOOGLE_NEWS_LOCALE_MAP = {
   ke: { gl: 'KE', hl: 'en-KE', ceid: 'KE:en' },
   ph: { gl: 'PH', hl: 'en-PH', ceid: 'PH:en' },
   my: { gl: 'MY', hl: 'en-MY', ceid: 'MY:en' },
-  de: { gl: 'DE', hl: 'de',    ceid: 'DE:de' },
-  fr: { gl: 'FR', hl: 'fr',    ceid: 'FR:fr' },
-  es: { gl: 'ES', hl: 'es',    ceid: 'ES:es' },
-  it: { gl: 'IT', hl: 'it',    ceid: 'IT:it' },
-  nl: { gl: 'NL', hl: 'nl',    ceid: 'NL:nl' },
+  de: { gl: 'DE', hl: 'de', ceid: 'DE:de' },
+  fr: { gl: 'FR', hl: 'fr', ceid: 'FR:fr' },
+  es: { gl: 'ES', hl: 'es', ceid: 'ES:es' },
+  it: { gl: 'IT', hl: 'it', ceid: 'IT:it' },
+  nl: { gl: 'NL', hl: 'nl', ceid: 'NL:nl' },
   pt: { gl: 'PT', hl: 'pt-PT', ceid: 'PT:pt-150' },
   br: { gl: 'BR', hl: 'pt-BR', ceid: 'BR:pt-419' },
   mx: { gl: 'MX', hl: 'es-419', ceid: 'MX:es-419' },
   ar: { gl: 'AR', hl: 'es-419', ceid: 'AR:es-419' },
-  jp: { gl: 'JP', hl: 'ja',    ceid: 'JP:ja' },
-  kr: { gl: 'KR', hl: 'ko',    ceid: 'KR:ko' },
+  jp: { gl: 'JP', hl: 'ja', ceid: 'JP:ja' },
+  kr: { gl: 'KR', hl: 'ko', ceid: 'KR:ko' },
   cn: { gl: 'CN', hl: 'zh-CN', ceid: 'CN:zh-Hans' },
   tw: { gl: 'TW', hl: 'zh-TW', ceid: 'TW:zh-Hant' },
-  ru: { gl: 'RU', hl: 'ru',    ceid: 'RU:ru' },
-  pl: { gl: 'PL', hl: 'pl',    ceid: 'PL:pl' },
-  se: { gl: 'SE', hl: 'sv',    ceid: 'SE:sv' },
-  no: { gl: 'NO', hl: 'no',    ceid: 'NO:no' },
-  tr: { gl: 'TR', hl: 'tr',    ceid: 'TR:tr' },
-  il: { gl: 'IL', hl: 'he',    ceid: 'IL:he' },
-  ae: { gl: 'AE', hl: 'en',    ceid: 'AE:en' },
-  sa: { gl: 'SA', hl: 'ar',    ceid: 'SA:ar' },
-  eg: { gl: 'EG', hl: 'ar',    ceid: 'EG:ar' },
-  id: { gl: 'ID', hl: 'id',    ceid: 'ID:id' },
-  th: { gl: 'TH', hl: 'th',    ceid: 'TH:th' },
-  vn: { gl: 'VN', hl: 'vi',    ceid: 'VN:vi' },
+  ru: { gl: 'RU', hl: 'ru', ceid: 'RU:ru' },
+  pl: { gl: 'PL', hl: 'pl', ceid: 'PL:pl' },
+  se: { gl: 'SE', hl: 'sv', ceid: 'SE:sv' },
+  no: { gl: 'NO', hl: 'no', ceid: 'NO:no' },
+  tr: { gl: 'TR', hl: 'tr', ceid: 'TR:tr' },
+  il: { gl: 'IL', hl: 'he', ceid: 'IL:he' },
+  ae: { gl: 'AE', hl: 'en', ceid: 'AE:en' },
+  sa: { gl: 'SA', hl: 'ar', ceid: 'SA:ar' },
+  eg: { gl: 'EG', hl: 'ar', ceid: 'EG:ar' },
+  id: { gl: 'ID', hl: 'id', ceid: 'ID:id' },
+  th: { gl: 'TH', hl: 'th', ceid: 'TH:th' },
+  vn: { gl: 'VN', hl: 'vi', ceid: 'VN:vi' },
   pk: { gl: 'PK', hl: 'en-PK', ceid: 'PK:en' },
   bd: { gl: 'BD', hl: 'en-BD', ceid: 'BD:en' },
   world: { gl: 'US', hl: 'en-US', ceid: 'US:en' },
@@ -2656,23 +2656,23 @@ const GOOGLE_NEWS_LOCALE_MAP = {
 // Subcategories (gaming, film, tv, music, politics) have no native topic and
 // fall back to the search-based approach using GOOGLE_NEWS_CATEGORY_QUERY.
 const GOOGLE_NEWS_TOPIC_TOKENS = {
-  world:         'CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx1YlY4U0FtVnVHZ0pWVXlnQVAB',
-  business:      'CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx6TVdZU0FtVnVHZ0pWVXlnQVAB',
-  technology:    'CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FtVnVHZ0pIUWlnQVAB',
+  world: 'CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx1YlY4U0FtVnVHZ0pWVXlnQVAB',
+  business: 'CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx6TVdZU0FtVnVHZ0pWVXlnQVAB',
+  technology: 'CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FtVnVHZ0pIUWlnQVAB',
   entertainment: 'CAAqJggKIiBDQkFTRWdvSUwyMHZNREpxYW5RU0FtVnVHZ0pWVXlnQVAB',
-  sports:        'CAAqJggKIiBDQkFTRWdvSUwyMHZNRFp1ZEdvU0FtVnVHZ0pWVXlnQVAB',
-  science:       'CAAqJggKIiBDQkFTRWdvSUwyMHZNRFp0Y1RjU0FtVnVHZ0pWVXlnQVAB',
-  health:        'CAAqIQgKIhtDQkFTRGdvSUwyMHZNR3QwTlRFU0FtVnVLQUFQAQ',
+  sports: 'CAAqJggKIiBDQkFTRWdvSUwyMHZNRFp1ZEdvU0FtVnVHZ0pWVXlnQVAB',
+  science: 'CAAqJggKIiBDQkFTRWdvSUwyMHZNRFp0Y1RjU0FtVnVHZ0pWVXlnQVAB',
+  health: 'CAAqIQgKIhtDQkFTRGdvSUwyMHZNR3QwTlRFU0FtVnVLQUFQAQ',
 };
 
 // Fallback search queries for categories that have no native Google News topic
 // (subcategories: gaming, film, tv, music, politics).
 const GOOGLE_NEWS_CATEGORY_QUERY = {
-  politics:      'politics election government parliament',
-  gaming:        '"video games" esports gaming',
-  film:          'movie film Hollywood "box office"',
-  tv:            'TV series streaming Netflix HBO',
-  music:         'music album Grammy concert tour',
+  politics: 'politics election government parliament',
+  gaming: '"video games" esports gaming',
+  film: 'movie film Hollywood "box office"',
+  tv: 'TV series streaming Netflix HBO',
+  music: 'music album Grammy concert tour',
 };
 
 /**
@@ -2971,7 +2971,7 @@ async function expandQueryWithLLM(keyword, llmKeys, useKeywordMonitorPrompt = fa
               terms,
               expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
             }),
-          }).catch(() => {});
+          }).catch(() => { });
         }
         return terms;
       }
@@ -3646,8 +3646,9 @@ export default async function handler(req, res) {
   });
   if (!envValid) return;
 
-  const { countries, categories, searchQuery, dateRange, sources: userSources, language: langParam, userId, mode, strictMode, threshold } = req.method === 'POST' ? req.body : req.query;
+  const { countries, categories, searchQuery, dateRange, sources: userSources, language: langParam, userId, mode, strictMode, threshold, forceRefresh: forceRefreshParam } = req.method === 'POST' ? req.body : req.query;
   const isKeywordMode = mode === 'keyword';
+  const forceRefresh = forceRefreshParam === 'true' || forceRefreshParam === true || forceRefreshParam === '1';
   // showNonEnglish=true removes the language=en filter from all API calls, allowing
   // native-language articles to surface for non-English-dominant countries.
   const showNonEnglish = langParam === 'all' || langParam === true || langParam === 'true';
@@ -4115,7 +4116,7 @@ export default async function handler(req, res) {
           NEWS_API_KEY, WORLD_NEWS_API_KEY, NEWS_DATA_API_KEY, GUARDIAN_API_KEY, GNEWS_API_KEY,
           MEDIASTACK_API_KEY, CURRENTS_API_KEY,
           activeDomains, activeSourceIds, fromISO, fromDateOnly, usePopularitySort,
-          rangeHours, dateRange, sourceFingerprint, showNonEnglish,
+          rangeHours, dateRange, sourceFingerprint, showNonEnglish, forceRefresh,
         })
       )
     );
@@ -4227,15 +4228,30 @@ const IN_FLIGHT_REQUESTS = new Map();
 // Thin dispatcher: checks cache, deduplicates in-flight requests, delegates
 // to _doFetchPair for the actual API work.
 async function fetchCountryCategoryPair(country, category, ctx) {
-  const { dateRange, sourceFingerprint, showNonEnglish } = ctx;
+  const { dateRange, sourceFingerprint, showNonEnglish, forceRefresh } = ctx;
   const cacheKey = getCacheKey(country, category, dateRange, sourceFingerprint, showNonEnglish);
 
   const cachedEntry = await getCache(cacheKey);
 
-  // If cache is valid AND no refresh is needed, return cached articles directly
-  if (cachedEntry && !isRefreshNeeded(cachedEntry)) {
+  // ── Smart cache-bust: force refresh when cached pool is too thin ──────
+  // If the cache was populated when APIs were down, the pool may contain
+  // only 0-4 articles. Rather than serving that for up to 6 hours, trigger
+  // an immediate refetch to give the working sources (Google News RSS,
+  // Currents, Guardian, RSS feeds) a chance to fill the pool.
+  const MIN_CACHED_ARTICLES = 5;
+  const cacheTooThin = cachedEntry && Array.isArray(cachedEntry.articles) && cachedEntry.articles.length < MIN_CACHED_ARTICLES;
+  if (cacheTooThin) {
+    console.log(`Cache too thin (${cachedEntry.articles.length} articles < ${MIN_CACHED_ARTICLES}): ${cacheKey} — forcing refresh`);
+  }
+
+  // If cache is valid AND no refresh is needed AND not too thin AND not force-refreshed, return cached articles directly
+  if (cachedEntry && !isRefreshNeeded(cachedEntry) && !cacheTooThin && !forceRefresh) {
     console.log(`Cache HIT (fresh): ${cacheKey}`);
     return cachedEntry.articles;
+  }
+
+  if (forceRefresh) {
+    console.log(`Force refresh requested: ${cacheKey}`);
   }
 
   // Deduplicate: return the in-flight promise if one already exists for this key
@@ -4244,7 +4260,7 @@ async function fetchCountryCategoryPair(country, category, ctx) {
     return IN_FLIGHT_REQUESTS.get(cacheKey);
   }
 
-  const reason = cachedEntry ? 'refresh needed' : 'cache miss';
+  const reason = cachedEntry ? (cacheTooThin ? 'too-thin refresh' : 'refresh needed') : 'cache miss';
   console.log(`Cache ${reason}: ${cacheKey} — fetching fresh data`);
   // Pass existing cached articles so _doFetchPair can merge into them
   const existingArticles = cachedEntry ? cachedEntry.articles : [];
