@@ -99,90 +99,28 @@ const EXPANSION_LABELS: Record<string, { label: string; colour: string }> = {
   unknown: { label: 'Unknown', colour: 'bg-stone-400' },
 }
 
-// ─── Alert modal ──────────────────────────────────────────────────────────────
-
-interface AlertModalProps {
-  keyword: Keyword
-  existing: KeywordAlertSetting | undefined
-  onSave: (email: string) => Promise<void>
-  onDisable: () => Promise<void>
-  onClose: () => void
-}
-
-function AlertModal({ keyword, existing, onSave, onDisable, onClose }: AlertModalProps) {
-  const [email, setEmail] = useState(existing?.email ?? '')
-  const [saving, setSaving] = useState(false)
-
-  async function handleSave() {
-    if (!email.includes('@')) { toast.error('Enter a valid email'); return }
-    setSaving(true)
-    try { await onSave(email); onClose() } finally { setSaving(false) }
-  }
-
-  async function handleDisable() {
-    setSaving(true)
-    try { await onDisable(); onClose() } finally { setSaving(false) }
-  }
-
-  return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Bell className="w-4 h-4" />
-            Email Alerts — <em className="not-italic font-semibold capitalize">{keyword.keyword}</em>
-          </DialogTitle>
-          <DialogDescription>
-            Get an email digest when new articles match this keyword.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 pt-2">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-stone-600 dark:text-slate-400">Email address</label>
-            <Input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="h-9 text-sm"
-            />
-          </div>
-          <div className="flex gap-2 pt-2">
-            <Button onClick={handleSave} disabled={saving} className="flex-1 bg-slate-900 hover:bg-slate-800 text-white">
-              {saving ? 'Saving…' : 'Enable alerts'}
-            </Button>
-            {existing?.enabled && (
-              <Button onClick={handleDisable} disabled={saving} variant="outline" className="text-red-600 border-red-200 hover:bg-red-50">
-                <BellOff className="w-4 h-4" />
-              </Button>
-            )}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
+// (Per-keyword AlertModal removed — alerts are now feed-only)
 
 // ─── Topic modal ──────────────────────────────────────────────────────────────
 
 interface TopicModalProps {
   keywords: Keyword[]
+  userEmail: string | null
   onClose: () => void
-  onCreate: (name: string, keywordIds: string[], email: string) => Promise<void>
+  onCreate: (name: string, keywordIds: string[], enableDigest: boolean) => Promise<void>
 }
 
-function CreateTopicModal({ keywords, onClose, onCreate }: TopicModalProps) {
+function CreateTopicModal({ keywords, userEmail, onClose, onCreate }: TopicModalProps) {
   const [name, setName] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [email, setEmail] = useState('')
+  const [enableDigest, setEnableDigest] = useState(false)
   const [saving, setSaving] = useState(false)
 
   async function handleCreate() {
     if (!name.trim()) { toast.error('Enter a feed name'); return }
     if (selected.size === 0) { toast.error('Select at least one keyword'); return }
-    if (email && !email.includes('@')) { toast.error('Enter a valid email address'); return }
     setSaving(true)
-    try { await onCreate(name.trim(), [...selected], email.trim()); onClose() } catch { toast.error('Failed to create feed') } finally { setSaving(false) }
+    try { await onCreate(name.trim(), [...selected], enableDigest); onClose() } catch { toast.error('Failed to create feed') } finally { setSaving(false) }
   }
 
   return (
@@ -222,18 +160,27 @@ function CreateTopicModal({ keywords, onClose, onCreate }: TopicModalProps) {
               ))}
             </div>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-stone-600 dark:text-slate-400 flex items-center gap-1.5">
-              <Bell className="w-3 h-3" /> Daily email digest (optional)
-            </label>
-            <Input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="you@example.com — leave blank to skip"
-              className="h-9 text-sm"
-            />
-          </div>
+          {userEmail && (
+            <button
+              type="button"
+              onClick={() => setEnableDigest(prev => !prev)}
+              className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors ${enableDigest
+                ? 'bg-blue-600 text-white'
+                : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-600'
+                }`}
+            >
+              <Bell className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="flex-1 text-left">Add to daily email digest</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${enableDigest ? 'bg-white/20 text-white' : 'bg-stone-200 dark:bg-slate-600 text-stone-500'}`}>
+                {enableDigest ? 'ON' : 'OFF'}
+              </span>
+            </button>
+          )}
+          {enableDigest && userEmail && (
+            <p className="text-[10px] text-stone-400 dark:text-slate-500 -mt-2">
+              Digest will be sent to {userEmail}
+            </p>
+          )}
           <Button onClick={handleCreate} disabled={saving} className="w-full bg-slate-900 hover:bg-slate-800 text-white">
             {saving ? 'Creating…' : 'Create feed'}
           </Button>
@@ -254,13 +201,11 @@ interface TopicAlertModalProps {
 }
 
 function TopicAlertModal({ topic, existing, onSave, onDisable, onClose }: TopicAlertModalProps) {
-  const [email, setEmail] = useState(existing?.email ?? '')
   const [saving, setSaving] = useState(false)
 
-  async function handleSave() {
-    if (!email.includes('@')) { toast.error('Enter a valid email'); return }
+  async function handleEnable() {
     setSaving(true)
-    try { await onSave(email); onClose() } finally { setSaving(false) }
+    try { await onSave(existing?.email ?? ''); onClose() } finally { setSaving(false) }
   }
 
   async function handleDisable() {
@@ -274,30 +219,29 @@ function TopicAlertModal({ topic, existing, onSave, onDisable, onClose }: TopicA
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bell className="w-4 h-4" />
-            Email Alerts — <em className="not-italic font-semibold">{topic.name}</em>
+            Daily Digest — <em className="not-italic font-semibold">{topic.name}</em>
           </DialogTitle>
           <DialogDescription>
-            Get a daily email digest when new articles match this feed.
+            {existing?.enabled
+              ? 'Daily digest is active for this feed.'
+              : 'Enable a daily email digest for this feed.'}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 pt-2">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-stone-600 dark:text-slate-400">Email address</label>
-            <Input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="h-9 text-sm"
-            />
-          </div>
-          <div className="flex gap-2 pt-2">
-            <Button onClick={handleSave} disabled={saving} className="flex-1 bg-slate-900 hover:bg-slate-800 text-white">
-              {saving ? 'Saving…' : 'Enable alerts'}
-            </Button>
-            {existing?.enabled && (
-              <Button onClick={handleDisable} disabled={saving} variant="outline" className="text-red-600 border-red-200 hover:bg-red-50">
+          {existing?.email && (
+            <p className="text-xs text-stone-500 dark:text-slate-400">
+              Sending to: <span className="font-medium text-stone-700 dark:text-slate-200">{existing.email}</span>
+            </p>
+          )}
+          <div className="flex gap-2">
+            {!existing?.enabled ? (
+              <Button onClick={handleEnable} disabled={saving} className="flex-1 bg-slate-900 hover:bg-slate-800 text-white">
+                {saving ? 'Enabling…' : 'Enable digest'}
+              </Button>
+            ) : (
+              <Button onClick={handleDisable} disabled={saving} variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50 gap-2">
                 <BellOff className="w-4 h-4" />
+                {saving ? 'Disabling…' : 'Disable digest'}
               </Button>
             )}
           </div>
@@ -343,7 +287,6 @@ export default function Keywords() {
 
   // ── UI state ──
   const [showThreshold, setShowThreshold] = useState(false)
-  const [alertModalKw, setAlertModalKw] = useState<Keyword | null>(null)
   const [alertModalTopic, setAlertModalTopic] = useState<KeywordTopic | null>(null)
   const [showCreateTopic, setShowCreateTopic] = useState(false)
 
@@ -544,46 +487,24 @@ export default function Keywords() {
     }
   }
 
-  const handleCreateTopic = async (name: string, keywordIds: string[], email: string) => {
+  const handleCreateTopic = async (name: string, keywordIds: string[], enableDigest: boolean) => {
     const topic = await api.createTopic(name)
     await Promise.all(keywordIds.map(id => api.addKeywordToTopic(topic.id, id)))
-    // Re-fetch topics to get membership. Supabase's PostgREST relationship
-    // embedding (keyword_topic_members) requires the schema cache to recognise
-    // the FK, which may not happen immediately after a fresh migration.
-    // Inject the known member IDs directly so the feed works straight away
-    // regardless of whether the embedded query returned them.
     const fresh = await api.getTopics()
     const members = keywordIds.map(id => ({ keyword_id: id }))
     setTopics(fresh.map(t =>
       t.id === topic.id ? { ...t, keyword_topic_members: members } : t
     ))
     setSelection({ type: 'topic', id: topic.id })
-    // Save email alert if provided
-    if (email) {
-      const setting = await api.upsertTopicAlertSetting(topic.id, email, 'daily', true)
+    // Save email alert if digest toggle was on
+    if (enableDigest && user?.primaryEmailAddress?.emailAddress) {
+      const setting = await api.upsertTopicAlertSetting(topic.id, user.primaryEmailAddress.emailAddress, 'daily', true)
       setAlertSettings(prev => [...prev, setting])
     }
-    toast.success(`Feed "${name}" created${email ? ' with daily email digest' : ''}`)
+    toast.success(`Feed "${name}" created${enableDigest ? ' with daily digest' : ''}`)
   }
 
-  const handleSaveAlert = async (email: string) => {
-    if (!alertModalKw) return
-    const setting = await api.upsertAlertSetting(alertModalKw.id, email, 'daily', true)
-    setAlertSettings(prev => {
-      const filtered = prev.filter(s => s.keyword_id !== alertModalKw.id)
-      return [...filtered, setting]
-    })
-    toast.success(`Alerts enabled for "${alertModalKw.keyword}"`)
-  }
-
-  const handleDisableAlert = async () => {
-    if (!alertModalKw) return
-    const existing = alertSettings.find(s => s.keyword_id === alertModalKw.id && !s.topic_id)
-    if (!existing) return
-    await api.deleteAlertSetting(existing.id)
-    setAlertSettings(prev => prev.filter(s => s.id !== existing.id))
-    toast.success('Alert disabled')
-  }
+  // (Per-keyword alert handlers removed — alerts are feed-only now)
 
   const handleSaveTopicAlert = async (email: string) => {
     if (!alertModalTopic) return
@@ -881,7 +802,6 @@ export default function Keywords() {
                           <div className="flex flex-nowrap lg:flex-wrap gap-2 overflow-x-auto lg:overflow-x-visible pb-1 lg:pb-0">
                             {keywords.map(kw => {
                               const isSelected = selection?.type === 'keyword' && selection.id === kw.id
-                              const hasAlert = alertSettings.some(s => s.keyword_id === kw.id && s.enabled)
                               const count = articleCounts[kw.id]
                               return (
                                 <div key={kw.id} className="relative group/kw flex-shrink-0 lg:flex-shrink">
@@ -900,19 +820,6 @@ export default function Keywords() {
                                         : 'bg-stone-200 dark:bg-slate-600 text-stone-500 dark:text-slate-400'
                                         }`}>{count}</span>
                                     )}
-                                    {/* Alert indicator */}
-                                    {hasAlert && (
-                                      <Bell className={`w-2.5 h-2.5 flex-shrink-0 ${isSelected ? 'text-white/70' : 'text-blue-500'}`} />
-                                    )}
-                                    {/* Alert button */}
-                                    <button
-                                      onClick={e => { e.stopPropagation(); setAlertModalKw(kw) }}
-                                      className={`rounded-full p-0.5 transition-colors flex-shrink-0 opacity-0 group-hover/kw:opacity-100 ${isSelected ? 'hover:bg-white/20 text-slate-300 hover:text-white' : 'hover:bg-stone-300 text-stone-400 hover:text-stone-600'}`}
-                                      aria-label={`Alert settings for ${kw.keyword}`}
-                                      title="Email alerts"
-                                    >
-                                      <Bell className="w-3 h-3" />
-                                    </button>
                                     {/* Delete button */}
                                     <button
                                       onClick={e => { e.stopPropagation(); handleDelete(kw) }}
@@ -998,19 +905,6 @@ export default function Keywords() {
                   </div>
 
                   <div className="ml-auto flex items-center gap-3">
-                    {/* Alert button (keyword only, articles view) */}
-                    {selectedKeyword && activeView === 'articles' && (
-                      <button
-                        onClick={() => setAlertModalKw(selectedKeyword)}
-                        className={`p-1.5 rounded-lg transition-colors ${alertSettings.some(s => s.keyword_id === selectedKeyword.id && s.enabled)
-                          ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20'
-                          : 'text-stone-400 hover:text-stone-600 hover:bg-stone-100 dark:hover:bg-slate-700'
-                          }`}
-                        title="Email alert settings"
-                      >
-                        <Bell className="w-4 h-4" />
-                      </button>
-                    )}
                     {/* Alert button (topic/feed, articles view) */}
                     {selectedTopic && activeView === 'articles' && (
                       <button
@@ -1200,16 +1094,6 @@ export default function Keywords() {
       )}
 
       {/* ── Modals ──────────────────────────────────────────────────────────── */}
-      {alertModalKw && (
-        <AlertModal
-          keyword={alertModalKw}
-          existing={alertSettings.find(s => s.keyword_id === alertModalKw.id && !s.topic_id)}
-          onSave={handleSaveAlert}
-          onDisable={handleDisableAlert}
-          onClose={() => setAlertModalKw(null)}
-        />
-      )}
-
       {alertModalTopic && (
         <TopicAlertModal
           topic={alertModalTopic}
@@ -1223,6 +1107,7 @@ export default function Keywords() {
       {showCreateTopic && (
         <CreateTopicModal
           keywords={keywords}
+          userEmail={user?.primaryEmailAddress?.emailAddress ?? null}
           onClose={() => setShowCreateTopic(false)}
           onCreate={handleCreateTopic}
         />
