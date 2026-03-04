@@ -69,7 +69,7 @@ export default async function handler(req, res) {
       if (!keyword) { skipped++; continue; }
 
       // Fetch news for this keyword (uses cache, so rarely hits external APIs)
-      const newsUrl = `${APP_URL}/api/news?countries=world&categories=world&searchQuery=${encodeURIComponent(keyword)}&dateRange=${alert.frequency === 'hourly' ? '24h' : '24h'}&mode=keyword`;
+      const newsUrl = `${APP_URL}/api/news?countries=world&categories=world&searchQuery=${encodeURIComponent(keyword)}&dateRange=${alert.frequency === 'hourly' ? '24h' : '3d'}&mode=keyword`;
       const newsRes = await fetch(newsUrl);
       if (!newsRes.ok) { skipped++; continue; }
       const { articles = [] } = await newsRes.json();
