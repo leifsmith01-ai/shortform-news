@@ -68,8 +68,8 @@ export default async function handler(req) {
         status: 400, headers: { 'Content-Type': 'application/json' },
       }));
     }
-    if (!['hourly', 'daily'].includes(frequency)) {
-      return cors(new Response(JSON.stringify({ error: 'frequency must be hourly or daily' }), {
+    if (frequency !== 'daily') {
+      return cors(new Response(JSON.stringify({ error: 'frequency must be daily' }), {
         status: 400, headers: { 'Content-Type': 'application/json' },
       }));
     }
