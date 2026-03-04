@@ -1045,6 +1045,46 @@ const RSS_SOURCES = [
     countries: new Set(['ca']),
   },
   {
+    name: 'CBC Politics',
+    domain: 'cbc.ca',
+    // CBC's dedicated politics section feed — covers Parliament Hill, federal
+    // and provincial politics. More targeted than the top-stories feed.
+    url: process.env.CBC_POLITICS_RSS_URL || 'https://www.cbc.ca/cmlink/rss-politics',
+    countries: new Set(['ca']),
+  },
+  {
+    name: 'Global News Canada',
+    domain: 'globalnews.ca',
+    // Major Canadian TV network's news site. Strong political and national
+    // news coverage across all provinces. Standard WordPress RSS feed.
+    url: process.env.GLOBAL_NEWS_RSS_URL || 'https://globalnews.ca/feed/',
+    countries: new Set(['ca']),
+  },
+  {
+    name: 'National Post',
+    domain: 'nationalpost.com',
+    // One of Canada's two national daily newspapers (Postmedia). Strong
+    // political commentary and national affairs coverage. WordPress RSS feed.
+    url: process.env.NATIONAL_POST_RSS_URL || 'https://nationalpost.com/feed/',
+    countries: new Set(['ca']),
+  },
+  {
+    name: 'The Hill Times',
+    domain: 'hilltimes.com',
+    // Ottawa-based political newspaper covering Parliament, federal politics,
+    // lobbying, and public policy. Canada's dedicated politics publication.
+    url: process.env.HILL_TIMES_RSS_URL || 'https://www.hilltimes.com/feed/',
+    countries: new Set(['ca']),
+  },
+  {
+    name: 'iPolitics',
+    domain: 'ipolitics.ca',
+    // Independent Canadian political journalism outlet focused on federal
+    // politics, Parliament Hill, and public policy analysis.
+    url: process.env.IPOLITICS_RSS_URL || 'https://ipolitics.ca/feed/',
+    countries: new Set(['ca']),
+  },
+  {
     name: 'Politico Europe',
     domain: 'politico.eu',
     // European politics and policy coverage. Strong on EU institutions,
