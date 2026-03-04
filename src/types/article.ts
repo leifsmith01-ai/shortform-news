@@ -44,7 +44,7 @@ export interface KeywordAlertSetting {
   user_id: string
   keyword_id: string
   email: string
-  frequency: 'hourly' | 'daily'
+  frequency: 'daily'
   enabled: boolean
   last_sent_at: string | null
   created_at: string

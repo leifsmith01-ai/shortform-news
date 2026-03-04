@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS public.keyword_alert_settings (
   user_id      TEXT        NOT NULL,
   keyword_id   UUID        NOT NULL REFERENCES public.tracked_keywords(id) ON DELETE CASCADE,
   email        TEXT        NOT NULL,
-  frequency    TEXT        NOT NULL DEFAULT 'daily' CHECK (frequency IN ('hourly', 'daily')),
+  frequency    TEXT        NOT NULL DEFAULT 'daily' CHECK (frequency = 'daily'),
   enabled      BOOLEAN     NOT NULL DEFAULT true,
   last_sent_at TIMESTAMPTZ,
   created_at   TIMESTAMPTZ DEFAULT NOW(),

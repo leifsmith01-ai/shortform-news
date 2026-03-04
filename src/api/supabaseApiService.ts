@@ -218,7 +218,7 @@ class SupabaseApiService {
   async upsertAlertSetting(
     keywordId: string,
     email: string,
-    frequency: 'hourly' | 'daily',
+    frequency: 'daily',
     enabled: boolean
   ): Promise<KeywordAlertSetting> {
     const { data, error } = await supabase

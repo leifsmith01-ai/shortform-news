@@ -58,7 +58,7 @@ export default async function handler(req, res) {
   for (const alert of alerts) {
     try {
       // Check if it's time to send based on frequency
-      const windowMs = alert.frequency === 'hourly' ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+      const windowMs = 24 * 60 * 60 * 1000;
       const lastSent = alert.last_sent_at ? new Date(alert.last_sent_at) : null;
       if (lastSent && now - lastSent < windowMs) {
         skipped++;
@@ -69,7 +69,7 @@ export default async function handler(req, res) {
       if (!keyword) { skipped++; continue; }
 
       // Fetch news for this keyword (uses cache, so rarely hits external APIs)
-      const newsUrl = `${APP_URL}/api/news?countries=world&categories=world&searchQuery=${encodeURIComponent(keyword)}&dateRange=${alert.frequency === 'hourly' ? '24h' : '3d'}&mode=keyword`;
+      const newsUrl = `${APP_URL}/api/news?countries=world&categories=world&searchQuery=${encodeURIComponent(keyword)}&dateRange=3d&mode=keyword`;
       const newsRes = await fetch(newsUrl);
       if (!newsRes.ok) { skipped++; continue; }
       const { articles = [] } = await newsRes.json();

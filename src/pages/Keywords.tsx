@@ -104,20 +104,19 @@ const EXPANSION_LABELS: Record<string, { label: string; colour: string }> = {
 interface AlertModalProps {
   keyword: Keyword
   existing: KeywordAlertSetting | undefined
-  onSave: (email: string, frequency: 'hourly' | 'daily') => Promise<void>
+  onSave: (email: string) => Promise<void>
   onDisable: () => Promise<void>
   onClose: () => void
 }
 
 function AlertModal({ keyword, existing, onSave, onDisable, onClose }: AlertModalProps) {
   const [email, setEmail] = useState(existing?.email ?? '')
-  const [freq, setFreq] = useState<'hourly' | 'daily'>(existing?.frequency ?? 'daily')
   const [saving, setSaving] = useState(false)
 
   async function handleSave() {
     if (!email.includes('@')) { toast.error('Enter a valid email'); return }
     setSaving(true)
-    try { await onSave(email, freq); onClose() } finally { setSaving(false) }
+    try { await onSave(email); onClose() } finally { setSaving(false) }
   }
 
   async function handleDisable() {
@@ -147,23 +146,6 @@ function AlertModal({ keyword, existing, onSave, onDisable, onClose }: AlertModa
               placeholder="you@example.com"
               className="h-9 text-sm"
             />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-stone-600 dark:text-slate-400">Frequency</label>
-            <div className="flex gap-2">
-              {(['hourly', 'daily'] as const).map(f => (
-                <button
-                  key={f}
-                  onClick={() => setFreq(f)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${freq === f
-                    ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-600 dark:border-slate-600'
-                    : 'bg-white dark:bg-slate-800 border-stone-200 dark:border-slate-600 text-stone-600 dark:text-slate-400 hover:border-stone-400'
-                  }`}
-                >
-                  {f === 'hourly' ? 'Hourly' : 'Daily digest'}
-                </button>
-              ))}
-            </div>
           </div>
           <div className="flex gap-2 pt-2">
             <Button onClick={handleSave} disabled={saving} className="flex-1 bg-slate-900 hover:bg-slate-800 text-white">
@@ -493,9 +475,9 @@ export default function Keywords() {
     toast.success(`Feed "${name}" created`)
   }
 
-  const handleSaveAlert = async (email: string, frequency: 'hourly' | 'daily') => {
+  const handleSaveAlert = async (email: string) => {
     if (!alertModalKw) return
-    const setting = await api.upsertAlertSetting(alertModalKw.id, email, frequency, true)
+    const setting = await api.upsertAlertSetting(alertModalKw.id, email, 'daily', true)
     setAlertSettings(prev => {
       const filtered = prev.filter(s => s.keyword_id !== alertModalKw.id)
       return [...filtered, setting]

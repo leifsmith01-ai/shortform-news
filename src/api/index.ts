@@ -167,7 +167,7 @@ class ApiService {
   async upsertAlertSetting(
     keywordId: string,
     email: string,
-    frequency: 'hourly' | 'daily',
+    frequency: 'daily',
     enabled: boolean
   ): Promise<KeywordAlertSetting> {
     if (!this.supabase) throw new Error('Must be signed in to manage alerts')
