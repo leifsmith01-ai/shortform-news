@@ -19,7 +19,7 @@ import { getCache, setCache } from './lib/redisCache.js';
 // Maximum number of articles to generate AI summaries for per request.
 // Raising this improves coverage but uses more LLM API quota.
 // Override via MAX_SUMMARY_ARTICLES env var (e.g. set to 5 to reduce costs).
-const MAX_SUMMARY_ARTICLES = parseInt(process.env.MAX_SUMMARY_ARTICLES || '10', 10);
+const MAX_SUMMARY_ARTICLES = parseInt(process.env.MAX_SUMMARY_ARTICLES || '20', 10);
 
 // API request timeout (ms) — prevents a single slow API from blocking the whole response
 const API_TIMEOUT_MS = 8000;
@@ -3271,6 +3271,15 @@ function parseBullets(text) {
       .map(line => line.replace(/^[\s]*\d+[\.\)]\s*/, '').trim())
       .filter(line => line.length > 10);
   }
+  if (bullets.length === 0) {
+    // Prose fallback: split into sentences when the LLM returns plain paragraphs
+    // without any bullet or numbered list syntax. Recovers otherwise-valid summaries.
+    const sentences = text
+      .split(/(?<=[.!?])\s+/)
+      .map(s => s.trim())
+      .filter(s => s.length >= 15 && !/^(article|text|note|summary):/i.test(s));
+    if (sentences.length > 0) return sentences.slice(0, 3);
+  }
   return bullets.length > 0 ? bullets.slice(0, 3) : null;
 }
 
@@ -3447,6 +3456,7 @@ async function generateSummary(article, llmKeys) {
       console.error('[summary] unexpected error:', err.message);
     }
   }
+  console.warn(`[summary] all providers failed for: ${article.url?.slice(0, 80) ?? article.title?.slice(0, 80)}`);
   return null;
 }
 
@@ -4360,7 +4370,7 @@ export default async function handler(req, res) {
     if (HAS_LLM && finalArticles.length > 0) {
       await Promise.all(finalArticles.slice(0, MAX_SUMMARY_ARTICLES).map(async (article) => {
         try {
-          const summary = await generateSummary(article, LLM_KEYS);
+          const summary = await generateSummaryCached(article, LLM_KEYS);
           if (summary) article.summary_points = summary;
         } catch (err) {
           console.error('Summary failed:', err.message);
