@@ -42,7 +42,8 @@ export interface KeywordTopic {
 export interface KeywordAlertSetting {
   id: string
   user_id: string
-  keyword_id: string
+  keyword_id: string | null
+  topic_id?: string | null
   email: string
   frequency: 'daily'
   enabled: boolean

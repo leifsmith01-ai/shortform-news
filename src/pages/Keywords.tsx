@@ -53,8 +53,8 @@ const REGION_OPTIONS: { value: string; label: string }[] = [
 // ─── LocalStorage persistence ─────────────────────────────────────────────────
 
 const LS = {
-  REGION:    'kw-region',
-  STRICT:    'kw-strict',
+  REGION: 'kw-region',
+  STRICT: 'kw-strict',
   THRESHOLD: 'kw-threshold',
   BOOL_MODE: 'kw-bool-mode',
 }
@@ -92,10 +92,10 @@ function expansionBreakdown(entries: SearchAnalyticsEntry[]): { source: string; 
 }
 
 const EXPANSION_LABELS: Record<string, { label: string; colour: string }> = {
-  static:  { label: 'Static map', colour: 'bg-blue-500' },
-  llm:     { label: 'AI-expanded', colour: 'bg-purple-500' },
+  static: { label: 'Static map', colour: 'bg-blue-500' },
+  llm: { label: 'AI-expanded', colour: 'bg-purple-500' },
   boolean: { label: 'Boolean query', colour: 'bg-green-500' },
-  raw:     { label: 'Raw keyword', colour: 'bg-amber-500' },
+  raw: { label: 'Raw keyword', colour: 'bg-amber-500' },
   unknown: { label: 'Unknown', colour: 'bg-stone-400' },
 }
 
@@ -168,19 +168,21 @@ function AlertModal({ keyword, existing, onSave, onDisable, onClose }: AlertModa
 interface TopicModalProps {
   keywords: Keyword[]
   onClose: () => void
-  onCreate: (name: string, keywordIds: string[]) => Promise<void>
+  onCreate: (name: string, keywordIds: string[], email: string) => Promise<void>
 }
 
 function CreateTopicModal({ keywords, onClose, onCreate }: TopicModalProps) {
   const [name, setName] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [email, setEmail] = useState('')
   const [saving, setSaving] = useState(false)
 
   async function handleCreate() {
     if (!name.trim()) { toast.error('Enter a feed name'); return }
     if (selected.size === 0) { toast.error('Select at least one keyword'); return }
+    if (email && !email.includes('@')) { toast.error('Enter a valid email address'); return }
     setSaving(true)
-    try { await onCreate(name.trim(), [...selected]); onClose() } catch { toast.error('Failed to create feed') } finally { setSaving(false) }
+    try { await onCreate(name.trim(), [...selected], email.trim()); onClose() } catch { toast.error('Failed to create feed') } finally { setSaving(false) }
   }
 
   return (
@@ -213,16 +215,92 @@ function CreateTopicModal({ keywords, onClose, onCreate }: TopicModalProps) {
                   className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${selected.has(kw.id)
                     ? 'bg-slate-900 text-white dark:bg-slate-600'
                     : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400 hover:bg-stone-200'
-                  }`}
+                    }`}
                 >
                   {kw.keyword}
                 </button>
               ))}
             </div>
           </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-stone-600 dark:text-slate-400 flex items-center gap-1.5">
+              <Bell className="w-3 h-3" /> Daily email digest (optional)
+            </label>
+            <Input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@example.com — leave blank to skip"
+              className="h-9 text-sm"
+            />
+          </div>
           <Button onClick={handleCreate} disabled={saving} className="w-full bg-slate-900 hover:bg-slate-800 text-white">
             {saving ? 'Creating…' : 'Create feed'}
           </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Topic alert modal ─────────────────────────────────────────────────────────
+
+interface TopicAlertModalProps {
+  topic: KeywordTopic
+  existing: KeywordAlertSetting | undefined
+  onSave: (email: string) => Promise<void>
+  onDisable: () => Promise<void>
+  onClose: () => void
+}
+
+function TopicAlertModal({ topic, existing, onSave, onDisable, onClose }: TopicAlertModalProps) {
+  const [email, setEmail] = useState(existing?.email ?? '')
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave() {
+    if (!email.includes('@')) { toast.error('Enter a valid email'); return }
+    setSaving(true)
+    try { await onSave(email); onClose() } finally { setSaving(false) }
+  }
+
+  async function handleDisable() {
+    setSaving(true)
+    try { await onDisable(); onClose() } finally { setSaving(false) }
+  }
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Bell className="w-4 h-4" />
+            Email Alerts — <em className="not-italic font-semibold">{topic.name}</em>
+          </DialogTitle>
+          <DialogDescription>
+            Get a daily email digest when new articles match this feed.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 pt-2">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-stone-600 dark:text-slate-400">Email address</label>
+            <Input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="h-9 text-sm"
+            />
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button onClick={handleSave} disabled={saving} className="flex-1 bg-slate-900 hover:bg-slate-800 text-white">
+              {saving ? 'Saving…' : 'Enable alerts'}
+            </Button>
+            {existing?.enabled && (
+              <Button onClick={handleDisable} disabled={saving} variant="outline" className="text-red-600 border-red-200 hover:bg-red-50">
+                <BellOff className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -266,6 +344,7 @@ export default function Keywords() {
   // ── UI state ──
   const [showThreshold, setShowThreshold] = useState(false)
   const [alertModalKw, setAlertModalKw] = useState<Keyword | null>(null)
+  const [alertModalTopic, setAlertModalTopic] = useState<KeywordTopic | null>(null)
   const [showCreateTopic, setShowCreateTopic] = useState(false)
 
   // ── Analytics tab ──
@@ -332,7 +411,7 @@ export default function Keywords() {
       setArticles(arts)
       // Update local count + persist to DB (fire-and-forget)
       setArticleCounts(prev => ({ ...prev, [kw.id]: arts.length }))
-      api.updateKeywordArticleCount(kw.id, arts.length).catch(() => {})
+      api.updateKeywordArticleCount(kw.id, arts.length).catch(() => { })
     } catch (err) {
       if (ctrl.signal.aborted) return
       toast.error(`Failed to fetch articles for "${kw.keyword}"`)
@@ -399,8 +478,8 @@ export default function Keywords() {
     const kwNames: string[] = selection.type === 'keyword'
       ? [keywords.find(k => k.id === selection.id)?.keyword].filter(Boolean) as string[]
       : (topics.find(t => t.id === selection.id)?.keyword_topic_members ?? [])
-          .map(m => keywords.find(k => k.id === m.keyword_id)?.keyword)
-          .filter(Boolean) as string[]
+        .map(m => keywords.find(k => k.id === m.keyword_id)?.keyword)
+        .filter(Boolean) as string[]
     if (!kwNames.length) return
     setIsLoadingAnalytics(true)
     api.getSearchAnalytics(analyticsDays, kwNames.length === 1 ? kwNames[0] : kwNames)
@@ -465,7 +544,7 @@ export default function Keywords() {
     }
   }
 
-  const handleCreateTopic = async (name: string, keywordIds: string[]) => {
+  const handleCreateTopic = async (name: string, keywordIds: string[], email: string) => {
     const topic = await api.createTopic(name)
     await Promise.all(keywordIds.map(id => api.addKeywordToTopic(topic.id, id)))
     // Re-fetch topics to get membership. Supabase's PostgREST relationship
@@ -479,7 +558,12 @@ export default function Keywords() {
       t.id === topic.id ? { ...t, keyword_topic_members: members } : t
     ))
     setSelection({ type: 'topic', id: topic.id })
-    toast.success(`Feed "${name}" created`)
+    // Save email alert if provided
+    if (email) {
+      const setting = await api.upsertTopicAlertSetting(topic.id, email, 'daily', true)
+      setAlertSettings(prev => [...prev, setting])
+    }
+    toast.success(`Feed "${name}" created${email ? ' with daily email digest' : ''}`)
   }
 
   const handleSaveAlert = async (email: string) => {
@@ -494,17 +578,36 @@ export default function Keywords() {
 
   const handleDisableAlert = async () => {
     if (!alertModalKw) return
-    const existing = alertSettings.find(s => s.keyword_id === alertModalKw.id)
+    const existing = alertSettings.find(s => s.keyword_id === alertModalKw.id && !s.topic_id)
     if (!existing) return
     await api.deleteAlertSetting(existing.id)
     setAlertSettings(prev => prev.filter(s => s.id !== existing.id))
     toast.success('Alert disabled')
   }
 
+  const handleSaveTopicAlert = async (email: string) => {
+    if (!alertModalTopic) return
+    const setting = await api.upsertTopicAlertSetting(alertModalTopic.id, email, 'daily', true)
+    setAlertSettings(prev => {
+      const filtered = prev.filter(s => s.topic_id !== alertModalTopic.id)
+      return [...filtered, setting]
+    })
+    toast.success(`Alerts enabled for feed "${alertModalTopic.name}"`)
+  }
+
+  const handleDisableTopicAlert = async () => {
+    if (!alertModalTopic) return
+    const existing = alertSettings.find(s => s.topic_id === alertModalTopic.id)
+    if (!existing) return
+    await api.deleteAlertSetting(existing.id)
+    setAlertSettings(prev => prev.filter(s => s.id !== existing.id))
+    toast.success('Feed alert disabled')
+  }
+
   const handleThresholdChange = async (kw: Keyword, value: number) => {
     const rounded = Math.round(value * 100) / 100
     setKeywords(prev => prev.map(k => k.id === kw.id ? { ...k, threshold: rounded } : k))
-    await api.updateKeywordThreshold(kw.id, rounded).catch(() => {})
+    await api.updateKeywordThreshold(kw.id, rounded).catch(() => { })
     // Re-fetch with new threshold if this keyword is selected
     if (selection?.type === 'keyword' && selection.id === kw.id) {
       fetchArticlesForKeyword({ ...kw, threshold: rounded })
@@ -657,7 +760,7 @@ export default function Keywords() {
                   className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${strictMode
                     ? 'bg-slate-900 text-white dark:bg-slate-600'
                     : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-600'
-                  }`}
+                    }`}
                 >
                   <CrosshairIcon className="w-3.5 h-3.5 flex-shrink-0" />
                   <span className="flex-1 text-left">Headline Match Only</span>
@@ -731,6 +834,7 @@ export default function Keywords() {
                             {topics.map(topic => {
                               const isSelected = selection?.type === 'topic' && selection.id === topic.id
                               const memberCount = topic.keyword_topic_members?.length ?? 0
+                              const hasTopicAlert = alertSettings.some(s => s.topic_id === topic.id && s.enabled)
                               return (
                                 <div key={topic.id} className="relative group/topic flex-shrink-0 lg:flex-shrink">
                                   <button
@@ -738,11 +842,14 @@ export default function Keywords() {
                                     className={`inline-flex items-center gap-1.5 pl-2.5 pr-7 py-1.5 rounded-full text-sm font-medium transition-colors ${isSelected
                                       ? 'bg-slate-900 text-white dark:bg-slate-700'
                                       : 'bg-stone-100 dark:bg-slate-700 text-stone-700 dark:text-slate-300 hover:bg-stone-200 dark:hover:bg-slate-600'
-                                    }`}
+                                      }`}
                                   >
                                     {isSelected ? <FolderOpen className="w-3 h-3" /> : <Folder className="w-3 h-3" />}
                                     {topic.name}
                                     <span className="text-[10px] opacity-60">{memberCount}</span>
+                                    {hasTopicAlert && (
+                                      <Bell className={`w-2.5 h-2.5 flex-shrink-0 ${isSelected ? 'text-white/70' : 'text-blue-500'}`} />
+                                    )}
                                   </button>
                                   <button
                                     onClick={e => { e.stopPropagation(); handleDeleteTopic(topic) }}
@@ -783,7 +890,7 @@ export default function Keywords() {
                                     className={`inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-full text-sm font-medium cursor-pointer select-none transition-colors ${isSelected
                                       ? 'bg-slate-900 text-white'
                                       : 'bg-stone-100 dark:bg-slate-700 text-stone-700 dark:text-slate-300 hover:bg-stone-200 dark:hover:bg-slate-600'
-                                    }`}
+                                      }`}
                                   >
                                     {kw.keyword}
                                     {/* Article count badge */}
@@ -791,7 +898,7 @@ export default function Keywords() {
                                       <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${isSelected
                                         ? 'bg-white/20 text-white'
                                         : 'bg-stone-200 dark:bg-slate-600 text-stone-500 dark:text-slate-400'
-                                      }`}>{count}</span>
+                                        }`}>{count}</span>
                                     )}
                                     {/* Alert indicator */}
                                     {hasAlert && (
@@ -812,7 +919,7 @@ export default function Keywords() {
                                       className={`rounded-full p-0.5 transition-colors flex-shrink-0 ${isSelected
                                         ? 'hover:bg-white/20 text-slate-300 hover:text-white'
                                         : 'hover:bg-stone-300 text-stone-400 hover:text-stone-600'
-                                      }`}
+                                        }`}
                                       aria-label={`Remove ${kw.keyword}`}
                                     >
                                       <X className="w-3 h-3" />
@@ -898,8 +1005,21 @@ export default function Keywords() {
                         className={`p-1.5 rounded-lg transition-colors ${alertSettings.some(s => s.keyword_id === selectedKeyword.id && s.enabled)
                           ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20'
                           : 'text-stone-400 hover:text-stone-600 hover:bg-stone-100 dark:hover:bg-slate-700'
-                        }`}
+                          }`}
                         title="Email alert settings"
+                      >
+                        <Bell className="w-4 h-4" />
+                      </button>
+                    )}
+                    {/* Alert button (topic/feed, articles view) */}
+                    {selectedTopic && activeView === 'articles' && (
+                      <button
+                        onClick={() => setAlertModalTopic(selectedTopic)}
+                        className={`p-1.5 rounded-lg transition-colors ${alertSettings.some(s => s.topic_id === selectedTopic.id && s.enabled)
+                          ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20'
+                          : 'text-stone-400 hover:text-stone-600 hover:bg-stone-100 dark:hover:bg-slate-700'
+                          }`}
+                        title="Feed email alert settings"
                       >
                         <Bell className="w-4 h-4" />
                       </button>
@@ -913,7 +1033,7 @@ export default function Keywords() {
                           className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md font-medium transition-colors ${activeView === view
                             ? 'bg-white dark:bg-slate-600 text-stone-900 dark:text-stone-100 shadow-sm'
                             : 'text-stone-500 dark:text-slate-400 hover:text-stone-700 dark:hover:text-slate-200'
-                          }`}
+                            }`}
                         >
                           {view === 'articles' ? <Newspaper className="w-3 h-3" /> : <BarChart2 className="w-3 h-3" />}
                           {view === 'articles' ? 'Articles' : 'Analytics'}
@@ -930,7 +1050,7 @@ export default function Keywords() {
                             className={`px-2.5 py-1 text-xs rounded-full font-medium transition-colors ${dateRange === range
                               ? 'bg-slate-900 text-white'
                               : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-600'
-                            }`}
+                              }`}
                           >
                             {range === '24h' ? '24h' : range === '3d' ? '3 days' : range === 'week' ? '1 week' : '1 month'}
                           </button>
@@ -947,7 +1067,7 @@ export default function Keywords() {
                             className={`px-2.5 py-1 text-xs rounded-full font-medium transition-colors ${analyticsDays === d
                               ? 'bg-slate-900 text-white'
                               : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-600'
-                            }`}
+                              }`}
                           >
                             {d}d
                           </button>
@@ -1083,10 +1203,20 @@ export default function Keywords() {
       {alertModalKw && (
         <AlertModal
           keyword={alertModalKw}
-          existing={alertSettings.find(s => s.keyword_id === alertModalKw.id)}
+          existing={alertSettings.find(s => s.keyword_id === alertModalKw.id && !s.topic_id)}
           onSave={handleSaveAlert}
           onDisable={handleDisableAlert}
           onClose={() => setAlertModalKw(null)}
+        />
+      )}
+
+      {alertModalTopic && (
+        <TopicAlertModal
+          topic={alertModalTopic}
+          existing={alertSettings.find(s => s.topic_id === alertModalTopic.id)}
+          onSave={handleSaveTopicAlert}
+          onDisable={handleDisableTopicAlert}
+          onClose={() => setAlertModalTopic(null)}
         />
       )}
 
