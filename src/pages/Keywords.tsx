@@ -1,7 +1,7 @@
 import React, { useContext, useState, useEffect, useCallback, useRef } from 'react'
 import {
   Tag, Plus, X, Lock, Newspaper, Search, LogIn, Globe, CrosshairIcon,
-  Bell, BellOff, Layers, SlidersHorizontal, ChevronDown, FolderPlus,
+  Bell, BellOff, Layers, FolderPlus,
   Folder, FolderOpen, Trash2, Code2, BarChart2, Zap, TrendingUp, TrendingDown, Minus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -55,9 +55,10 @@ const REGION_OPTIONS: { value: string; label: string }[] = [
 const LS = {
   REGION: 'kw-region',
   STRICT: 'kw-strict',
-  THRESHOLD: 'kw-threshold',
   BOOL_MODE: 'kw-bool-mode',
 }
+
+const DEFAULT_THRESHOLD = 0.12
 
 const load = <T,>(key: string, fallback: T): T => {
   try { const v = localStorage.getItem(key); return v !== null ? JSON.parse(v) : fallback } catch { return fallback }
@@ -320,12 +321,10 @@ export default function Keywords() {
   const [dateRange, setDateRange] = useState<'24h' | '3d' | 'week' | 'month'>('24h')
   const [region, setRegion] = useState<string>(() => load(LS.REGION, 'world'))
   const [strictMode, setStrictMode] = useState<boolean>(() => load(LS.STRICT, false))
-  const [threshold, setThreshold] = useState<number>(() => load(LS.THRESHOLD, 0.12))
   const [showBoolBuilder, setShowBoolBuilder] = useState<boolean>(() => load(LS.BOOL_MODE, false))
   const [boolQuery, setBoolQuery] = useState('')
 
   // ── UI state ──
-  const [showThreshold, setShowThreshold] = useState(false)
   const [alertModalTopic, setAlertModalTopic] = useState<KeywordTopic | null>(null)
   const [showCreateTopic, setShowCreateTopic] = useState(false)
 
@@ -345,7 +344,6 @@ export default function Keywords() {
   // Persist preferences
   useEffect(() => { save(LS.REGION, region) }, [region])
   useEffect(() => { save(LS.STRICT, strictMode) }, [strictMode])
-  useEffect(() => { save(LS.THRESHOLD, threshold) }, [threshold])
   useEffect(() => { save(LS.BOOL_MODE, showBoolBuilder) }, [showBoolBuilder])
 
   // Load keywords, topics, alert settings
@@ -391,7 +389,7 @@ export default function Keywords() {
         dateRange,
         mode: 'keyword',
         strictMode,
-        threshold: kw.threshold ?? threshold,
+        threshold: kw.threshold ?? DEFAULT_THRESHOLD,
       })
       if (ctrl.signal.aborted) return
       const arts = result?.articles ?? []
@@ -406,7 +404,7 @@ export default function Keywords() {
     } finally {
       if (!ctrl.signal.aborted) setIsLoadingArticles(false)
     }
-  }, [dateRange, region, strictMode, threshold, showBoolBuilder, boolQuery])
+  }, [dateRange, region, strictMode, showBoolBuilder, boolQuery])
 
   const fetchArticlesForTopic = useCallback(async (topic: KeywordTopic) => {
     if (abortRef.current) abortRef.current.abort()
@@ -431,7 +429,7 @@ export default function Keywords() {
         dateRange,
         mode: 'keyword',
         strictMode,
-        threshold,
+        threshold: DEFAULT_THRESHOLD,
       })
       if (ctrl.signal.aborted) return
       setArticles(result?.articles ?? [])
@@ -442,7 +440,7 @@ export default function Keywords() {
     } finally {
       if (!ctrl.signal.aborted) setIsLoadingArticles(false)
     }
-  }, [keywords, dateRange, region, strictMode, threshold])
+  }, [keywords, dateRange, region, strictMode])
 
   // Trigger fetch whenever selection or filters change
   useEffect(() => {
@@ -611,23 +609,12 @@ export default function Keywords() {
     toast.success('Feed alert disabled')
   }
 
-  const handleThresholdChange = async (kw: Keyword, value: number) => {
-    const rounded = Math.round(value * 100) / 100
-    setKeywords(prev => prev.map(k => k.id === kw.id ? { ...k, threshold: rounded } : k))
-    await api.updateKeywordThreshold(kw.id, rounded).catch(() => { })
-    // Re-fetch with new threshold if this keyword is selected
-    if (selection?.type === 'keyword' && selection.id === kw.id) {
-      fetchArticlesForKeyword({ ...kw, threshold: rounded })
-    }
-  }
-
   // ── Derived ─────────────────────────────────────────────────────────────────
 
   const regionLabel = REGION_OPTIONS.find(r => r.value === region)?.label ?? 'Global'
   const selectedKeyword = selection?.type === 'keyword' ? keywords.find(k => k.id === selection.id) : null
   const selectedTopic = selection?.type === 'topic' ? topics.find(t => t.id === selection.id) : null
   const selectionLabel = selectedKeyword?.keyword ?? selectedTopic?.name ?? null
-  const selectionThreshold = selectedKeyword?.threshold ?? threshold
 
   const analyticsDaily = groupByDay(analyticsEntries)
   const analyticsBreakdown = expansionBreakdown(analyticsEntries)
@@ -735,16 +722,7 @@ export default function Keywords() {
             {/* Monitor settings */}
             {isSignedIn && (
               <div className="p-3 lg:p-4 border-b border-stone-100 dark:border-slate-700 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-stone-400 dark:text-slate-500 uppercase tracking-wide hidden lg:block">Monitor Settings</p>
-                  <button
-                    onClick={() => setShowThreshold(prev => !prev)}
-                    className="text-xs text-stone-400 hover:text-stone-600 flex items-center gap-1"
-                  >
-                    <SlidersHorizontal className="w-3 h-3" />
-                    <ChevronDown className={`w-3 h-3 transition-transform ${showThreshold ? 'rotate-180' : ''}`} />
-                  </button>
-                </div>
+                <p className="text-xs font-semibold text-stone-400 dark:text-slate-500 uppercase tracking-wide hidden lg:block">Monitor Settings</p>
 
                 {/* Region focus */}
                 <div className="space-y-1.5">
@@ -777,32 +755,6 @@ export default function Keywords() {
                     {strictMode ? 'ON' : 'OFF'}
                   </span>
                 </button>
-
-                {/* Threshold slider (collapsible) */}
-                {showThreshold && (
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-stone-500 dark:text-slate-400 flex items-center justify-between">
-                      <span className="flex items-center gap-1.5"><SlidersHorizontal className="w-3 h-3" /> Relevance threshold</span>
-                      <span className="font-mono">{(selectionThreshold * 100).toFixed(0)}%</span>
-                    </label>
-                    <input
-                      type="range"
-                      min={0}
-                      max={0.5}
-                      step={0.01}
-                      value={selectionThreshold}
-                      onChange={e => {
-                        const val = parseFloat(e.target.value)
-                        setThreshold(val)
-                        if (selectedKeyword) handleThresholdChange(selectedKeyword, val)
-                      }}
-                      className="w-full h-1.5 accent-slate-900 dark:accent-slate-400"
-                    />
-                    <div className="flex justify-between text-[9px] text-stone-300 dark:text-slate-600">
-                      <span>Broad</span><span>Precise</span>
-                    </div>
-                  </div>
-                )}
 
                 <p className="text-[10px] text-stone-400 dark:text-slate-500 leading-tight hidden lg:block">
                   {strictMode ? 'Only showing articles with keyword in the headline — highest precision.' : 'Showing all matching articles ranked by relevance.'}
@@ -979,11 +931,6 @@ export default function Keywords() {
                     )}
                     {strictMode && (
                       <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">Headlines</span>
-                    )}
-                    {selectedKeyword && (selectedKeyword.threshold ?? threshold) !== 0.12 && (
-                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
-                        Threshold {((selectedKeyword.threshold ?? threshold) * 100).toFixed(0)}%
-                      </span>
                     )}
                     {selectedTopic && (
                       <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
