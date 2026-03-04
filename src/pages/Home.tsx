@@ -272,8 +272,6 @@ export default function Home() {
           setSelectedCategories={setSelectedCategories}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
-          dateRange={dateRange}
-          setDateRange={setDateRange}
           selectedSources={selectedSources}
           setSelectedSources={setSelectedSources}
           savedKeywords={savedKeywords}
@@ -301,8 +299,6 @@ export default function Home() {
                     setSelectedCategories={setSelectedCategories}
                     searchQuery={searchQuery}
                     setSearchQuery={setSearchQuery}
-                    dateRange={dateRange}
-                    setDateRange={setDateRange}
                     selectedSources={selectedSources}
                     setSelectedSources={setSelectedSources}
                     savedKeywords={savedKeywords}
@@ -330,6 +326,22 @@ export default function Home() {
                   Updated {lastUpdated.toLocaleTimeString()}
                 </span>
               )}
+
+              {/* Time period pills — matching Keywords page style */}
+              <div className="flex items-center gap-1">
+                {(['24h', '3d', 'week', 'month'] as const).map(range => (
+                  <button
+                    key={range}
+                    onClick={() => setDateRange(range)}
+                    className={`px-2.5 py-1 text-xs rounded-full font-medium transition-colors ${dateRange === range
+                      ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900'
+                      : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-600'
+                    }`}
+                  >
+                    {range === '24h' ? '24h' : range === '3d' ? '3 days' : range === 'week' ? '1 week' : '1 month'}
+                  </button>
+                ))}
+              </div>
 
               {(selectedCountries.length > 1 || selectedCategories.length > 1) && articles.length > 0 && (
                 <div className="flex flex-col items-end gap-1">
