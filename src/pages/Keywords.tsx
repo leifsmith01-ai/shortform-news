@@ -274,7 +274,7 @@ export default function Keywords() {
 
   // ── Input / filters ──
   const [inputValue, setInputValue] = useState('')
-  const [dateRange, setDateRange] = useState<'24h' | '3d' | 'week'>('24h')
+  const [dateRange, setDateRange] = useState<'24h' | '3d' | 'week' | 'month'>('24h')
   const [region, setRegion] = useState<string>(() => load(LS.REGION, 'world'))
   const [strictMode, setStrictMode] = useState<boolean>(() => load(LS.STRICT, false))
   const [threshold, setThreshold] = useState<number>(() => load(LS.THRESHOLD, 0.12))
@@ -934,7 +934,7 @@ export default function Keywords() {
                     {/* Timeframe (articles view only) */}
                     {activeView === 'articles' && (
                       <div className="flex items-center gap-1">
-                        {(['24h', '3d', 'week'] as const).map(range => (
+                        {(['24h', '3d', 'week', 'month'] as const).map(range => (
                           <button
                             key={range}
                             onClick={() => setDateRange(range)}
@@ -943,7 +943,7 @@ export default function Keywords() {
                               : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-600'
                             }`}
                           >
-                            {range === '24h' ? '24h' : range === '3d' ? '3 days' : '1 week'}
+                            {range === '24h' ? '24h' : range === '3d' ? '3 days' : range === 'week' ? '1 week' : '1 month'}
                           </button>
                         ))}
                       </div>
