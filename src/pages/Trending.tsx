@@ -7,15 +7,6 @@ import NewsCard from '@/components/news/NewsCard';
 import LoadingCard from '@/components/news/LoadingCard';
 import api from '@/api';
 
-const CATEGORY_COLORS: Record<string, string> = {
-  'health-tech-science': 'bg-blue-100 text-blue-700',
-  business: 'bg-green-100 text-green-700',
-  sports: 'bg-orange-100 text-orange-700',
-  entertainment: 'bg-pink-100 text-pink-700',
-  politics: 'bg-amber-100 text-amber-700',
-  world: 'bg-teal-100 text-teal-700',
-};
-
 export default function Trending() {
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -146,21 +137,7 @@ export default function Trending() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {articles.map((article, index) => (
-                    <div key={index} className="relative">
-                      {/* Rank badge */}
-                      <div className={`absolute -top-2 -left-2 z-10 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shadow-md ${
-                        index === 0
-                          ? 'bg-yellow-400 text-yellow-900'
-                          : index === 1
-                          ? 'bg-slate-300 text-slate-700'
-                          : index === 2
-                          ? 'bg-amber-600 text-white'
-                          : 'bg-stone-200 dark:bg-slate-700 text-stone-600 dark:text-slate-300'
-                      }`}>
-                        {index + 1}
-                      </div>
-                      <NewsCard article={article} index={index} rank={index + 1} isPriority={index < 3} />
-                    </div>
+                    <NewsCard key={index} article={article} index={index} rank={index + 1} isPriority={index < 3} />
                   ))}
                 </div>
               </div>

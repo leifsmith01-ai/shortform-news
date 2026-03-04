@@ -311,7 +311,7 @@ export default function Home() {
               </Sheet>
 
               <div>
-                <h1 className="text-xl lg:text-2xl font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-slate-900 dark:text-slate-200" />
                   {dateRangeLabel}
                 </h1>

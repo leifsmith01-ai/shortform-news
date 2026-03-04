@@ -15,8 +15,8 @@ export default function Layout({ children, currentPageName }: { children: React.
     { name: 'Saved', icon: Bookmark, page: '/saved' },
     { name: 'History', icon: Clock, page: '/history' },
     { name: 'Settings', icon: Settings, page: '/settings' },
-    { name: 'About', icon: Info, page: '/about' },
-    { name: 'Privacy', icon: Shield, page: '/privacy-policy' },
+    { name: 'About', icon: Info, page: '/about', showOnMobile: false },
+    { name: 'Privacy', icon: Shield, page: '/privacy-policy', showOnMobile: false },
   ];
 
   const isActive = (page: string) =>
@@ -115,7 +115,7 @@ export default function Layout({ children, currentPageName }: { children: React.
       {/* ── Mobile bottom navigation (hidden on md+) ──────────────────── */}
       <nav className="md:hidden flex-shrink-0 bg-slate-900 border-t border-slate-800 px-1 pt-2 pb-[max(8px,env(safe-area-inset-bottom))] fixed bottom-0 inset-x-0 z-50">
         <div className="flex justify-around items-center overflow-x-auto scrollbar-none gap-0.5">
-          {navItems.map((item) => {
+          {navItems.filter(item => item.showOnMobile !== false).map((item) => {
             const Icon = item.icon;
             const active = isActive(item.page);
             return (
