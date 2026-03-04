@@ -115,6 +115,12 @@ export function mergeAndRank(
         cache.set(article.url, article)
     }
 
+    // Track fresh article URLs so we can exempt them from the date filter below.
+    // The backend already applied date enforcement (including intentional fill-up
+    // for low-coverage pairs like Canada+Politics), so re-filtering them here
+    // would silently drop those fill-up articles and miscount what was fetched.
+    const freshUrls = new Set(freshArticles.map(a => a.url).filter(Boolean))
+
     writeCache(cache)
 
     // Filter cached articles by countries, categories, date range, and search query
@@ -138,8 +144,10 @@ export function mergeAndRank(
             if (!categorySet.has(mapped)) return false
         }
 
-        // Date filter — articles outside the time window are removed
-        if (cutoff) {
+        // Date filter — skip for freshly fetched articles. The backend already
+        // applied date enforcement, including intentional out-of-window fill-ups
+        // for low-coverage pairs. Only trim stale articles from previous sessions.
+        if (cutoff && !freshUrls.has(article.url || '')) {
             const publishedTime = article.publishedAt ? new Date(article.publishedAt).getTime() : 0
             if (publishedTime && publishedTime < cutoff.getTime()) return false
         }
