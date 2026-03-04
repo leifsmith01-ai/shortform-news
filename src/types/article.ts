@@ -36,7 +36,7 @@ export interface KeywordTopic {
   user_id: string
   name: string
   created_at: string
-  keywords?: Keyword[]
+  keyword_topic_members?: { keyword_id: string }[]
 }
 
 export interface KeywordAlertSetting {

@@ -348,7 +348,7 @@ export default function Keywords() {
     abortRef.current = ctrl
 
     // Get the keyword IDs belonging to this topic
-    const memberIds = (topic.keyword_topic_members as { keyword_id: string }[] | undefined)?.map(m => m.keyword_id) ?? []
+    const memberIds = topic.keyword_topic_members?.map(m => m.keyword_id) ?? []
     const topicKeywords = keywords.filter(kw => memberIds.includes(kw.id))
     if (topicKeywords.length === 0) { setArticles([]); return }
 
@@ -398,7 +398,7 @@ export default function Keywords() {
     if (activeView !== 'analytics' || !selection || !isSignedIn) return
     const kwNames: string[] = selection.type === 'keyword'
       ? [keywords.find(k => k.id === selection.id)?.keyword].filter(Boolean) as string[]
-      : ((topics.find(t => t.id === selection.id)?.keyword_topic_members as { keyword_id: string }[] | undefined) ?? [])
+      : (topics.find(t => t.id === selection.id)?.keyword_topic_members ?? [])
           .map(m => keywords.find(k => k.id === m.keyword_id)?.keyword)
           .filter(Boolean) as string[]
     if (!kwNames.length) return
@@ -468,9 +468,16 @@ export default function Keywords() {
   const handleCreateTopic = async (name: string, keywordIds: string[]) => {
     const topic = await api.createTopic(name)
     await Promise.all(keywordIds.map(id => api.addKeywordToTopic(topic.id, id)))
-    // Re-fetch topics to get membership
+    // Re-fetch topics to get membership. Supabase's PostgREST relationship
+    // embedding (keyword_topic_members) requires the schema cache to recognise
+    // the FK, which may not happen immediately after a fresh migration.
+    // Inject the known member IDs directly so the feed works straight away
+    // regardless of whether the embedded query returned them.
     const fresh = await api.getTopics()
-    setTopics(fresh)
+    const members = keywordIds.map(id => ({ keyword_id: id }))
+    setTopics(fresh.map(t =>
+      t.id === topic.id ? { ...t, keyword_topic_members: members } : t
+    ))
     setSelection({ type: 'topic', id: topic.id })
     toast.success(`Feed "${name}" created`)
   }
@@ -723,7 +730,7 @@ export default function Keywords() {
                           <div className="flex flex-nowrap lg:flex-wrap gap-2 overflow-x-auto lg:overflow-visible pb-1">
                             {topics.map(topic => {
                               const isSelected = selection?.type === 'topic' && selection.id === topic.id
-                              const memberCount = (topic.keyword_topic_members as { keyword_id: string }[] | undefined)?.length ?? 0
+                              const memberCount = topic.keyword_topic_members?.length ?? 0
                               return (
                                 <div key={topic.id} className="relative group/topic flex-shrink-0 lg:flex-shrink">
                                   <button
