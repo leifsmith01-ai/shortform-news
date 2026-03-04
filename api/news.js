@@ -2650,27 +2650,61 @@ const GOOGLE_NEWS_LOCALE_MAP = {
   world: { gl: 'US', hl: 'en-US', ceid: 'US:en' },
 };
 
-// Maps category → a short search phrase used when building a category-mode
-// Google News RSS query. Kept concise so the RSS feed stays on-topic.
+// Maps top-level categories to their native Google News topic tokens.
+// These tokens are Google's own curated section feeds — they're more precise
+// than keyword searches and cover any country via the locale params.
+// Subcategories (gaming, film, tv, music, politics) have no native topic and
+// fall back to the search-based approach using GOOGLE_NEWS_CATEGORY_QUERY.
+const GOOGLE_NEWS_TOPIC_TOKENS = {
+  world:         'CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx1YlY4U0FtVnVHZ0pWVXlnQVAB',
+  business:      'CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx6TVdZU0FtVnVHZ0pWVXlnQVAB',
+  technology:    'CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FtVnVHZ0pIUWlnQVAB',
+  entertainment: 'CAAqJggKIiBDQkFTRWdvSUwyMHZNREpxYW5RU0FtVnVHZ0pWVXlnQVAB',
+  sports:        'CAAqJggKIiBDQkFTRWdvSUwyMHZNRFp1ZEdvU0FtVnVHZ0pWVXlnQVAB',
+  science:       'CAAqJggKIiBDQkFTRWdvSUwyMHZNRFp0Y1RjU0FtVnVHZ0pWVXlnQVAB',
+  health:        'CAAqIQgKIhtDQkFTRGdvSUwyMHZNR3QwTlRFU0FtVnVLQUFQAQ',
+};
+
+// Fallback search queries for categories that have no native Google News topic
+// (subcategories: gaming, film, tv, music, politics).
 const GOOGLE_NEWS_CATEGORY_QUERY = {
-  world: 'world news international',
-  politics: 'politics election government parliament',
-  technology: 'technology AI software startup',
-  business: 'business economy finance stock market',
-  science: 'science research discovery climate',
-  health: 'health medical disease vaccine healthcare',
-  sports: 'sports championship athlete league',
-  entertainment: 'entertainment film music celebrity',
-  gaming: '"video games" esports gaming',
-  film: 'movie film Hollywood "box office"',
-  tv: 'TV series streaming Netflix HBO',
-  music: 'music album Grammy concert tour',
+  politics:      'politics election government parliament',
+  gaming:        '"video games" esports gaming',
+  film:          'movie film Hollywood "box office"',
+  tv:            'TV series streaming Netflix HBO',
+  music:         'music album Grammy concert tour',
 };
 
 /**
- * Fetch articles from Google News RSS for a given free-text query.
+ * Fetch articles from Google News RSS for a given category and country.
+ * Uses the native topic feed when available (more precise), otherwise falls
+ * back to a search query. Country locale params are applied in both cases.
+ */
+async function fetchGoogleNewsRSSByCategory(category, { country = 'world' } = {}) {
+  const locale = GOOGLE_NEWS_LOCALE_MAP[country] || GOOGLE_NEWS_LOCALE_MAP.us;
+  const localeParams = new URLSearchParams({ hl: locale.hl, gl: locale.gl, ceid: locale.ceid });
+
+  const token = GOOGLE_NEWS_TOPIC_TOKENS[category];
+  if (token) {
+    // Native topic feed — Google's curated section, country-localised via gl/hl/ceid
+    const url = `https://news.google.com/rss/topics/${token}?${localeParams}`;
+    return fetchRSSFeed(url);
+  }
+
+  // No native topic — build a keyword search query instead
+  const fallbackQuery = GOOGLE_NEWS_CATEGORY_QUERY[category] || category;
+  const countryName = COUNTRY_NAMES[country] || '';
+  const q = country !== 'world' && countryName
+    ? `${countryName} ${fallbackQuery}`
+    : fallbackQuery;
+  const searchParams = new URLSearchParams({ q, hl: locale.hl, gl: locale.gl, ceid: locale.ceid });
+  const url = `https://news.google.com/rss/search?${searchParams}`;
+  return fetchRSSFeed(url);
+}
+
+/**
+ * Fetch articles from Google News RSS for a given free-text query (keyword mode).
  * Country locale parameters are applied so results are geographically relevant.
- * Returns parsed RSS items (same shape as fetchRSSFeed).
  */
 async function fetchGoogleNewsRSS(query, { country = 'world' } = {}) {
   const locale = GOOGLE_NEWS_LOCALE_MAP[country] || GOOGLE_NEWS_LOCALE_MAP.us;
@@ -4354,18 +4388,15 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
   }
 
   // ── 5b. Google News RSS ───────────────────────────────────────────────────
-  // Free, no API key required. Builds a search query from country name + category
-  // terms and fetches articles via the Google News RSS search endpoint.
-  // Always attempted — Google News covers virtually every country and category.
+  // Free, no API key required. Uses native Google News topic feeds for top-level
+  // categories (world, business, technology, sports, entertainment, science, health)
+  // and falls back to keyword search for subcategories without a native topic.
+  // Country locale params (gl/hl/ceid) are applied in both cases.
   {
-    const countryName = COUNTRY_NAMES[country] || '';
-    const catQuery = GOOGLE_NEWS_CATEGORY_QUERY[category] || category;
-    const gnQuery = country !== 'world' && countryName
-      ? `${countryName} ${catQuery}`
-      : catQuery;
-    console.log(`  [5b] Google News RSS [${country}/${category}]`);
+    const gnMode = GOOGLE_NEWS_TOPIC_TOKENS[category] ? 'topic' : 'search';
+    console.log(`  [5b] Google News RSS [${country}/${category}] (${gnMode})`);
     try {
-      const gnItems = await fetchGoogleNewsRSS(gnQuery, { country });
+      const gnItems = await fetchGoogleNewsRSSByCategory(category, { country });
       const gnArticles = gnItems.map(item => formatGoogleNewsRSSArticle(item, country, category));
       formattedArticles = [...formattedArticles, ...gnArticles];
       console.log(`  [5b] Google News RSS: ${gnArticles.length} articles`);
