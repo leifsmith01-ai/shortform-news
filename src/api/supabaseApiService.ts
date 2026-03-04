@@ -221,17 +221,72 @@ class SupabaseApiService {
     frequency: 'daily',
     enabled: boolean
   ): Promise<KeywordAlertSetting> {
-    const { data, error } = await supabase
+    // Use upsert via the partial unique index on (user_id, keyword_id) where topic_id IS NULL.
+    // Supabase upsert needs the conflict columns to match — we filter after to return the row.
+    const { data: existing } = await supabase
       .from('keyword_alert_settings')
-      .upsert(
-        { user_id: this.userId, keyword_id: keywordId, email, frequency, enabled },
-        { onConflict: 'user_id,keyword_id' }
-      )
-      .select()
-      .single()
+      .select('id')
+      .eq('user_id', this.userId)
+      .eq('keyword_id', keywordId)
+      .is('topic_id', null)
+      .maybeSingle()
 
-    if (error) throw error
-    return data
+    const row = { user_id: this.userId, keyword_id: keywordId, topic_id: null, email, frequency, enabled }
+
+    if (existing?.id) {
+      const { data, error } = await supabase
+        .from('keyword_alert_settings')
+        .update({ email, frequency, enabled })
+        .eq('id', existing.id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    } else {
+      const { data, error } = await supabase
+        .from('keyword_alert_settings')
+        .insert(row)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    }
+  }
+
+  async upsertTopicAlertSetting(
+    topicId: string,
+    email: string,
+    frequency: 'daily',
+    enabled: boolean
+  ): Promise<KeywordAlertSetting> {
+    const { data: existing } = await supabase
+      .from('keyword_alert_settings')
+      .select('id')
+      .eq('user_id', this.userId)
+      .eq('topic_id', topicId)
+      .is('keyword_id', null)
+      .maybeSingle()
+
+    const row = { user_id: this.userId, topic_id: topicId, keyword_id: null, email, frequency, enabled }
+
+    if (existing?.id) {
+      const { data, error } = await supabase
+        .from('keyword_alert_settings')
+        .update({ email, frequency, enabled })
+        .eq('id', existing.id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    } else {
+      const { data, error } = await supabase
+        .from('keyword_alert_settings')
+        .insert(row)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    }
   }
 
   async deleteAlertSetting(id: string): Promise<void> {

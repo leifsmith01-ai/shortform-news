@@ -174,6 +174,16 @@ class ApiService {
     return await this.supabase.upsertAlertSetting(keywordId, email, frequency, enabled)
   }
 
+  async upsertTopicAlertSetting(
+    topicId: string,
+    email: string,
+    frequency: 'daily',
+    enabled: boolean
+  ): Promise<KeywordAlertSetting> {
+    if (!this.supabase) throw new Error('Must be signed in to manage alerts')
+    return await this.supabase.upsertTopicAlertSetting(topicId, email, frequency, enabled)
+  }
+
   async deleteAlertSetting(id: string) {
     if (!this.supabase) throw new Error('Must be signed in to manage alerts')
     return await this.supabase.deleteAlertSetting(id)
