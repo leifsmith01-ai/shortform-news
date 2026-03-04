@@ -2957,7 +2957,7 @@ async function expandQueryWithLLM(keyword, llmKeys, useKeywordMonitorPrompt = fa
   const prompt = useKeywordMonitorPrompt
     ? KEYWORD_MONITOR_EXPANSION_PROMPT(keyword)
     : EXPANSION_PROMPT(keyword);
-  // Try Gemini first (fastest/cheapest), then Groq
+  // Try free providers in order; tight 4s timeout — expansion shouldn't delay the search
   const providers = [
     llmKeys.gemini && (async () => {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${llmKeys.gemini}`;
@@ -2967,11 +2967,26 @@ async function expandQueryWithLLM(keyword, llmKeys, useKeywordMonitorPrompt = fa
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { temperature: 0.3, maxOutputTokens: 100 }
         })
-      }, 4000); // tight 4s timeout — expansion shouldn't delay the search
+      }, 4000);
       const data = await res.json();
       if (res.status === 429 || data.error?.code === 429) return null;
       if (!res.ok) return null;
       return data.candidates?.[0]?.content?.parts?.[0]?.text;
+    }),
+    llmKeys.cerebras && (async () => {
+      const res = await fetchWithTimeout('https://api.cerebras.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${llmKeys.cerebras}` },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.3, max_tokens: 100
+        })
+      }, 4000);
+      const data = await res.json();
+      if (res.status === 429) return null;
+      if (!res.ok) return null;
+      return data.choices?.[0]?.message?.content;
     }),
     llmKeys.groq && (async () => {
       const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
@@ -2979,6 +2994,21 @@ async function expandQueryWithLLM(keyword, llmKeys, useKeywordMonitorPrompt = fa
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${llmKeys.groq}` },
         body: JSON.stringify({
           model: 'llama-3.1-8b-instant',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.3, max_tokens: 100
+        })
+      }, 4000);
+      const data = await res.json();
+      if (res.status === 429) return null;
+      if (!res.ok) return null;
+      return data.choices?.[0]?.message?.content;
+    }),
+    llmKeys.mistral && (async () => {
+      const res = await fetchWithTimeout('https://api.mistral.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${llmKeys.mistral}` },
+        body: JSON.stringify({
+          model: 'mistral-small-latest',
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.3, max_tokens: 100
         })
@@ -3200,7 +3230,7 @@ async function searchGNewsByKeyword(keyword, apiKey, opts = {}) {
 }
 
 // ── AI Summarisation — multi-provider fallback chain ─────────────────────────
-// Order: Gemini → Groq → OpenAI → Cohere
+// Order: Gemini → Cerebras → Groq → Mistral → SambaNova → OpenRouter → OpenAI → Cohere
 // Each provider throws QuotaExceededError on 429/quota so the next is tried.
 
 class QuotaExceededError extends Error {
@@ -3317,6 +3347,74 @@ async function summarizeWithCohere(content, key) {
   return parseBullets(data.message?.content?.[0]?.text);
 }
 
+async function summarizeWithCerebras(content, key) {
+  const res = await fetchWithTimeout('https://api.cerebras.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b',
+      messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
+      temperature: 0.2,
+      max_tokens: 500
+    })
+  });
+  const data = await res.json();
+  if (res.status === 429) { throw new QuotaExceededError('Cerebras'); }
+  if (!res.ok) { console.error(`Cerebras error: ${data.error?.message?.slice(0, 100)}`); return null; }
+  return parseBullets(data.choices?.[0]?.message?.content);
+}
+
+async function summarizeWithMistral(content, key) {
+  const res = await fetchWithTimeout('https://api.mistral.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({
+      model: 'mistral-small-latest',
+      messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
+      temperature: 0.2,
+      max_tokens: 500
+    })
+  });
+  const data = await res.json();
+  if (res.status === 429) { throw new QuotaExceededError('Mistral'); }
+  if (!res.ok) { console.error(`Mistral error: ${data.error?.message?.slice(0, 100)}`); return null; }
+  return parseBullets(data.choices?.[0]?.message?.content);
+}
+
+async function summarizeWithSambaNova(content, key) {
+  const res = await fetchWithTimeout('https://api.sambanova.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({
+      model: 'Meta-Llama-3.3-70B-Instruct',
+      messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
+      temperature: 0.2,
+      max_tokens: 500
+    })
+  });
+  const data = await res.json();
+  if (res.status === 429) { throw new QuotaExceededError('SambaNova'); }
+  if (!res.ok) { console.error(`SambaNova error: ${data.error?.message?.slice(0, 100)}`); return null; }
+  return parseBullets(data.choices?.[0]?.message?.content);
+}
+
+async function summarizeWithOpenRouter(content, key) {
+  const res = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'HTTP-Referer': 'shortform-news' },
+    body: JSON.stringify({
+      model: 'meta-llama/llama-4-scout:free',
+      messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
+      temperature: 0.2,
+      max_tokens: 500
+    })
+  });
+  const data = await res.json();
+  if (res.status === 429) { throw new QuotaExceededError('OpenRouter'); }
+  if (!res.ok) { console.error(`OpenRouter error: ${data.error?.message?.slice(0, 100)}`); return null; }
+  return parseBullets(data.choices?.[0]?.message?.content);
+}
+
 // Per-article summary cache — avoids re-generating LLM summaries for the same article
 // across multiple cache refreshes. TTL of 36 hours is longer than the 12-hour news
 // cache since article content doesn't change after publication.
@@ -3327,10 +3425,14 @@ const SUMMARY_CACHE_TTL_MS = 36 * 60 * 60 * 1000; // 36 hours
 async function generateSummary(article, llmKeys) {
   const content = prepareArticleContent(article);
   const providers = [
-    llmKeys.gemini && (() => summarizeWithGemini(content, llmKeys.gemini)),
-    llmKeys.groq && (() => summarizeWithGroq(content, llmKeys.groq)),
-    llmKeys.openai && (() => summarizeWithOpenAI(content, llmKeys.openai)),
-    llmKeys.cohere && (() => summarizeWithCohere(content, llmKeys.cohere)),
+    llmKeys.gemini     && (() => summarizeWithGemini(content, llmKeys.gemini)),
+    llmKeys.cerebras   && (() => summarizeWithCerebras(content, llmKeys.cerebras)),
+    llmKeys.groq       && (() => summarizeWithGroq(content, llmKeys.groq)),
+    llmKeys.mistral    && (() => summarizeWithMistral(content, llmKeys.mistral)),
+    llmKeys.sambanova  && (() => summarizeWithSambaNova(content, llmKeys.sambanova)),
+    llmKeys.openrouter && (() => summarizeWithOpenRouter(content, llmKeys.openrouter)),
+    llmKeys.openai     && (() => summarizeWithOpenAI(content, llmKeys.openai)),
+    llmKeys.cohere     && (() => summarizeWithCohere(content, llmKeys.cohere)),
   ].filter(Boolean);
 
   for (const attempt of providers) {
@@ -3743,10 +3845,14 @@ export default async function handler(req, res) {
 
   // LLM summarisation — collect all configured keys; generateSummary tries them in order
   const LLM_KEYS = {
-    gemini: process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || null,
-    groq: process.env.GROQ_API_KEY || null,
-    openai: process.env.OPENAI_API_KEY || null,
-    cohere: process.env.COHERE_API_KEY || null,
+    gemini:     process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || null,
+    cerebras:   process.env.CEREBRAS_API_KEY   || null,
+    groq:       process.env.GROQ_API_KEY        || null,
+    mistral:    process.env.MISTRAL_API_KEY     || null,
+    sambanova:  process.env.SAMBANOVA_API_KEY   || null,
+    openrouter: process.env.OPENROUTER_API_KEY  || null,
+    openai:     process.env.OPENAI_API_KEY      || null,
+    cohere:     process.env.COHERE_API_KEY      || null,
   };
   const HAS_LLM = Object.values(LLM_KEYS).some(Boolean);
 
