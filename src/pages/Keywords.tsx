@@ -762,6 +762,19 @@ export default function Keywords() {
               </div>
             )}
 
+            {/* Create feed from keywords — shown when ≥2 keywords exist */}
+            {isSignedIn && keywords.length >= 2 && (
+              <div className="px-3 lg:px-4 pb-2">
+                <button
+                  onClick={() => setShowCreateTopic(true)}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-stone-300 dark:border-slate-600 text-xs font-medium text-stone-500 dark:text-slate-400 hover:border-stone-400 dark:hover:border-slate-500 hover:text-stone-700 dark:hover:text-slate-300 hover:bg-stone-50 dark:hover:bg-slate-700/50 transition-colors"
+                >
+                  <FolderPlus className="w-3.5 h-3.5 flex-shrink-0" />
+                  Create feed from keywords
+                </button>
+              </div>
+            )}
+
             {/* Keyword + topic list */}
             <div className="lg:flex-1">
               <ScrollArea className="h-full">
@@ -879,16 +892,6 @@ export default function Keywords() {
                         )}
                       </div>
 
-                      {/* Create topic button */}
-                      {keywords.length >= 2 && (
-                        <button
-                          onClick={() => setShowCreateTopic(true)}
-                          className="flex items-center gap-1.5 text-xs text-stone-400 dark:text-slate-500 hover:text-stone-600 dark:hover:text-slate-300 transition-colors"
-                        >
-                          <FolderPlus className="w-3.5 h-3.5" />
-                          Create feed from keywords
-                        </button>
-                      )}
                     </>
                   )}
                 </div>
