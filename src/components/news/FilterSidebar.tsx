@@ -4,20 +4,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Globe, Newspaper, ChevronDown, Search, Calendar, Flame, TrendingUp, Tag, Sparkles, Bookmark, Clock, Building2, Settings } from 'lucide-react';
+import { Globe, Newspaper, ChevronDown, Search, Flame, TrendingUp, Tag, Sparkles, Bookmark, Clock, Building2, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { TRUSTED_SOURCES, SOURCE_GROUPS, ALL_SOURCE_DOMAINS } from '@/lib/sources';
 
 const NAV_LINKS = [
@@ -163,8 +156,6 @@ export default function FilterSidebar({
   setSelectedCategories,
   searchQuery,
   setSearchQuery,
-  dateRange,
-  setDateRange,
   selectedSources,
   setSelectedSources,
   savedKeywords = [],
@@ -175,8 +166,6 @@ export default function FilterSidebar({
   setSelectedCategories: (fn: (prev: string[]) => string[]) => void;
   searchQuery: string;
   setSearchQuery: (q: string) => void;
-  dateRange: string;
-  setDateRange: (r: string) => void;
   selectedSources: string[];
   setSelectedSources: (fn: (prev: string[]) => string[]) => void;
   savedKeywords?: string[];
@@ -386,25 +375,6 @@ export default function FilterSidebar({
           <p className="mt-1.5 text-[11px] text-slate-600">
             Use <span className="font-mono text-slate-500">AND</span> / <span className="font-mono text-slate-500">NOT</span> for precise searches
           </p>
-        </div>
-
-        {/* Date Range Section */}
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-3">
-            <Calendar className="w-4 h-4 text-slate-400" />
-            <span className="text-sm font-medium text-slate-300">Time Period</span>
-          </div>
-          <Select value={dateRange} onValueChange={setDateRange}>
-            <SelectTrigger className="bg-slate-800 border-slate-700 text-white focus:border-slate-500 focus:ring-slate-500">
-              <SelectValue placeholder="Select date range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="24h">Last 24 hours</SelectItem>
-              <SelectItem value="3d">Last 3 days</SelectItem>
-              <SelectItem value="week">Last week</SelectItem>
-              <SelectItem value="month">Last month</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         {/* Countries Section */}
