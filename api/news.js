@@ -4093,10 +4093,10 @@ export default async function handler(req, res) {
   const categoryList = Array.isArray(categories) ? categories : [categories || 'technology'];
   const sourceFingerprint = getSourceFingerprint(userSources);
 
-  // Expand the 'all' wildcard category to every real category so that existing
-  // per-pair fetching, caching, and filtering logic works without modification.
-  const ALL_REAL_CATEGORIES = ['health-tech-science', 'business', 'sports', 'entertainment', 'politics'];
-  const effectiveCategoryList = [...new Set(categoryList.flatMap(c => c === 'all' ? ALL_REAL_CATEGORIES : [c]))];
+  // 'all' stays as a single value — _doFetchPair treats it as 'world' (general
+  // news) with no category filter. This makes ONE API call instead of 5, cutting
+  // response time from ~30s to ~6s.
+  const effectiveCategoryList = [...new Set(categoryList)];
 
   try {
     // ── Fetch all country/category pairs in PARALLEL ──────────────────────
@@ -4280,6 +4280,12 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
     rangeHours, dateRange, showNonEnglish,
   } = ctx;
 
+  // When 'all' categories is selected, treat as 'world' for API calls.
+  // This fetches general/top news for the country without category filtering,
+  // using one API call instead of five.
+  const isAllCategories = category === 'all';
+  const effectiveCategory = isAllCategories ? 'world' : category;
+
   // For non-English-primary countries, automatically include native-language articles
   // alongside English coverage so users get local perspectives without needing a toggle.
   // English-primary countries (US/GB/AU/CA/NZ/IE) remain English-only unless the
@@ -4317,37 +4323,37 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
   const skipDomains = !RSS_WELL_SERVED_COUNTRIES.has(country) && country !== 'world';
   const skipSecondaryAPIs = NEWSAPI_FIRST_PASS_COUNTRIES.has(country);
 
-  console.log(`  [1+2+3+6+7+8] Parallel fetch [${country}/${category}]${skipDomains ? ' (skipDomains)' : ''}${skipSecondaryAPIs ? ' (NewsAPI-first)' : ''}${effectiveShowNonEnglish ? ' (bilingual)' : ''}`);
+  console.log(`  [1+2+3+6+7+8] Parallel fetch [${country}/${category}${isAllCategories ? ' → world' : ''}]${skipDomains ? ' (skipDomains)' : ''}${skipSecondaryAPIs ? ' (NewsAPI-first)' : ''}${effectiveShowNonEnglish ? ' (bilingual)' : ''}`);
   // MediaStack: non-English specialist, very low quota (~16/day free).
   // Only call when showNonEnglish=true and country is not an English-primary well-served country.
   const useMediaStack = MEDIASTACK_API_KEY && effectiveShowNonEnglish && !RSS_WELL_SERVED_COUNTRIES.has(country);
   const [newsApiRaw, worldNewsRaw, gNewsRaw, newsDataRaw, currentsRaw, mediaStackRaw] = await Promise.all([
     (country === 'world' || NEWS_API_SUPPORTED_COUNTRIES.has(country))
-      ? fetchFromNewsAPI(country, category, NEWS_API_KEY, activeDomains, activeSourceIds, { from: fromISO, sortByPopularity: usePopularitySort, skipDomains, showNonEnglish: effectiveShowNonEnglish })
+      ? fetchFromNewsAPI(country, effectiveCategory, NEWS_API_KEY, activeDomains, activeSourceIds, { from: fromISO, sortByPopularity: usePopularitySort, skipDomains, showNonEnglish: effectiveShowNonEnglish })
         .catch(err => { console.error('  NewsAPI failed:', err.message); return []; })
       : Promise.resolve([]),
     (!skipSecondaryAPIs && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country)))
-      ? fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
+      ? fetchFromWorldNewsAPI(country, effectiveCategory, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
         .catch(err => { console.error('  WorldNewsAPI failed:', err.message); return []; })
       : Promise.resolve([]),
     (!skipSecondaryAPIs && GNEWS_API_KEY)
-      ? fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
+      ? fetchFromGNews(country, effectiveCategory, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
         .catch(err => { console.error('  GNews failed:', err.message); return []; })
       : Promise.resolve([]),
     // NewsData.io in the parallel pass — broadest country coverage (100+), bolsters
     // article volume especially for non-English and underserved markets.
     (NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country)))
-      ? fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly, showNonEnglish: effectiveShowNonEnglish })
+      ? fetchFromNewsData(country, effectiveCategory, NEWS_DATA_API_KEY, { from: fromDateOnly, showNonEnglish: effectiveShowNonEnglish })
         .catch(err => { console.error('  NewsData failed:', err.message); return []; })
       : Promise.resolve([]),
     // Currents API — 600 req/day free; general fallback for additional source diversity.
     CURRENTS_API_KEY
-      ? fetchFromCurrentsAPI(country, category, CURRENTS_API_KEY, { from: fromISO, showNonEnglish: effectiveShowNonEnglish })
+      ? fetchFromCurrentsAPI(country, effectiveCategory, CURRENTS_API_KEY, { from: fromISO, showNonEnglish: effectiveShowNonEnglish })
         .catch(err => { console.error('  Currents failed:', err.message); return []; })
       : Promise.resolve([]),
     // MediaStack — ~16 req/day free; non-English specialist; skipped for English-primary countries.
     useMediaStack
-      ? fetchFromMediaStack(country, category, MEDIASTACK_API_KEY, { from: fromISO })
+      ? fetchFromMediaStack(country, effectiveCategory, MEDIASTACK_API_KEY, { from: fromISO })
         .catch(err => { console.error('  MediaStack failed:', err.message); return []; })
       : Promise.resolve([]),
   ]);
@@ -4407,7 +4413,7 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
     incrementApiCounter('guardian');
     console.log(`  [4] Guardian [${country}/${category}] (have ${formattedArticles.length} so far)`);
     try {
-      const results = await fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: fromDateOnly });
+      const results = await fetchFromGuardian(country, effectiveCategory, GUARDIAN_API_KEY, { from: fromDateOnly });
       const extra = results.map(r => formatGuardianArticle(r, country, category, true)).filter(a => !seenUrls.has(a.url));
       formattedArticles = [...formattedArticles, ...extra];
     } catch (err) {
@@ -4448,7 +4454,7 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
     const gnMode = GOOGLE_NEWS_TOPIC_TOKENS[category] ? 'topic' : 'search';
     console.log(`  [5b] Google News RSS [${country}/${category}] (${gnMode})`);
     try {
-      const gnItems = await fetchGoogleNewsRSSByCategory(category, { country });
+      const gnItems = await fetchGoogleNewsRSSByCategory(effectiveCategory, { country });
       const gnArticles = gnItems.map(item => formatGoogleNewsRSSArticle(item, country, category));
       formattedArticles = [...formattedArticles, ...gnArticles];
       console.log(`  [5b] Google News RSS: ${gnArticles.length} articles`);
@@ -4467,26 +4473,30 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
   const LOW_COVERAGE_FLOOR = 8;
 
   // ── Category relevance filter ────────────────────────────────────────
+  // Skip category filter entirely when category is 'all' — return all articles
+  // for the country regardless of topic.
   const beforeCatFilter = formattedArticles.length;
   // Snapshot pre-filter list so we can run a rescue pass below if coverage is thin.
   const preFilterArticles = formattedArticles;
-  formattedArticles = formattedArticles.filter(a => {
-    if (articleMatchesCategory(a, category)) return true;
-    // Country-in-title bypass: allow articles that explicitly mention the country
-    // in the headline, but only if they also have at least one weak category signal.
-    // Previously any country-in-title article bypassed the category check entirely,
-    // allowing e.g. "Brazil economy" articles to appear in a sports feed.
-    if (country !== 'world' && category !== 'world') {
-      const { inTitle } = articleMentionsCountry(a, country);
-      if (!inTitle) return false;
-      const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
-      if (!catKeywords) return true; // unknown category — allow through
-      const text = `${(a.title || '')} ${(a.description || '')}`.toLowerCase();
-      return catKeywords.strong.some(kw => text.includes(kw)) ||
-        catKeywords.weak.some(kw => text.includes(kw));
-    }
-    return false;
-  });
+  if (!isAllCategories) {
+    formattedArticles = formattedArticles.filter(a => {
+      if (articleMatchesCategory(a, category)) return true;
+      // Country-in-title bypass: allow articles that explicitly mention the country
+      // in the headline, but only if they also have at least one weak category signal.
+      // Previously any country-in-title article bypassed the category check entirely,
+      // allowing e.g. "Brazil economy" articles to appear in a sports feed.
+      if (country !== 'world' && category !== 'world') {
+        const { inTitle } = articleMentionsCountry(a, country);
+        if (!inTitle) return false;
+        const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
+        if (!catKeywords) return true; // unknown category — allow through
+        const text = `${(a.title || '')} ${(a.description || '')}`.toLowerCase();
+        return catKeywords.strong.some(kw => text.includes(kw)) ||
+          catKeywords.weak.some(kw => text.includes(kw));
+      }
+      return false;
+    });
+  }
   if (formattedArticles.length < beforeCatFilter) {
     console.log(`  Category filter: kept ${formattedArticles.length}/${beforeCatFilter} for [${category}]`);
   }
@@ -4556,28 +4566,28 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
 
     if (!calledSources.has('worldnews') && WORLD_NEWS_API_KEY && (country === 'world' || WORLD_NEWS_API_SUPPORTED_COUNTRIES.has(country))) {
       retryPromises.push(
-        fetchFromWorldNewsAPI(country, category, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
+        fetchFromWorldNewsAPI(country, effectiveCategory, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
           .then(raw => raw.map(a => formatWorldNewsAPIArticle(a, country, category, true)))
           .catch(() => [])
       );
     }
     if (!calledSources.has('newsdata') && NEWS_DATA_API_KEY && (country === 'world' || NEWS_DATA_SUPPORTED_COUNTRIES.has(country))) {
       retryPromises.push(
-        fetchFromNewsData(country, category, NEWS_DATA_API_KEY, { from: fromDateOnly, showNonEnglish: effectiveShowNonEnglish })
+        fetchFromNewsData(country, effectiveCategory, NEWS_DATA_API_KEY, { from: fromDateOnly, showNonEnglish: effectiveShowNonEnglish })
           .then(raw => raw.filter(a => a.title && a.title !== '[Removed]').map(a => formatNewsDataArticle(a, country, category, true)))
           .catch(() => [])
       );
     }
     if (!calledSources.has('guardian') && GUARDIAN_API_KEY) {
       retryPromises.push(
-        fetchFromGuardian(country, category, GUARDIAN_API_KEY, { from: fromDateOnly })
+        fetchFromGuardian(country, effectiveCategory, GUARDIAN_API_KEY, { from: fromDateOnly })
           .then(r => r.map(r => formatGuardianArticle(r, country, category, true)))
           .catch(() => [])
       );
     }
     if (!calledSources.has('gnews') && GNEWS_API_KEY) {
       retryPromises.push(
-        fetchFromGNews(country, category, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
+        fetchFromGNews(country, effectiveCategory, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, showNonEnglish: effectiveShowNonEnglish })
           .then(raw => raw.filter(a => a.title).map(a => formatGNewsArticle(a, country, category, true)))
           .catch(() => [])
       );
@@ -4587,20 +4597,22 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
       const retryResults = await Promise.all(retryPromises);
       let retryArticles = retryResults.flat().filter(a => !existingUrls.has(a.url));
 
-      // Apply same category + country filters to retry batch
-      retryArticles = retryArticles.filter(a => {
-        if (articleMatchesCategory(a, category)) return true;
-        if (country !== 'world' && category !== 'world') {
-          const { inTitle } = articleMentionsCountry(a, country);
-          if (!inTitle) return false;
-          const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
-          if (!catKeywords) return true;
-          const text = `${(a.title || '')} ${(a.description || '')}`.toLowerCase();
-          return catKeywords.strong.some(kw => text.includes(kw)) ||
-            catKeywords.weak.some(kw => text.includes(kw));
-        }
-        return false;
-      });
+      // Apply same category + country filters to retry batch (skip for 'all')
+      if (!isAllCategories) {
+        retryArticles = retryArticles.filter(a => {
+          if (articleMatchesCategory(a, category)) return true;
+          if (country !== 'world' && category !== 'world') {
+            const { inTitle } = articleMentionsCountry(a, country);
+            if (!inTitle) return false;
+            const catKeywords = CATEGORY_RELEVANCE_KEYWORDS[category];
+            if (!catKeywords) return true;
+            const text = `${(a.title || '')} ${(a.description || '')}`.toLowerCase();
+            return catKeywords.strong.some(kw => text.includes(kw)) ||
+              catKeywords.weak.some(kw => text.includes(kw));
+          }
+          return false;
+        });
+      }
       if (country !== 'world') {
         // If already well below the floor, relax to score >= 1 so that score-1
         // articles (single weak body mention) are included as last-resort coverage.
