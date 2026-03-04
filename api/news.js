@@ -2598,6 +2598,126 @@ async function fetchRSSFeed(url) {
   return items;
 }
 
+// ── Google News RSS support ───────────────────────────────────────────────
+// Google News provides free RSS feeds via search queries — no API key needed.
+// Article links are Google redirect URLs (news.google.com/rss/articles/…) that
+// transparently forward users to the original publisher's page.
+// Uses the same RSS_CACHE infrastructure as the other feed sources.
+
+// Maps ISO country code → Google News locale parameters (gl, hl, ceid).
+const GOOGLE_NEWS_LOCALE_MAP = {
+  us: { gl: 'US', hl: 'en-US', ceid: 'US:en' },
+  gb: { gl: 'GB', hl: 'en-GB', ceid: 'GB:en' },
+  au: { gl: 'AU', hl: 'en-AU', ceid: 'AU:en' },
+  ca: { gl: 'CA', hl: 'en-CA', ceid: 'CA:en' },
+  nz: { gl: 'NZ', hl: 'en-NZ', ceid: 'NZ:en' },
+  ie: { gl: 'IE', hl: 'en-IE', ceid: 'IE:en' },
+  in: { gl: 'IN', hl: 'en-IN', ceid: 'IN:en' },
+  sg: { gl: 'SG', hl: 'en-SG', ceid: 'SG:en' },
+  za: { gl: 'ZA', hl: 'en-ZA', ceid: 'ZA:en' },
+  ng: { gl: 'NG', hl: 'en-NG', ceid: 'NG:en' },
+  gh: { gl: 'GH', hl: 'en-GH', ceid: 'GH:en' },
+  ke: { gl: 'KE', hl: 'en-KE', ceid: 'KE:en' },
+  ph: { gl: 'PH', hl: 'en-PH', ceid: 'PH:en' },
+  my: { gl: 'MY', hl: 'en-MY', ceid: 'MY:en' },
+  de: { gl: 'DE', hl: 'de',    ceid: 'DE:de' },
+  fr: { gl: 'FR', hl: 'fr',    ceid: 'FR:fr' },
+  es: { gl: 'ES', hl: 'es',    ceid: 'ES:es' },
+  it: { gl: 'IT', hl: 'it',    ceid: 'IT:it' },
+  nl: { gl: 'NL', hl: 'nl',    ceid: 'NL:nl' },
+  pt: { gl: 'PT', hl: 'pt-PT', ceid: 'PT:pt-150' },
+  br: { gl: 'BR', hl: 'pt-BR', ceid: 'BR:pt-419' },
+  mx: { gl: 'MX', hl: 'es-419', ceid: 'MX:es-419' },
+  ar: { gl: 'AR', hl: 'es-419', ceid: 'AR:es-419' },
+  jp: { gl: 'JP', hl: 'ja',    ceid: 'JP:ja' },
+  kr: { gl: 'KR', hl: 'ko',    ceid: 'KR:ko' },
+  cn: { gl: 'CN', hl: 'zh-CN', ceid: 'CN:zh-Hans' },
+  tw: { gl: 'TW', hl: 'zh-TW', ceid: 'TW:zh-Hant' },
+  ru: { gl: 'RU', hl: 'ru',    ceid: 'RU:ru' },
+  pl: { gl: 'PL', hl: 'pl',    ceid: 'PL:pl' },
+  se: { gl: 'SE', hl: 'sv',    ceid: 'SE:sv' },
+  no: { gl: 'NO', hl: 'no',    ceid: 'NO:no' },
+  tr: { gl: 'TR', hl: 'tr',    ceid: 'TR:tr' },
+  il: { gl: 'IL', hl: 'he',    ceid: 'IL:he' },
+  ae: { gl: 'AE', hl: 'en',    ceid: 'AE:en' },
+  sa: { gl: 'SA', hl: 'ar',    ceid: 'SA:ar' },
+  eg: { gl: 'EG', hl: 'ar',    ceid: 'EG:ar' },
+  id: { gl: 'ID', hl: 'id',    ceid: 'ID:id' },
+  th: { gl: 'TH', hl: 'th',    ceid: 'TH:th' },
+  vn: { gl: 'VN', hl: 'vi',    ceid: 'VN:vi' },
+  pk: { gl: 'PK', hl: 'en-PK', ceid: 'PK:en' },
+  bd: { gl: 'BD', hl: 'en-BD', ceid: 'BD:en' },
+  world: { gl: 'US', hl: 'en-US', ceid: 'US:en' },
+};
+
+// Maps category → a short search phrase used when building a category-mode
+// Google News RSS query. Kept concise so the RSS feed stays on-topic.
+const GOOGLE_NEWS_CATEGORY_QUERY = {
+  world: 'world news international',
+  politics: 'politics election government parliament',
+  technology: 'technology AI software startup',
+  business: 'business economy finance stock market',
+  science: 'science research discovery climate',
+  health: 'health medical disease vaccine healthcare',
+  sports: 'sports championship athlete league',
+  entertainment: 'entertainment film music celebrity',
+  gaming: '"video games" esports gaming',
+  film: 'movie film Hollywood "box office"',
+  tv: 'TV series streaming Netflix HBO',
+  music: 'music album Grammy concert tour',
+};
+
+/**
+ * Fetch articles from Google News RSS for a given free-text query.
+ * Country locale parameters are applied so results are geographically relevant.
+ * Returns parsed RSS items (same shape as fetchRSSFeed).
+ */
+async function fetchGoogleNewsRSS(query, { country = 'world' } = {}) {
+  const locale = GOOGLE_NEWS_LOCALE_MAP[country] || GOOGLE_NEWS_LOCALE_MAP.us;
+  const params = new URLSearchParams({
+    q: query,
+    hl: locale.hl,
+    gl: locale.gl,
+    ceid: locale.ceid,
+  });
+  const url = `https://news.google.com/rss/search?${params}`;
+  return fetchRSSFeed(url);
+}
+
+/**
+ * Normalise a Google News RSS item into the canonical article shape.
+ * Google News embeds the publisher name at the end of the title as " - Source";
+ * this function splits that out so it becomes the article's source field.
+ */
+function formatGoogleNewsRSSArticle(item, country, category) {
+  let title = item.title || '';
+  let source = 'Google News';
+  const dashIdx = title.lastIndexOf(' - ');
+  if (dashIdx > 0) {
+    source = title.slice(dashIdx + 3).trim();
+    title = title.slice(0, dashIdx).trim();
+  }
+  const publishedAt = item.pubDate
+    ? new Date(item.pubDate).toISOString()
+    : new Date().toISOString();
+  const locale = GOOGLE_NEWS_LOCALE_MAP[country] || GOOGLE_NEWS_LOCALE_MAP.us;
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    title,
+    description: item.description || '',
+    content: item.description || '',
+    url: item.link,
+    image_url: null,
+    source,
+    publishedAt,
+    time_ago: timeAgo(publishedAt),
+    country, category,
+    language: locale.hl.split('-')[0] || 'en',
+    summary_points: null,
+    _meta: { sourceCountry: country },
+  };
+}
+
 // ── Keyword query expansion ────────────────────────────────────────────────
 // Maps a normalised search term to an array of related terms that are ORed
 // together in the API query. This solves cases where articles use an alternate
@@ -3662,6 +3782,27 @@ export default async function handler(req, res) {
         );
       }
 
+      // 7. Google News RSS — free, no API key; use raw keyword for best precision
+      searchPromises.push(
+        fetchGoogleNewsRSS(keyword, { country: countryList[0] })
+          .then(items => {
+            const kwLower = keyword.toLowerCase();
+            const matched = items.filter(item => {
+              const text = `${item.title || ''} ${item.description || ''}`.toLowerCase();
+              if (text.includes(kwLower)) return true;
+              for (const term of searchTerms) {
+                const t = term.toLowerCase().replace(/^["'(]+|["')]+$/g, '');
+                if (t.length < 2) continue;
+                if (text.includes(t)) return true;
+              }
+              return false;
+            });
+            if (matched.length > 0) console.log(`  [7] Google News RSS keyword: ${matched.length} articles`);
+            return matched.map(item => formatGoogleNewsRSSArticle(item, countryList[0], categoryList[0]));
+          })
+          .catch(err => { console.error('  Google News RSS keyword failed:', err.message); return []; })
+      );
+
       const searchResults = await Promise.all(searchPromises);
       let results = searchResults.flat();
 
@@ -4209,6 +4350,27 @@ async function _doFetchPair(cacheKey, country, category, ctx, existingArticles =
           console.error(`  RSS feed failed:`, result.reason?.message);
         }
       }
+    }
+  }
+
+  // ── 5b. Google News RSS ───────────────────────────────────────────────────
+  // Free, no API key required. Builds a search query from country name + category
+  // terms and fetches articles via the Google News RSS search endpoint.
+  // Always attempted — Google News covers virtually every country and category.
+  {
+    const countryName = COUNTRY_NAMES[country] || '';
+    const catQuery = GOOGLE_NEWS_CATEGORY_QUERY[category] || category;
+    const gnQuery = country !== 'world' && countryName
+      ? `${countryName} ${catQuery}`
+      : catQuery;
+    console.log(`  [5b] Google News RSS [${country}/${category}]`);
+    try {
+      const gnItems = await fetchGoogleNewsRSS(gnQuery, { country });
+      const gnArticles = gnItems.map(item => formatGoogleNewsRSSArticle(item, country, category));
+      formattedArticles = [...formattedArticles, ...gnArticles];
+      console.log(`  [5b] Google News RSS: ${gnArticles.length} articles`);
+    } catch (err) {
+      console.error('  Google News RSS failed:', err.message);
     }
   }
 
