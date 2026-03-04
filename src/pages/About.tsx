@@ -69,7 +69,7 @@ export default function About() {
             </span>
             <h2 className="text-3xl font-bold text-stone-900 dark:text-stone-100 leading-tight tracking-tight mb-4">
               Your news.<br />
-              <span className="text-indigo-500">Your</span> way.
+              <span className="text-slate-600 dark:text-slate-300">Your</span> way.
             </h2>
             <p className="text-stone-500 dark:text-slate-400 leading-relaxed max-w-xl">
               Shortform is a news platform built on a simple idea: you should be in control of what you read,
@@ -97,7 +97,7 @@ export default function About() {
           </div>
 
           {/* Pull quote */}
-          <div className="bg-white dark:bg-slate-800 border border-stone-200 dark:border-slate-700 border-l-4 border-l-indigo-500 rounded-xl px-6 py-5 mb-8">
+          <div className="bg-white dark:bg-slate-800 border border-stone-200 dark:border-slate-700 border-l-4 border-l-slate-400 dark:border-l-slate-500 rounded-xl px-6 py-5 mb-8">
             <blockquote className="text-base font-medium text-stone-800 dark:text-stone-100 leading-relaxed">
               Enterprise-grade media monitoring used to cost thousands. We think staying informed about the
               world should be accessible.

@@ -46,17 +46,17 @@ const COUNTRY_FLAGS: Record<string, string> = {
 };
 
 const CATEGORY_COLORS = {
-  technology: 'bg-blue-500/10 text-blue-600 border-blue-200',
-  business: 'bg-emerald-500/10 text-emerald-600 border-emerald-200',
-  science: 'bg-purple-500/10 text-purple-600 border-purple-200',
-  health: 'bg-rose-500/10 text-rose-600 border-rose-200',
-  sports: 'bg-orange-500/10 text-orange-600 border-orange-200',
-  gaming: 'bg-violet-500/10 text-violet-600 border-violet-200',
-  film: 'bg-pink-500/10 text-pink-600 border-pink-200',
-  tv: 'bg-fuchsia-500/10 text-fuchsia-600 border-fuchsia-200',
-  music: 'bg-yellow-500/10 text-yellow-600 border-yellow-200',
-  politics: 'bg-slate-500/10 text-slate-600 border-slate-200',
-  world: 'bg-cyan-500/10 text-cyan-600 border-cyan-200',
+  technology: 'bg-blue-500/10 text-blue-600 border-blue-200 dark:text-blue-400 dark:border-blue-700',
+  business: 'bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:text-emerald-400 dark:border-emerald-700',
+  science: 'bg-purple-500/10 text-purple-600 border-purple-200 dark:text-purple-400 dark:border-purple-700',
+  health: 'bg-rose-500/10 text-rose-600 border-rose-200 dark:text-rose-400 dark:border-rose-700',
+  sports: 'bg-orange-500/10 text-orange-600 border-orange-200 dark:text-orange-400 dark:border-orange-700',
+  gaming: 'bg-violet-500/10 text-violet-600 border-violet-200 dark:text-violet-400 dark:border-violet-700',
+  film: 'bg-pink-500/10 text-pink-600 border-pink-200 dark:text-pink-400 dark:border-pink-700',
+  tv: 'bg-fuchsia-500/10 text-fuchsia-600 border-fuchsia-200 dark:text-fuchsia-400 dark:border-fuchsia-700',
+  music: 'bg-yellow-500/10 text-yellow-600 border-yellow-200 dark:text-yellow-400 dark:border-yellow-700',
+  politics: 'bg-slate-500/10 text-slate-600 border-slate-200 dark:text-slate-400 dark:border-slate-600',
+  world: 'bg-cyan-500/10 text-cyan-600 border-cyan-200 dark:text-cyan-400 dark:border-cyan-700',
 };
 
 export default function NewsCard({ article, index, rank, isPriority = false }) {
@@ -278,13 +278,6 @@ export default function NewsCard({ article, index, rank, isPriority = false }) {
             <span>{article.time_ago || 'Today'}</span>
           </div>
         </div>
-
-        {/* Published date */}
-        {article.publishedAt && (
-          <div className="flex items-center gap-1 text-xs text-stone-500 dark:text-slate-400 mb-3">
-            <span>{new Date(article.publishedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-          </div>
-        )}
 
         {/* Title */}
         <h3 className="text-lg font-semibold text-stone-900 dark:text-stone-100 leading-snug mb-3 line-clamp-2 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors">

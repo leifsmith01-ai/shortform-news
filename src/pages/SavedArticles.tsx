@@ -4,6 +4,7 @@ import { ApiReadyContext } from '@/App';
 import { useCountUp } from '@/hooks/useCountUp';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import NewsCard from '@/components/news/NewsCard';
 import LoadingCard from '@/components/news/LoadingCard';
 import AdUnit from '@/components/AdUnit';
@@ -79,17 +80,18 @@ export default function SavedArticles() {
           {isSignedIn && savedArticles.length > 0 && (
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-stone-400" />
-              <select
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                className="px-3 py-1.5 rounded-md border border-stone-200 dark:border-slate-600 text-sm bg-white dark:bg-slate-700 dark:text-stone-100"
-              >
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>
-                    {cat === 'all' ? 'All Categories' : cat}
-                  </option>
-                ))}
-              </select>
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger className="w-40 h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(cat => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat === 'all' ? 'All Categories' : cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
         </div>
@@ -150,16 +152,17 @@ export default function SavedArticles() {
             ) : filteredArticles.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {filteredArticles.map((article, index) => (
-                  <div key={article.id || index} className="relative">
+                  <div key={article.id || index} className="flex flex-col gap-1">
                     <NewsCard article={article} index={index} rank={index + 1} />
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="absolute top-2 right-2 z-20"
-                      onClick={() => handleDelete(article.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex justify-end px-1">
+                      <button
+                        onClick={() => handleDelete(article.id)}
+                        className="flex items-center gap-1.5 text-xs text-stone-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors py-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Remove
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
