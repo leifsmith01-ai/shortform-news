@@ -222,13 +222,85 @@ async function tryCohere(content, key) {
   return parseBullets(data.message?.content?.[0]?.text);
 }
 
+async function tryCerebras(content, key) {
+  const res = await fetchWithTimeout('https://api.cerebras.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b',
+      messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
+      temperature: 0.2,
+      max_tokens: 500,
+    }),
+  });
+  const data = await res.json();
+  if (res.status === 429) { throw new QuotaExceededError('Cerebras'); }
+  if (!res.ok) { console.error(`Cerebras error: ${data.error?.message?.slice(0, 100)}`); return null; }
+  return parseBullets(data.choices?.[0]?.message?.content);
+}
+
+async function tryMistral(content, key) {
+  const res = await fetchWithTimeout('https://api.mistral.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({
+      model: 'mistral-small-latest',
+      messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
+      temperature: 0.2,
+      max_tokens: 500,
+    }),
+  });
+  const data = await res.json();
+  if (res.status === 429) { throw new QuotaExceededError('Mistral'); }
+  if (!res.ok) { console.error(`Mistral error: ${data.error?.message?.slice(0, 100)}`); return null; }
+  return parseBullets(data.choices?.[0]?.message?.content);
+}
+
+async function trySambaNova(content, key) {
+  const res = await fetchWithTimeout('https://api.sambanova.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({
+      model: 'Meta-Llama-3.3-70B-Instruct',
+      messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
+      temperature: 0.2,
+      max_tokens: 500,
+    }),
+  });
+  const data = await res.json();
+  if (res.status === 429) { throw new QuotaExceededError('SambaNova'); }
+  if (!res.ok) { console.error(`SambaNova error: ${data.error?.message?.slice(0, 100)}`); return null; }
+  return parseBullets(data.choices?.[0]?.message?.content);
+}
+
+async function tryOpenRouter(content, key) {
+  const res = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'HTTP-Referer': 'shortform-news' },
+    body: JSON.stringify({
+      model: 'meta-llama/llama-4-scout:free',
+      messages: [{ role: 'user', content: SUMMARY_PROMPT(content) }],
+      temperature: 0.2,
+      max_tokens: 500,
+    }),
+  });
+  const data = await res.json();
+  if (res.status === 429) { throw new QuotaExceededError('OpenRouter'); }
+  if (!res.ok) { console.error(`OpenRouter error: ${data.error?.message?.slice(0, 100)}`); return null; }
+  return parseBullets(data.choices?.[0]?.message?.content);
+}
+
 async function generateSummary(article, llmKeys) {
   const content = prepareContent(article);
   const providers = [
-    llmKeys.gemini && (() => tryGemini(content, llmKeys.gemini)),
-    llmKeys.groq   && (() => tryGroq(content, llmKeys.groq)),
-    llmKeys.openai && (() => tryOpenAI(content, llmKeys.openai)),
-    llmKeys.cohere && (() => tryCohere(content, llmKeys.cohere)),
+    llmKeys.gemini     && (() => tryGemini(content, llmKeys.gemini)),
+    llmKeys.cerebras   && (() => tryCerebras(content, llmKeys.cerebras)),
+    llmKeys.groq       && (() => tryGroq(content, llmKeys.groq)),
+    llmKeys.mistral    && (() => tryMistral(content, llmKeys.mistral)),
+    llmKeys.sambanova  && (() => trySambaNova(content, llmKeys.sambanova)),
+    llmKeys.openrouter && (() => tryOpenRouter(content, llmKeys.openrouter)),
+    llmKeys.openai     && (() => tryOpenAI(content, llmKeys.openai)),
+    llmKeys.cohere     && (() => tryCohere(content, llmKeys.cohere)),
   ].filter(Boolean);
 
   for (const attempt of providers) {
@@ -284,17 +356,21 @@ export default async function handler(req, res) {
 
   const { valid: envValid } = validateEnv(res, {
     required: ['NEWS_API_KEY'],
-    optional: ['GUARDIAN_API_KEY', 'GEMINI_API_KEY', 'GROQ_API_KEY', 'OPENAI_API_KEY', 'COHERE_API_KEY'],
+    optional: ['GUARDIAN_API_KEY', 'GEMINI_API_KEY', 'CEREBRAS_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'SAMBANOVA_API_KEY', 'OPENROUTER_API_KEY', 'OPENAI_API_KEY', 'COHERE_API_KEY'],
   });
   if (!envValid) return;
 
   const NEWS_API_KEY = process.env.NEWS_API_KEY;
   const GUARDIAN_API_KEY = process.env.GUARDIAN_API_KEY || null;
   const LLM_KEYS = {
-    gemini: process.env.GEMINI_API_KEY || null,
-    groq:   process.env.GROQ_API_KEY   || null,
-    openai: process.env.OPENAI_API_KEY || null,
-    cohere: process.env.COHERE_API_KEY || null,
+    gemini:     process.env.GEMINI_API_KEY    || null,
+    cerebras:   process.env.CEREBRAS_API_KEY  || null,
+    groq:       process.env.GROQ_API_KEY      || null,
+    mistral:    process.env.MISTRAL_API_KEY   || null,
+    sambanova:  process.env.SAMBANOVA_API_KEY || null,
+    openrouter: process.env.OPENROUTER_API_KEY || null,
+    openai:     process.env.OPENAI_API_KEY    || null,
+    cohere:     process.env.COHERE_API_KEY    || null,
   };
   const HAS_LLM = Object.values(LLM_KEYS).some(Boolean);
 
