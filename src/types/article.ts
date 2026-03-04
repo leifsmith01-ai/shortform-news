@@ -59,6 +59,16 @@ export interface SearchAnalyticsEntry {
   result_count: number | null
   is_boolean: boolean
   created_at: string
+  top_sources?: Record<string, number>
+  top_countries?: Record<string, number>
+}
+
+export interface GoogleTrendsData {
+  interest: { date: string; value: number }[]
+  direction: 'rising' | 'falling' | 'stable'
+  changePct: number
+  breakoutQueries: string[]
+  cached?: boolean
 }
 
 export interface FetchNewsParams {

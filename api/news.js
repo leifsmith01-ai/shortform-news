@@ -3586,8 +3586,25 @@ function formatRSSArticle(item, feedSource, country, category) {
 //   );
 //
 // Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_ANON_KEY) to enable.
-async function logSearchAnalytics(supabaseUrl, supabaseKey, { keyword, userId, expansionSource, resultCount, isBoolean }) {
+// Build top-N source and country maps from an array of article objects.
+function extractSourceGeo(articles, topN = 6) {
+  const sources = {};
+  const countries = {};
+  for (const a of articles) {
+    if (a.source) sources[a.source] = (sources[a.source] ?? 0) + 1;
+    const country = a._meta?.sourceCountry || a.country;
+    if (country) countries[country] = (countries[country] ?? 0) + 1;
+  }
+  const top = (obj) =>
+    Object.fromEntries(
+      Object.entries(obj).sort((x, y) => y[1] - x[1]).slice(0, topN)
+    );
+  return { topSources: top(sources), topCountries: top(countries) };
+}
+
+async function logSearchAnalytics(supabaseUrl, supabaseKey, { keyword, userId, expansionSource, resultCount, isBoolean, articles = [] }) {
   if (!supabaseUrl || !supabaseKey) return;
+  const { topSources, topCountries } = extractSourceGeo(articles);
   try {
     await fetch(`${supabaseUrl}/rest/v1/search_analytics`, {
       method: 'POST',
@@ -3603,6 +3620,8 @@ async function logSearchAnalytics(supabaseUrl, supabaseKey, { keyword, userId, e
         expansion_source: expansionSource,
         result_count: resultCount,
         is_boolean: isBoolean,
+        top_sources: Object.keys(topSources).length ? topSources : null,
+        top_countries: Object.keys(topCountries).length ? topCountries : null,
       }),
     });
   } catch (err) {
@@ -4011,6 +4030,7 @@ export default async function handler(req, res) {
         expansionSource,
         resultCount: clean.length,
         isBoolean: expansionSource === 'boolean',
+        articles: clean,
       });
 
       return res.status(200).json({ status: 'ok', articles: clean, totalResults: clean.length, cached: false });
