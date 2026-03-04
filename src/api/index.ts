@@ -5,7 +5,7 @@
 import { mockApiService } from './mockApiService'
 import { newsApiClient } from './newsApiClient'
 import SupabaseApiService from './supabaseApiService'
-import type { ApiClient, Article, FetchNewsParams, KeywordTopic, KeywordAlertSetting, SearchAnalyticsEntry } from '@/types/article'
+import type { ApiClient, Article, FetchNewsParams, KeywordTopic, KeywordAlertSetting, SearchAnalyticsEntry, GoogleTrendsData } from '@/types/article'
 
 // Use mock API ONLY if explicitly set to 'true', otherwise always use real API
 const USE_MOCK_API = String(import.meta.env.VITE_USE_MOCK_API).toLowerCase() === 'true'
@@ -194,6 +194,17 @@ class ApiService {
   async getSearchAnalytics(days?: number, keyword?: string | string[]): Promise<SearchAnalyticsEntry[]> {
     if (!this.supabase) throw new Error('Must be signed in to view analytics')
     return await this.supabase.getSearchAnalytics(days, keyword)
+  }
+
+  // ─── Google Trends ────────────────────────────────────────────────────────
+
+  async getGoogleTrends(keyword: string, days: 7 | 30 | 90): Promise<GoogleTrendsData> {
+    const res = await fetch(`/api/google-trends?keyword=${encodeURIComponent(keyword)}&period=${days}`)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.error || `Google Trends request failed (${res.status})`)
+    }
+    return res.json() as Promise<GoogleTrendsData>
   }
 
   // ─── Article Reactions — requires sign-in ────────────────────────────────
