@@ -3,7 +3,7 @@ import SEO from '@/components/SEO'
 import {
   Tag, Plus, X, Lock, Newspaper, Search, LogIn, Globe, CrosshairIcon,
   Bell, BellOff, Layers, FolderPlus,
-  Folder, FolderOpen, Trash2, Code2, BarChart2, Zap, TrendingUp, TrendingDown, Minus,
+  Folder, FolderOpen, Trash2, Code2, BarChart2, Zap, TrendingUp, TrendingDown, Minus, RefreshCw
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -374,7 +374,7 @@ export default function Keywords() {
 
   // ── Fetch articles ─────────────────────────────────────────────────────────
 
-  const fetchArticlesForKeyword = useCallback(async (kw: Keyword) => {
+  const fetchArticlesForKeyword = useCallback(async (kw: Keyword, forceRefresh: boolean = false) => {
     if (abortRef.current) abortRef.current.abort()
     const ctrl = new AbortController()
     abortRef.current = ctrl
@@ -391,6 +391,7 @@ export default function Keywords() {
         mode: 'keyword',
         strictMode,
         threshold: kw.threshold ?? DEFAULT_THRESHOLD,
+        forceRefresh,
       })
       if (ctrl.signal.aborted) return
       const arts = result?.articles ?? []
@@ -407,7 +408,7 @@ export default function Keywords() {
     }
   }, [dateRange, region, strictMode, showBoolBuilder, boolQuery])
 
-  const fetchArticlesForTopic = useCallback(async (topic: KeywordTopic) => {
+  const fetchArticlesForTopic = useCallback(async (topic: KeywordTopic, forceRefresh: boolean = false) => {
     if (abortRef.current) abortRef.current.abort()
     const ctrl = new AbortController()
     abortRef.current = ctrl
@@ -431,6 +432,7 @@ export default function Keywords() {
         mode: 'keyword',
         strictMode,
         threshold: DEFAULT_THRESHOLD,
+        forceRefresh,
       })
       if (ctrl.signal.aborted) return
       setArticles(result?.articles ?? [])
@@ -448,10 +450,10 @@ export default function Keywords() {
     if (!selection) return
     if (selection.type === 'keyword') {
       const kw = keywords.find(k => k.id === selection.id)
-      if (kw) fetchArticlesForKeyword(kw)
+      if (kw) fetchArticlesForKeyword(kw, false)
     } else {
       const topic = topics.find(t => t.id === selection.id)
-      if (topic) fetchArticlesForTopic(topic)
+      if (topic) fetchArticlesForTopic(topic, false)
     }
   }, [selection, fetchArticlesForKeyword, fetchArticlesForTopic])
 
@@ -949,6 +951,24 @@ export default function Keywords() {
                   </div>
 
                   <div className="ml-auto flex items-center gap-3">
+                    {/* Manual Refresh Button */}
+                    <button
+                      onClick={() => {
+                        if (selection?.type === 'keyword') {
+                          const kw = keywords.find(k => k.id === selection.id)
+                          if (kw) fetchArticlesForKeyword(kw, true)
+                        } else if (selection?.type === 'topic') {
+                          const topic = topics.find(t => t.id === selection.id)
+                          if (topic) fetchArticlesForTopic(topic, true)
+                        }
+                      }}
+                      disabled={isLoadingArticles}
+                      className="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 hover:bg-stone-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 flex items-center gap-1.5 text-xs font-medium"
+                      title="Force refresh live articles"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isLoadingArticles ? 'animate-spin' : ''}`} />
+                      <span className="hidden sm:inline">Refresh</span>
+                    </button>
                     {/* Alert button (topic/feed, articles view) */}
                     {selectedTopic && activeView === 'articles' && (
                       <button

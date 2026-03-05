@@ -74,7 +74,7 @@ class ApiService {
   }
 
   async saveArticle(article: Article) {
-    if (this.supabase) return await this.supabase.saveArticle(article as Record<string, unknown>)
+    if (this.supabase) return await this.supabase.saveArticle(article as unknown as Record<string, unknown>)
     return await this.client.saveArticle(article)
   }
 
@@ -96,7 +96,7 @@ class ApiService {
 
   async addToHistory(article: Article): Promise<Article | null> {
     try {
-      if (this.supabase) return await this.supabase.addToHistory(article as Record<string, unknown>) as Article
+      if (this.supabase) return await this.supabase.addToHistory(article as unknown as Record<string, unknown>) as Article
       return await this.client.addToHistory(article)
     } catch {
       return null
@@ -112,7 +112,16 @@ class ApiService {
 
   async addKeyword(keyword: string) {
     if (!this.supabase) throw new Error('Must be signed in to manage keywords')
-    return await this.supabase.addKeyword(keyword)
+    const result = await this.supabase.addKeyword(keyword)
+    // Fire-and-forget an initial fetch to populate the `keyword_articles` table immediately
+    this.fetchNews({
+      countries: ['world'],
+      categories: ['world'],
+      searchQuery: keyword,
+      mode: 'keyword',
+      forceRefresh: true
+    }).catch(err => console.error('Failed to pre-fetch articles for new keyword:', err))
+    return result
   }
 
   async deleteKeyword(id: string) {
@@ -220,7 +229,7 @@ class ApiService {
 
   async setReaction(article: Article, reaction: 'up' | 'down') {
     if (!this.supabase) throw new Error('Must be signed in to react to articles')
-    return await this.supabase.setReaction(article as Record<string, unknown>, reaction)
+    return await this.supabase.setReaction(article as unknown as Record<string, unknown>, reaction)
   }
 
   async removeReaction(articleUrl: string) {

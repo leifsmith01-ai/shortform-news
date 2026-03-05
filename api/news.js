@@ -3434,14 +3434,14 @@ const SUMMARY_CACHE_TTL_MS = 36 * 60 * 60 * 1000; // 36 hours
 async function generateSummary(article, llmKeys) {
   const content = prepareArticleContent(article);
   const providers = [
-    llmKeys.gemini     && (() => summarizeWithGemini(content, llmKeys.gemini)),
-    llmKeys.cerebras   && (() => summarizeWithCerebras(content, llmKeys.cerebras)),
-    llmKeys.groq       && (() => summarizeWithGroq(content, llmKeys.groq)),
-    llmKeys.mistral    && (() => summarizeWithMistral(content, llmKeys.mistral)),
-    llmKeys.sambanova  && (() => summarizeWithSambaNova(content, llmKeys.sambanova)),
+    llmKeys.gemini && (() => summarizeWithGemini(content, llmKeys.gemini)),
+    llmKeys.cerebras && (() => summarizeWithCerebras(content, llmKeys.cerebras)),
+    llmKeys.groq && (() => summarizeWithGroq(content, llmKeys.groq)),
+    llmKeys.mistral && (() => summarizeWithMistral(content, llmKeys.mistral)),
+    llmKeys.sambanova && (() => summarizeWithSambaNova(content, llmKeys.sambanova)),
     llmKeys.openrouter && (() => summarizeWithOpenRouter(content, llmKeys.openrouter)),
-    llmKeys.openai     && (() => summarizeWithOpenAI(content, llmKeys.openai)),
-    llmKeys.cohere     && (() => summarizeWithCohere(content, llmKeys.cohere)),
+    llmKeys.openai && (() => summarizeWithOpenAI(content, llmKeys.openai)),
+    llmKeys.cohere && (() => summarizeWithCohere(content, llmKeys.cohere)),
   ].filter(Boolean);
 
   for (const attempt of providers) {
@@ -3855,14 +3855,14 @@ export default async function handler(req, res) {
 
   // LLM summarisation — collect all configured keys; generateSummary tries them in order
   const LLM_KEYS = {
-    gemini:     process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || null,
-    cerebras:   process.env.CEREBRAS_API_KEY   || null,
-    groq:       process.env.GROQ_API_KEY        || null,
-    mistral:    process.env.MISTRAL_API_KEY     || null,
-    sambanova:  process.env.SAMBANOVA_API_KEY   || null,
-    openrouter: process.env.OPENROUTER_API_KEY  || null,
-    openai:     process.env.OPENAI_API_KEY      || null,
-    cohere:     process.env.COHERE_API_KEY      || null,
+    gemini: process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || null,
+    cerebras: process.env.CEREBRAS_API_KEY || null,
+    groq: process.env.GROQ_API_KEY || null,
+    mistral: process.env.MISTRAL_API_KEY || null,
+    sambanova: process.env.SAMBANOVA_API_KEY || null,
+    openrouter: process.env.OPENROUTER_API_KEY || null,
+    openai: process.env.OPENAI_API_KEY || null,
+    cohere: process.env.COHERE_API_KEY || null,
   };
   const HAS_LLM = Object.values(LLM_KEYS).some(Boolean);
 
@@ -3885,7 +3885,7 @@ export default async function handler(req, res) {
     const modeTag = isKeywordMode ? (strictMode ? 'kw-strict' : 'kw-monitor') : 'kw';
     const kwCacheKey = `${modeTag}-${keyword.toLowerCase()}-${countryList.sort().join(',')}-${categoryList.sort().join(',')}-${dateRange || 'all'}-${sourceFingerprint}`;
     const kwCached = await getCache(kwCacheKey);
-    if (kwCached) {
+    if (kwCached && !forceRefresh) {
       console.log(`Keyword cache HIT: "${keyword}"`);
       return res.status(200).json({ status: 'ok', articles: kwCached.articles, totalResults: kwCached.articles.length, cached: true });
     }
@@ -3903,128 +3903,248 @@ export default async function handler(req, res) {
       .filter(t => t.length > 1);
 
     try {
-      // Fire all keyword searches in parallel across all sources
-      const searchPromises = [];
+      let results = [];
+      let usedDbCache = false;
 
-      // 1. NewsAPI — keyword search with trusted domains
-      searchPromises.push(
-        searchNewsAPIByKeyword(expandedQuery, NEWS_API_KEY, activeDomains, { from: fromISO, sortByPopularity: usePopularitySort })
-          .then(raw => {
-            const valid = raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com');
-            console.log(`  [1] NewsAPI keyword: ${valid.length} articles`);
-            return valid.map(a => formatNewsAPIArticle(a, countryList[0], categoryList[0]));
-          })
-          .catch(err => { console.error('  NewsAPI keyword search failed:', err.message); return []; })
-      );
+      // ── Hybrid Architecture: Check Supabase DB first (if tracked keyword) ──
+      // The cron job continuously populates `keyword_articles` for active keywords.
+      // We only try the DB if the user is authenticated and we're not force-refreshing.
+      if (userId && !forceRefresh && SUPABASE_URL && SUPABASE_KEY) {
+        try {
+          const { createClient } = await import('@supabase/supabase-js');
+          const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-      // 2. WorldNewsAPI
-      if (WORLD_NEWS_API_KEY) {
-        searchPromises.push(
-          searchWorldNewsAPIByKeyword(expandedQuery, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort })
-            .then(raw => { console.log(`  [2] WorldNewsAPI keyword: ${raw.length} articles`); return raw.map(a => formatWorldNewsAPIArticle(a, countryList[0], categoryList[0])); })
-            .catch(err => { console.error('  WorldNewsAPI keyword search failed:', err.message); return []; })
-        );
-      }
+          // 1. Find the keyword_id for this user
+          const { data: trackData, error: trackErr } = await supabase
+            .from('tracked_keywords')
+            .select('id')
+            .eq('user_id', userId)
+            .ilike('keyword', keyword)
+            .single();
 
-      // 3. NewsData.io
-      if (NEWS_DATA_API_KEY) {
-        searchPromises.push(
-          searchNewsDataByKeyword(expandedQuery, NEWS_DATA_API_KEY, { from: fromDateOnly })
-            .then(raw => { const valid = raw.filter(a => a.title); console.log(`  [3] NewsData keyword: ${valid.length} articles`); return valid.map(a => formatNewsDataArticle(a, countryList[0], categoryList[0])); })
-            .catch(err => { console.error('  NewsData keyword search failed:', err.message); return []; })
-        );
-      }
+          if (!trackErr && trackData && trackData.id) {
+            // 2. Fetch pre-fetched articles from keyword_articles
+            const { data: dbArticles, error: dbErr } = await supabase
+              .from('keyword_articles')
+              .select('*')
+              .eq('keyword_id', trackData.id)
+              // Only get recent articles matching the requested date range
+              .gte('published_at', fromISO || new Date(0).toISOString())
+              .order('published_at', { ascending: false })
+              .limit(50);
 
-      // 4. Guardian
-      if (GUARDIAN_API_KEY) {
-        searchPromises.push(
-          searchGuardianByKeyword(expandedQuery, GUARDIAN_API_KEY, { from: fromDateOnly })
-            .then(raw => { console.log(`  [4] Guardian keyword: ${raw.length} articles`); return raw.map(r => formatGuardianArticle(r, countryList[0], categoryList[0])); })
-            .catch(err => { console.error('  Guardian keyword search failed:', err.message); return []; })
-        );
-      }
-
-      // 5. GNews — now included in keyword search (supports country filtering natively)
-      if (GNEWS_API_KEY) {
-        searchPromises.push(
-          searchGNewsByKeyword(expandedQuery, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, country: countryList[0] })
-            .then(raw => { const valid = raw.filter(a => a.title); console.log(`  [5] GNews keyword: ${valid.length} articles`); return valid.map(a => formatGNewsArticle(a, countryList[0], categoryList[0])); })
-            .catch(err => { console.error('  GNews keyword search failed:', err.message); return []; })
-        );
-      }
-
-      // 6. RSS feeds — check if any apply to the selected countries
-      const rssPromises = [];
-      for (const country of countryList) {
-        const applicableFeeds = RSS_SOURCES.filter(f => f.url && f.countries.has(country));
-        for (const feed of applicableFeeds) {
-          rssPromises.push(
-            fetchRSSFeed(feed.url)
-              .then(items => {
-                // Filter RSS items using expanded search terms + stemming,
-                // consistent with how API sources are filtered.
-                const kwLower = keyword.toLowerCase();
-                const matched = items.filter(item => {
-                  // Date window check — reject items older than fromDate
-                  if (fromDate && item.pubDate) {
-                    const pubTime = new Date(item.pubDate).getTime();
-                    if (pubTime < fromDate.getTime()) return false;
-                  }
-                  const text = `${item.title || ''} ${item.description || ''}`.toLowerCase();
-                  if (text.includes(kwLower)) return true;
-                  for (const term of searchTerms) {
-                    const t = term.toLowerCase().replace(/^["'(]+|["')]+$/g, '');
-                    if (t.length < 2) continue;
-                    if (text.includes(t)) return true;
-                    const stemmed = stemWord(t);
-                    if (stemmed !== t && stemmed.length >= 3 && text.includes(stemmed)) return true;
-                  }
-                  return false;
-                });
-                return matched.map(item => formatRSSArticle(item, feed, country, categoryList[0]));
-              })
-              .catch(() => [])
-          );
+            if (!dbErr && dbArticles && dbArticles.length > 0) {
+              console.log(`  [DB] Loaded ${dbArticles.length} pre-fetched articles from keyword_articles table`);
+              // Map DB rows back to canonical article format
+              results = dbArticles.map(row => ({
+                title: row.title,
+                url: row.article_url,
+                description: row.description,
+                content: row.content,
+                source: { name: row.source || 'News Source' },
+                image: row.image_url,
+                publishedAt: row.published_at,
+                author: row.author,
+                category: row.category || categoryList[0],
+                // Map country back if it was inferred
+                _countryScore: row.country === 'inferred' ? 10 : 0
+              }));
+              usedDbCache = true;
+            }
+          }
+        } catch (dbErr) {
+          console.error("  [DB] Failed to query keyword_articles:", dbErr.message);
         }
       }
-      if (rssPromises.length > 0) {
+
+      // ── Fallback: Live API Fan-out ──────────────────────────────────────────
+      if (!usedDbCache) {
+        const searchPromises = [];
+
+        // 1. NewsAPI — keyword search with trusted domains
         searchPromises.push(
-          Promise.all(rssPromises).then(results => {
-            const flat = results.flat();
-            if (flat.length > 0) console.log(`  [6] RSS keyword: ${flat.length} articles`);
-            return flat;
-          })
+          searchNewsAPIByKeyword(expandedQuery, NEWS_API_KEY, activeDomains, { from: fromISO, sortByPopularity: usePopularitySort })
+            .then(raw => {
+              const valid = raw.filter(a => a.title && a.title !== '[Removed]' && a.url !== 'https://removed.com');
+              console.log(`  [1] NewsAPI keyword: ${valid.length} articles`);
+              return valid.map(a => formatNewsAPIArticle(a, countryList[0], categoryList[0]));
+            })
+            .catch(err => { console.error('  NewsAPI keyword search failed:', err.message); return []; })
         );
-      }
 
-      // 7. Google News RSS — free, no API key; use raw keyword for best precision
-      searchPromises.push(
-        fetchGoogleNewsRSS(keyword, { country: countryList[0] })
-          .then(items => {
-            const kwLower = keyword.toLowerCase();
-            const matched = items.filter(item => {
-              // Date window check — reject items older than fromDate
-              if (fromDate && item.pubDate) {
-                const pubTime = new Date(item.pubDate).getTime();
-                if (pubTime < fromDate.getTime()) return false;
-              }
-              const text = `${item.title || ''} ${item.description || ''}`.toLowerCase();
-              if (text.includes(kwLower)) return true;
-              for (const term of searchTerms) {
-                const t = term.toLowerCase().replace(/^["'(]+|["')]+$/g, '');
-                if (t.length < 2) continue;
-                if (text.includes(t)) return true;
-              }
-              return false;
+        // 2. WorldNewsAPI
+        if (WORLD_NEWS_API_KEY) {
+          searchPromises.push(
+            searchWorldNewsAPIByKeyword(expandedQuery, WORLD_NEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort })
+              .then(raw => { console.log(`  [2] WorldNewsAPI keyword: ${raw.length} articles`); return raw.map(a => formatWorldNewsAPIArticle(a, countryList[0], categoryList[0])); })
+              .catch(err => { console.error('  WorldNewsAPI keyword search failed:', err.message); return []; })
+          );
+        }
+
+        // 3. NewsData.io
+        if (NEWS_DATA_API_KEY) {
+          searchPromises.push(
+            searchNewsDataByKeyword(expandedQuery, NEWS_DATA_API_KEY, { from: fromDateOnly })
+              .then(raw => { const valid = raw.filter(a => a.title); console.log(`  [3] NewsData keyword: ${valid.length} articles`); return valid.map(a => formatNewsDataArticle(a, countryList[0], categoryList[0])); })
+              .catch(err => { console.error('  NewsData keyword search failed:', err.message); return []; })
+          );
+        }
+
+        // 4. Guardian
+        if (GUARDIAN_API_KEY) {
+          searchPromises.push(
+            searchGuardianByKeyword(expandedQuery, GUARDIAN_API_KEY, { from: fromDateOnly })
+              .then(raw => { console.log(`  [4] Guardian keyword: ${raw.length} articles`); return raw.map(r => formatGuardianArticle(r, countryList[0], categoryList[0])); })
+              .catch(err => { console.error('  Guardian keyword search failed:', err.message); return []; })
+          );
+        }
+
+        // 5. GNews — now included in keyword search (supports country filtering natively)
+        if (GNEWS_API_KEY) {
+          searchPromises.push(
+            searchGNewsByKeyword(expandedQuery, GNEWS_API_KEY, { from: fromISO, sortByPopularity: usePopularitySort, country: countryList[0] })
+              .then(raw => { const valid = raw.filter(a => a.title); console.log(`  [5] GNews keyword: ${valid.length} articles`); return valid.map(a => formatGNewsArticle(a, countryList[0], categoryList[0])); })
+              .catch(err => { console.error('  GNews keyword search failed:', err.message); return []; })
+          );
+        }
+
+        // 6. RSS feeds — check if any apply to the selected countries
+        const rssPromises = [];
+        for (const country of countryList) {
+          const applicableFeeds = RSS_SOURCES.filter(f => f.url && f.countries.has(country));
+          for (const feed of applicableFeeds) {
+            rssPromises.push(
+              fetchRSSFeed(feed.url)
+                .then(items => {
+                  // Filter RSS items using expanded search terms + stemming,
+                  // consistent with how API sources are filtered.
+                  const kwLower = keyword.toLowerCase();
+                  const matched = items.filter(item => {
+                    // Date window check — reject items older than fromDate
+                    if (fromDate && item.pubDate) {
+                      const pubTime = new Date(item.pubDate).getTime();
+                      if (pubTime < fromDate.getTime()) return false;
+                    }
+                    const text = `${item.title || ''} ${item.description || ''}`.toLowerCase();
+                    if (text.includes(kwLower)) return true;
+                    for (const term of searchTerms) {
+                      const t = term.toLowerCase().replace(/^["'(]+|["')]+$/g, '');
+                      if (t.length < 2) continue;
+                      if (text.includes(t)) return true;
+                      const stemmed = stemWord(t);
+                      if (stemmed !== t && stemmed.length >= 3 && text.includes(stemmed)) return true;
+                    }
+                    return false;
+                  });
+                  return matched.map(item => formatRSSArticle(item, feed, country, categoryList[0]));
+                })
+                .catch(() => [])
+            );
+          }
+        }
+        if (rssPromises.length > 0) {
+          searchPromises.push(
+            Promise.all(rssPromises).then(rssResults => {
+              const flat = rssResults.flat();
+              if (flat.length > 0) console.log(`  [6] RSS keyword: ${flat.length} articles`);
+              return flat;
+            })
+          );
+        }
+
+        // 7. Google News RSS — free, no API key; use raw keyword for best precision
+        searchPromises.push(
+          fetchGoogleNewsRSS(keyword, { country: countryList[0] })
+            .then(items => {
+              const kwLower = keyword.toLowerCase();
+              const matched = items.filter(item => {
+                // Date window check — reject items older than fromDate
+                if (fromDate && item.pubDate) {
+                  const pubTime = new Date(item.pubDate).getTime();
+                  if (pubTime < fromDate.getTime()) return false;
+                }
+                const text = `${item.title || ''} ${item.description || ''}`.toLowerCase();
+                if (text.includes(kwLower)) return true;
+                for (const term of searchTerms) {
+                  const t = term.toLowerCase().replace(/^["'(]+|["')]+$/g, '');
+                  if (t.length < 2) continue;
+                  if (text.includes(t)) return true;
+                }
+                return false;
+              });
+              if (matched.length > 0) console.log(`  [7] Google News RSS keyword: ${matched.length} articles`);
+              return matched.map(item => formatGoogleNewsRSSArticle(item, countryList[0], categoryList[0]));
+            })
+            .catch(err => { console.error('  Google News RSS keyword failed:', err.message); return []; })
+        );
+
+        const searchResults = await Promise.all(searchPromises);
+        results = searchResults.flat();
+
+        // ── Semantic Search Fallback (if lexical search failed) ─────────────
+        // If we found very few articles for an ad-hoc search, we try falling
+        // back to our entire keyword_articles vector store to find related 
+        // articles that might not share the exact words (e.g. "orbital mechanics" -> "SpaceX")
+        if (results.length < 5 && LLM_KEYS.gemini && SUPABASE_URL && SUPABASE_KEY) {
+          console.log(`  [Semantic] Lexical returned only ${results.length}. Trying vector search for: "${keyword}"`);
+          try {
+            const { createClient } = await import('@supabase/supabase-js');
+            const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+            const embedUrl = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${LLM_KEYS.gemini}`;
+            const embedRes = await fetch(embedUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                model: "models/text-embedding-004",
+                content: { parts: [{ text: keyword }] },
+              }),
             });
-            if (matched.length > 0) console.log(`  [7] Google News RSS keyword: ${matched.length} articles`);
-            return matched.map(item => formatGoogleNewsRSSArticle(item, countryList[0], categoryList[0]));
-          })
-          .catch(err => { console.error('  Google News RSS keyword failed:', err.message); return []; })
-      );
 
-      const searchResults = await Promise.all(searchPromises);
-      let results = searchResults.flat();
+            if (embedRes.ok) {
+              const embedData = await embedRes.json();
+              const embedding = embedData.embedding?.values;
+
+              if (embedding) {
+                // Call RPC function without constraining by k_id
+                const { data: vectorMatches, error: vecErr } = await supabase.rpc('match_keyword_articles', {
+                  query_embedding: embedding,
+                  match_threshold: 0.15, // minimum similarity score
+                  match_count: 15,
+                  k_id: null // Search globally across all tracked articles
+                });
+
+                if (!vecErr && vectorMatches && vectorMatches.length > 0) {
+                  console.log(`  [Semantic] Found ${vectorMatches.length} related articles via pgvector.`);
+
+                  // Map and merge them, applying an artificial penalty to countryScore so lexical results rank higher
+                  const semanticResults = vectorMatches.map(row => ({
+                    title: row.title,
+                    url: row.article_url,
+                    description: row.description,
+                    content: row.description, // Content is usually missing or long, fallback to description
+                    source: { name: row.source || 'Semantic Match' },
+                    image: row.image_url,
+                    publishedAt: row.published_at,
+                    author: row.author,
+                    category: row.category || categoryList[0],
+                    _countryScore: row.country === 'inferred' ? 1 : 0,
+                    _isSemanticMatch: true // Tag it so we know it came from a vector fallback
+                  }));
+
+                  // Need to filter out any that we already fetched lexically
+                  const existingUrls = new Set(results.map(r => r.url).filter(Boolean));
+                  const newSemantic = semanticResults.filter(r => r.url && !existingUrls.has(r.url));
+
+                  results = [...results, ...newSemantic];
+                }
+              }
+            }
+          } catch (semErr) {
+            console.error("  [Semantic] Fallback failed:", semErr.message);
+          }
+        }
+      }
 
       // ── Category relevance filter ────────────────────────────────────
       // When the user has specific categories selected (not just "world"),

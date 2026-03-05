@@ -82,6 +82,7 @@ export interface FetchNewsParams {
   mode?: 'keyword'
   strictMode?: boolean
   threshold?: number
+  forceRefresh?: boolean
 }
 
 export interface FetchNewsResult {
