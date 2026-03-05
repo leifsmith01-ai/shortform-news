@@ -11,6 +11,30 @@
       "destination": "/api/$1"
     },
     {
+      "source": "/trending",
+      "destination": "/trending.html"
+    },
+    {
+      "source": "/finance",
+      "destination": "/finance.html"
+    },
+    {
+      "source": "/personalized",
+      "destination": "/personalized.html"
+    },
+    {
+      "source": "/keywords",
+      "destination": "/keywords.html"
+    },
+    {
+      "source": "/about",
+      "destination": "/about.html"
+    },
+    {
+      "source": "/privacy-policy",
+      "destination": "/privacy-policy.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
