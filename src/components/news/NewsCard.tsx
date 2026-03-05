@@ -184,11 +184,26 @@ export default function NewsCard({ article, index, rank, isPriority = false }) {
     }
   };
 
+  const newsArticleSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'NewsArticle',
+    headline: article.title,
+    description: article.description || (article.summary_points?.[0] ?? ''),
+    url: article.url,
+    datePublished: article.publishedAt,
+    image: article.image_url || undefined,
+    publisher: {
+      '@type': 'Organization',
+      name: article.source,
+    },
+  };
+
   return (
     <article
       style={{ animationDelay: `${Math.min(index, 5) * 50}ms` }}
       className="news-card-enter group bg-white dark:bg-slate-800 rounded-2xl border border-stone-200 dark:border-slate-700 overflow-hidden hover:shadow-xl hover:shadow-stone-200/50 dark:hover:shadow-slate-900/50 transition-[box-shadow,transform] duration-500 hover:-translate-y-1 relative"
     >
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(newsArticleSchema) }} />
       {/* Ranking Badge */}
       <div className="absolute top-4 left-4 z-10 w-10 h-10 bg-slate-900 text-white rounded-full flex items-center justify-center font-bold text-lg shadow-lg">
         {rank}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import SEO from '@/components/SEO'
 import { motion } from 'framer-motion'
 import { Settings as SettingsIcon, Building2, Check, Moon, Sun } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -68,6 +69,11 @@ export default function Settings() {
 
   return (
     <div className="h-full flex flex-col bg-stone-50 dark:bg-slate-900">
+      <SEO
+        title="Settings"
+        description="Manage your Shortform account settings, choose trusted news sources, and customise your short-form news experience."
+        canonical="/settings"
+      />
       <header className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-4 lg:px-8 py-4 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">

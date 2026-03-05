@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import SEO from '@/components/SEO';
 import { RefreshCw, Flame, AlertCircle, TrendingUp } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -53,6 +54,11 @@ export default function Trending() {
 
   return (
     <div className="flex h-full bg-stone-50 dark:bg-slate-900 flex-col">
+      <SEO
+        title="Trending News Right Now"
+        description="Discover what's trending right now. The most-read short-form news stories from around the world, updated in real time."
+        canonical="/trending"
+      />
       {/* Header */}
       <header className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-4 lg:px-8 py-4 flex-shrink-0">
         <div className="flex items-center justify-between">

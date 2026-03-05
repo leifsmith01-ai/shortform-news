@@ -1,9 +1,15 @@
 import { Shield } from 'lucide-react'
+import SEO from '@/components/SEO'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 export default function PrivacyPolicy() {
   return (
     <div className="h-full flex flex-col bg-stone-50 dark:bg-slate-900">
+      <SEO
+        title="Privacy Policy"
+        description="Shortform Privacy Policy — how we collect, use, and protect your data when you use our AI-powered news service."
+        canonical="/privacy-policy"
+      />
       <header className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-4 lg:px-8 py-4 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-slate-900 dark:bg-slate-700 flex items-center justify-center">

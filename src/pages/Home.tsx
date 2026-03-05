@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import SEO from '@/components/SEO';
 import { RefreshCw, Menu, Sparkles, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -263,6 +264,11 @@ export default function Home() {
 
   return (
     <div className="flex flex-col lg:flex-row h-full bg-stone-50 dark:bg-slate-900">
+      <SEO
+        title="Latest News in Brief"
+        description="Get the latest breaking news in short-form summaries. AI-powered headlines from trusted sources worldwide, updated every hour."
+        canonical="/"
+      />
       {/* Desktop Sidebar */}
       <aside className="hidden lg:block w-72 flex-shrink-0 border-r border-stone-200 dark:border-slate-700">
         <FilterSidebar

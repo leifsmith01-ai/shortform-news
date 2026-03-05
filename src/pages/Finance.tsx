@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import SEO from '@/components/SEO';
 import { RefreshCw, Menu, TrendingUp, Calendar as CalendarIcon, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -116,6 +117,11 @@ export default function Finance() {
 
   return (
     <div className="flex h-full bg-stone-50 dark:bg-slate-900">
+      <SEO
+        title="Finance & Markets News"
+        description="Stay on top of markets and business news with short-form financial summaries. Stocks, crypto, and economic news in brief."
+        canonical="/finance"
+      />
       {/* Desktop Sidebar */}
       <aside className="hidden lg:block w-72 flex-shrink-0 border-r border-stone-200 dark:border-slate-700">
         <FinanceFilterSidebar
