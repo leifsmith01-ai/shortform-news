@@ -1,4 +1,5 @@
 import React, { useContext, useState, useEffect } from 'react'
+import SEO from '@/components/SEO'
 import { Sparkles, BookOpen, Lock, LogIn } from 'lucide-react'
 import { useCountUp } from '@/hooks/useCountUp'
 import { Link } from 'react-router-dom'
@@ -159,6 +160,11 @@ export default function Personalized() {
 
   return (
     <div className="h-full flex flex-col bg-stone-50 dark:bg-slate-900">
+      <SEO
+        title="Your Personalised News Feed"
+        description="Your personalised news feed, powered by AI. Short-form news summaries tailored to your interests and reading habits."
+        canonical="/personalized"
+      />
       <header className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-4 lg:px-8 py-4 flex-shrink-0">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">

@@ -1,7 +1,32 @@
 import React from 'react';
+import { Helmet } from 'react-helmet-async';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Bookmark, Clock, Sparkles, Tag, Bell, TrendingUp, LogIn, Flame, Settings, Info, Shield } from 'lucide-react';
 import { UserButton, SignedIn, SignedOut } from '@clerk/clerk-react';
+
+const organizationSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'Shortform',
+  url: 'https://shortform.news',
+  logo: 'https://shortform.news/logo.webp',
+  description: 'AI-powered short-form news summaries from trusted sources worldwide.',
+};
+
+const websiteSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'Shortform',
+  url: 'https://shortform.news',
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: {
+      '@type': 'EntryPoint',
+      urlTemplate: 'https://shortform.news/keywords?q={search_term_string}',
+    },
+    'query-input': 'required name=search_term_string',
+  },
+};
 
 export default function Layout({ children, currentPageName }: { children: React.ReactNode; currentPageName: string }) {
   const location = useLocation();
@@ -24,6 +49,10 @@ export default function Layout({ children, currentPageName }: { children: React.
 
   return (
     <div className="app-container flex flex-col md:flex-row">
+      <Helmet>
+        <script type="application/ld+json">{JSON.stringify(organizationSchema)}</script>
+        <script type="application/ld+json">{JSON.stringify(websiteSchema)}</script>
+      </Helmet>
 
       {/* ── Mobile top header (hidden on md+) ─────────────────────────── */}
       <header className="md:hidden flex-shrink-0 bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between sticky top-0 z-50">

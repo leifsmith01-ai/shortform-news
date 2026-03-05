@@ -1,4 +1,5 @@
 import React, { useContext, useState, useEffect, useCallback, useRef } from 'react'
+import SEO from '@/components/SEO'
 import {
   Tag, Plus, X, Lock, Newspaper, Search, LogIn, Globe, CrosshairIcon,
   Bell, BellOff, Layers, FolderPlus,
@@ -627,6 +628,11 @@ export default function Keywords() {
 
   return (
     <div className="h-full flex flex-col bg-stone-50 dark:bg-slate-900">
+      <SEO
+        title="News Keyword Monitoring"
+        description="Monitor breaking news with keyword alerts. Search and track the topics that matter to you with short-form summaries."
+        canonical="/keywords"
+      />
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-4 lg:px-8 py-4 flex-shrink-0">
         <div className="flex items-center gap-3">

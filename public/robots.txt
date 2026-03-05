@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+
+# Block auth pages from indexing
+Disallow: /sign-in
+Disallow: /sign-up
+
+# Block private/user-specific pages
+Disallow: /saved
+Disallow: /history
+Disallow: /settings
+
+Sitemap: https://shortform.news/sitemap.xml

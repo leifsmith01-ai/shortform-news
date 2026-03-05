@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import SEO from '@/components/SEO'
 import { Info } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
@@ -47,6 +48,11 @@ const steps = [
 export default function About() {
   return (
     <div className="h-full flex flex-col bg-stone-50 dark:bg-slate-900">
+      <SEO
+        title="About Shortform"
+        description="About Shortform — the AI-powered news aggregator delivering short-form summaries from trusted sources worldwide, tailored by country and category."
+        canonical="/about"
+      />
       <header className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-4 lg:px-8 py-4 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-slate-900 dark:bg-slate-700 flex items-center justify-center">
