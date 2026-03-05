@@ -63,6 +63,9 @@ export default function AdUnit({
 
   return (
     <div className={`ad-unit overflow-hidden ${className}`}>
+      <p className="text-[10px] uppercase tracking-widest text-stone-400 dark:text-slate-500 text-center mb-1 select-none">
+        Advertisement
+      </p>
       <ins
         ref={adRef}
         className="adsbygoogle"

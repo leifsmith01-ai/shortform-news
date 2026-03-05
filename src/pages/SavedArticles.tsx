@@ -97,15 +97,6 @@ export default function SavedArticles() {
         </div>
       </header>
 
-      {/* Ad banner between header and content */}
-      <div className="px-4 lg:px-8 pt-4">
-        <AdUnit
-          slot="2844757664"
-          format="horizontal"
-          className="rounded-xl overflow-hidden bg-stone-100 min-h-[90px]"
-        />
-      </div>
-
       {/* Body */}
       {isLoaded && !isSignedIn ? (
         <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
@@ -152,18 +143,31 @@ export default function SavedArticles() {
             ) : filteredArticles.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {filteredArticles.map((article, index) => (
-                  <div key={article.id || index} className="flex flex-col gap-1">
-                    <NewsCard article={article} index={index} rank={index + 1} />
-                    <div className="flex justify-end px-1">
-                      <button
-                        onClick={() => handleDelete(article.id)}
-                        className="flex items-center gap-1.5 text-xs text-stone-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors py-1"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Remove
-                      </button>
+                  <React.Fragment key={article.id || index}>
+                    <div className="flex flex-col gap-1">
+                      <NewsCard article={article} index={index} rank={index + 1} />
+                      <div className="flex justify-end px-1">
+                        <button
+                          onClick={() => handleDelete(article.id)}
+                          className="flex items-center gap-1.5 text-xs text-stone-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors py-1"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Remove
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                    {/* Ad after every 6th article */}
+                    {(index + 1) % 6 === 0 && (
+                      <div className="col-span-full">
+                        {/* TODO: create a dedicated slot in AdSense dashboard for this placement */}
+                        <AdUnit
+                          slot="2844757664"
+                          format="horizontal"
+                          className="rounded-xl overflow-hidden bg-stone-100 dark:bg-slate-800 min-h-[90px]"
+                        />
+                      </div>
+                    )}
+                  </React.Fragment>
                 ))}
               </div>
             ) : (
