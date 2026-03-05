@@ -159,9 +159,8 @@ export default function SavedArticles() {
                     {/* Ad after every 6th article */}
                     {(index + 1) % 6 === 0 && (
                       <div className="col-span-full">
-                        {/* TODO: create a dedicated slot in AdSense dashboard for this placement */}
                         <AdUnit
-                          slot="2844757664"
+                          slot="2555571916"
                           format="horizontal"
                           className="rounded-xl overflow-hidden bg-stone-100 dark:bg-slate-800 min-h-[90px]"
                         />
