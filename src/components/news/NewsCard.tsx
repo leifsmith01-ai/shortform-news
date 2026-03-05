@@ -1,5 +1,7 @@
 import React, { useContext, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ExternalLink, Clock, Bookmark, BookmarkCheck, Share2, Twitter, Facebook, Linkedin, Link2, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { toArticleSlug } from '@/lib/articleSlug';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -295,8 +297,15 @@ export default function NewsCard({ article, index, rank, isPriority = false }) {
         </div>
 
         {/* Title */}
-        <h3 className="text-lg font-semibold text-stone-900 dark:text-stone-100 leading-snug mb-3 line-clamp-2 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors">
-          {article.title}
+        <h3 className="text-lg font-semibold text-stone-900 dark:text-stone-100 leading-snug mb-3 line-clamp-2 transition-colors">
+          <Link
+            to={`/article/${toArticleSlug(article.url)}`}
+            state={{ article }}
+            onClick={handleArticleClick}
+            className="hover:text-slate-700 dark:hover:text-slate-300 hover:underline underline-offset-2"
+          >
+            {article.title}
+          </Link>
         </h3>
 
         {/* Source */}
