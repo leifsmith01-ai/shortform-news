@@ -185,7 +185,7 @@ async function main() {
                         title: article.title,
                         description: article.description,
                         content: article.content,
-                        source: article.source.name,
+                        source: article.source?.name || article.source || null,
                         image_url: article.image,
                         published_at: article.publishedAt,
                         author: article.author,
