@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Helmet } from 'react-helmet-async';
 import SEO from '@/components/SEO';
 import { RefreshCw, Flame, AlertCircle, TrendingUp } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,18 @@ export default function Trending() {
     fetchTrending();
   }, []);
 
+  const itemListSchema = useMemo(() => ({
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Trending News',
+    itemListElement: articles.slice(0, 10).map((a: any, i: number) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: a.url,
+      name: a.title,
+    })),
+  }), [articles]);
+
   return (
     <div className="flex h-full bg-stone-50 dark:bg-slate-900 flex-col">
       <SEO
@@ -59,6 +72,11 @@ export default function Trending() {
         description="Discover what's trending right now. The most-read short-form news stories from around the world, updated in real time."
         canonical="/trending"
       />
+      {articles.length > 0 && (
+        <Helmet>
+          <script type="application/ld+json">{JSON.stringify(itemListSchema)}</script>
+        </Helmet>
+      )}
       {/* Header */}
       <header className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-4 lg:px-8 py-4 flex-shrink-0">
         <div className="flex items-center justify-between">

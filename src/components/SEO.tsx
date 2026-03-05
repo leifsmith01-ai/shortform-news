@@ -8,9 +8,11 @@ interface SEOProps {
   canonical: string;
   ogImage?: string;
   ogType?: 'website' | 'article';
+  publishedTime?: string;
+  section?: string;
 }
 
-export default function SEO({ title, description, canonical, ogImage, ogType = 'website' }: SEOProps) {
+export default function SEO({ title, description, canonical, ogImage, ogType = 'website', publishedTime, section }: SEOProps) {
   const fullTitle = `${title} | Shortform`;
   const canonicalUrl = `${BASE_URL}${canonical}`;
   const image = ogImage || `${BASE_URL}/logo.webp`;
@@ -27,6 +29,17 @@ export default function SEO({ title, description, canonical, ogImage, ogType = '
       <meta property="og:title" content={fullTitle} />
       <meta property="og:description" content={description} />
       <meta property="og:image" content={image} />
+
+      {/* article:* — Google News Publisher Center signals */}
+      {ogType === 'article' && publishedTime && (
+        <meta property="article:published_time" content={publishedTime} />
+      )}
+      {ogType === 'article' && section && (
+        <meta property="article:section" content={section} />
+      )}
+      {ogType === 'article' && (
+        <meta property="article:author" content="Shortform" />
+      )}
 
       {/* Twitter */}
       <meta property="twitter:card" content="summary_large_image" />

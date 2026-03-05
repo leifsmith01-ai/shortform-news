@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Helmet } from 'react-helmet-async';
 import SEO from '@/components/SEO';
 import { RefreshCw, Menu, TrendingUp, Calendar as CalendarIcon, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -115,6 +116,18 @@ export default function Finance() {
     industrial: 'Industrials', materials: 'Materials', utilities: 'Utilities',
   };
 
+  const itemListSchema = useMemo(() => ({
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Finance & Markets News',
+    itemListElement: (articles as any[]).slice(0, 10).map((a, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: a.url,
+      name: a.title,
+    })),
+  }), [articles]);
+
   return (
     <div className="flex h-full bg-stone-50 dark:bg-slate-900">
       <SEO
@@ -122,6 +135,11 @@ export default function Finance() {
         description="Stay on top of markets and business news with short-form financial summaries. Stocks, crypto, and economic news in brief."
         canonical="/finance"
       />
+      {articles.length > 0 && (
+        <Helmet>
+          <script type="application/ld+json">{JSON.stringify(itemListSchema)}</script>
+        </Helmet>
+      )}
       {/* Desktop Sidebar */}
       <aside className="hidden lg:block w-72 flex-shrink-0 border-r border-stone-200 dark:border-slate-700">
         <FinanceFilterSidebar

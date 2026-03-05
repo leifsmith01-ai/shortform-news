@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Helmet } from 'react-helmet-async';
 import SEO from '@/components/SEO';
 import { RefreshCw, Menu, Sparkles, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -262,6 +263,18 @@ export default function Home() {
     'month': 'This Month'
   }[dateRange]), [dateRange]);
 
+  const itemListSchema = useMemo(() => ({
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Latest News in Brief',
+    itemListElement: articles.slice(0, 10).map((a, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: a.url,
+      name: a.title,
+    })),
+  }), [articles]);
+
   return (
     <div className="flex flex-col lg:flex-row h-full bg-stone-50 dark:bg-slate-900">
       <SEO
@@ -269,6 +282,11 @@ export default function Home() {
         description="Get the latest breaking news in short-form summaries. AI-powered headlines from trusted sources worldwide, updated every hour."
         canonical="/"
       />
+      {articles.length > 0 && (
+        <Helmet>
+          <script type="application/ld+json">{JSON.stringify(itemListSchema)}</script>
+        </Helmet>
+      )}
       {/* Desktop Sidebar */}
       <aside className="hidden lg:block w-72 flex-shrink-0 border-r border-stone-200 dark:border-slate-700">
         <FilterSidebar
