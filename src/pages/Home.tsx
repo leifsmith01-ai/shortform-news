@@ -344,13 +344,17 @@ export default function Home() {
                       : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-600'
                     }`}
                   >
-                    {range === '24h' ? '24h' : range === '3d' ? '3 days' : range === 'week' ? '1 week' : '1 month'}
+                    {range === '24h' ? '24h'
+                      : range === '3d' ? <><span className="sm:hidden">3d</span><span className="hidden sm:inline">3 days</span></>
+                      : range === 'week' ? <><span className="sm:hidden">1w</span><span className="hidden sm:inline">1 week</span></>
+                      : <><span className="sm:hidden">1m</span><span className="hidden sm:inline">1 month</span></>
+                    }
                   </button>
                 ))}
               </div>
 
               {(selectedCountries.length > 1 || selectedCategories.length > 1) && articles.length > 0 && (
-                <div className="flex flex-col items-end gap-1">
+                <div className="hidden lg:flex flex-col items-end gap-1">
                   <span className="text-[10px] text-stone-400 uppercase tracking-wider hidden sm:block">Group by</span>
                   <ToggleGroup type="single" value={groupBy || 'none'} onValueChange={setGroupBy}>
                     <ToggleGroupItem value="none" aria-label="Flat list — all articles in one stream" title="Flat list — all articles in one stream" className="text-xs">
