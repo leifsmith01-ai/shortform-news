@@ -337,7 +337,7 @@ async function runSentimentAnalysis(prompt, llmKeys) {
 
 // ── Data fetchers ─────────────────────────────────────────────────────────────
 
-async function fetchNewsArticles(keyword, supabaseUrl, serviceKey) {
+async function fetchNewsArticles(keyword, supabaseUrl, serviceKey, days) {
   try {
     // Step 1: look up keyword_ids for this keyword name
     const kwRes = await fetchWithTimeout(
@@ -349,10 +349,11 @@ async function fetchNewsArticles(keyword, supabaseUrl, serviceKey) {
     if (!Array.isArray(kwRows) || kwRows.length === 0) return [];
 
     const ids = kwRows.map(r => r.id).join(',');
+    const since = new Date(Date.now() - Number(days) * 86400_000).toISOString();
 
-    // Step 2: fetch recent articles for those keyword_ids
+    // Step 2: fetch recent articles for those keyword_ids filtered by date
     const artRes = await fetchWithTimeout(
-      `${supabaseUrl}/rest/v1/keyword_articles?keyword_id=in.(${ids})&select=title,description,source,published_at,country&order=published_at.desc&limit=50`,
+      `${supabaseUrl}/rest/v1/keyword_articles?keyword_id=in.(${ids})&select=title,description,source,published_at,country&published_at=gte.${since}&order=published_at.desc&limit=50`,
       { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
     );
     if (!artRes.ok) return [];
@@ -364,9 +365,11 @@ async function fetchNewsArticles(keyword, supabaseUrl, serviceKey) {
   }
 }
 
-async function fetchRedditPosts(keyword) {
+async function fetchRedditPosts(keyword, days = 7) {
   try {
-    const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(keyword)}&sort=hot&t=week&limit=25&type=link`;
+    const t = days <= 1 ? 'day' : days <= 7 ? 'week' : days <= 30 ? 'month' : 'year';
+    // Include text posts (self posts) by removing type=link filter
+    const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(keyword)}&sort=hot&t=${t}&limit=25`;
     const res = await fetchWithTimeout(url, {
       headers: { 'User-Agent': 'shortform-news/1.0 (sentiment analysis)' }
     });
@@ -400,8 +403,8 @@ export default async function handler(req, res) {
   if (!keyword || typeof keyword !== 'string' || keyword.trim().length === 0) {
     return res.status(400).json({ error: 'keyword is required' });
   }
-  if (!['7', '30', '90'].includes(String(days))) {
-    return res.status(400).json({ error: 'days must be 7, 30, or 90' });
+  if (!['1', '3', '7', '30', '90'].includes(String(days))) {
+    return res.status(400).json({ error: 'days must be 1, 3, 7, 30, or 90' });
   }
 
   const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -433,8 +436,8 @@ export default async function handler(req, res) {
 
   // Fetch data sources in parallel
   const [newsArticles, redditPosts] = await Promise.all([
-    SUPABASE_URL && SERVICE_KEY ? fetchNewsArticles(kw, SUPABASE_URL, SERVICE_KEY) : Promise.resolve([]),
-    fetchRedditPosts(kw),
+    SUPABASE_URL && SERVICE_KEY ? fetchNewsArticles(kw, SUPABASE_URL, SERVICE_KEY, days) : Promise.resolve([]),
+    fetchRedditPosts(kw, Number(days)),
   ]);
 
   if (newsArticles.length === 0 && redditPosts.length === 0) {
@@ -453,6 +456,8 @@ export default async function handler(req, res) {
 
   const payload = {
     ...result,
+    // If LLM returned null socialSentiment but we had Reddit posts, fall back to overall sentiment
+    socialSentiment: result.socialSentiment ?? (redditPosts.length > 0 ? result.sentiment : null),
     newsCount: newsArticles.length,
     redditCount: redditPosts.length,
     outletTiers: computeOutletTiers(newsArticles),
