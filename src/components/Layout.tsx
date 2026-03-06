@@ -55,7 +55,7 @@ export default function Layout({ children, currentPageName }: { children: React.
       </Helmet>
 
       {/* ── Mobile top header (hidden on md+) ─────────────────────────── */}
-      <header className="md:hidden flex-shrink-0 bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between sticky top-0 z-50">
+      <header className="md:hidden flex-shrink-0 bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between fixed top-0 inset-x-0 z-50">
         <Link to="/" className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-lg overflow-hidden">
             <img src="/logo.webp" alt="Shortform" fetchPriority="high" className="w-full h-full object-contain" />
@@ -136,7 +136,7 @@ export default function Layout({ children, currentPageName }: { children: React.
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 min-h-0 h-full pb-16 md:pb-0">
+        <main className="flex-1 min-h-0 h-full pt-[60px] md:pt-0 pb-16 md:pb-0">
           {children}
         </main>
       </div>
