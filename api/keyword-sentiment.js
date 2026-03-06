@@ -16,8 +16,8 @@ class QuotaExceededError extends Error {
   }
 }
 
-function fetchWithTimeout(url, options = {}) {
-  return fetch(url, { ...options, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
+  return fetch(url, { ...options, signal: AbortSignal.timeout(timeoutMs) });
 }
 
 // ── Outlet tier helpers ───────────────────────────────────────────────────────
@@ -472,7 +472,12 @@ export default async function handler(req, res) {
     : [];
 
   if (newsArticles.length === 0) {
-    const appOrigin = process.env.APP_ORIGIN || process.env.VITE_APP_ORIGIN || null;
+    const proto = req.headers['x-forwarded-proto'] || 'https';
+  const host  = req.headers['x-forwarded-host']  || req.headers['host'] || '';
+  const appOrigin =
+    process.env.APP_ORIGIN ||
+    process.env.VITE_APP_ORIGIN ||
+    (host ? `${proto}://${host}` : 'https://shortform.news');
     newsArticles = await fetchNewsArticlesLive(kw, appOrigin, days);
   }
 
