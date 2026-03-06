@@ -365,15 +365,47 @@ async function fetchNewsArticles(keyword, supabaseUrl, serviceKey, days) {
   }
 }
 
+async function fetchNewsArticlesLive(keyword, appOrigin, days) {
+  if (!appOrigin) return [];
+  try {
+    const dateRange = days <= 1 ? '24h' : days <= 3 ? '3d' : days <= 7 ? 'week' : 'month';
+    const res = await fetchWithTimeout(`${appOrigin}/api/news`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ searchQuery: keyword, mode: 'keyword', dateRange, strictMode: false, forceRefresh: false }),
+    }, 15000);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const articles = (data.articles || []).slice(0, 50).map(a => ({
+      title: a.title,
+      description: a.description,
+      source: a.source?.name || a.source || null,
+      published_at: a.publishedAt,
+      country: a.country || null,
+    }));
+    console.log(`[sentiment] Live news fallback: ${articles.length} articles for "${keyword}"`);
+    return articles;
+  } catch (err) {
+    console.warn('[sentiment] Live news fallback failed:', err.message);
+    return [];
+  }
+}
+
 async function fetchRedditPosts(keyword, days = 7) {
   try {
     const t = days <= 1 ? 'day' : days <= 7 ? 'week' : days <= 30 ? 'month' : 'year';
-    // Include text posts (self posts) by removing type=link filter
     const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(keyword)}&sort=hot&t=${t}&limit=25`;
     const res = await fetchWithTimeout(url, {
-      headers: { 'User-Agent': 'shortform-news/1.0 (sentiment analysis)' }
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; shortform-news/1.0; +https://shortformnews.com)',
+        'Accept': 'application/json',
+        'Accept-Language': 'en-US,en;q=0.9',
+      }
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.warn(`[sentiment] Reddit returned ${res.status} for "${keyword}"`);
+      return [];
+    }
     const data = await res.json();
     const posts = data?.data?.children ?? [];
     return posts
@@ -434,11 +466,17 @@ export default async function handler(req, res) {
     return res.status(200).json({ ...cached, cached: true });
   }
 
-  // Fetch data sources in parallel
-  const [newsArticles, redditPosts] = await Promise.all([
-    SUPABASE_URL && SERVICE_KEY ? fetchNewsArticles(kw, SUPABASE_URL, SERVICE_KEY, days) : Promise.resolve([]),
-    fetchRedditPosts(kw, Number(days)),
-  ]);
+  // Fetch news: Supabase keyword_articles first, live /api/news as fallback
+  let newsArticles = SUPABASE_URL && SERVICE_KEY
+    ? await fetchNewsArticles(kw, SUPABASE_URL, SERVICE_KEY, days)
+    : [];
+
+  if (newsArticles.length === 0) {
+    const appOrigin = process.env.APP_ORIGIN || process.env.VITE_APP_ORIGIN || null;
+    newsArticles = await fetchNewsArticlesLive(kw, appOrigin, days);
+  }
+
+  const redditPosts = await fetchRedditPosts(kw, Number(days));
 
   if (newsArticles.length === 0 && redditPosts.length === 0) {
     return res.status(404).json({ error: 'No content found for this keyword' });
