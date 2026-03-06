@@ -77,6 +77,8 @@ export interface KeywordSentimentData {
   socialSentiment: 'positive' | 'negative' | 'neutral' | 'mixed' | null
   confidence: number
   summary: string
+  newsSummary: string | null
+  socialSummary: string | null
   themes: string[]
   newsCount: number
   redditCount: number

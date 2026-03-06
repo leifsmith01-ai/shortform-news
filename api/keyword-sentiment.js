@@ -42,16 +42,18 @@ Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
   "newsSentiment": "positive" or "negative" or "neutral" or "mixed",
   "socialSentiment": "positive" or "negative" or "neutral" or "mixed" or null,
   "confidence": <number between 0 and 1>,
-  "summary": "<2-3 sentences describing the overall coverage tone and public mood>",
+  "summary": "<2-3 sentences describing the overall combined coverage tone and public mood>",
+  "newsSummary": "<2-3 sentences summarising the tone and key narratives in the news reporting>",
+  "socialSummary": "<2-3 sentences summarising the public mood and key themes in social media commentary, or null if no social posts>",
   "themes": ["<theme1>", "<theme2>", "<theme3>"]
 }
 
 Rules:
 - Use "mixed" when coverage contains significant positive and negative elements
 - Use "neutral" for purely factual, non-evaluative coverage
-- Set socialSentiment to null if no Reddit posts were provided
+- Set socialSentiment and socialSummary to null if no Reddit posts were provided
 - Keep themes concise (2-4 words each)
-- The summary should be insightful, not generic`;
+- Each summary should be insightful and specific to its source type, not generic`;
 }
 
 function parseSentimentJSON(text) {
@@ -68,6 +70,8 @@ function parseSentimentJSON(text) {
       socialSentiment: validSentiments.includes(parsed.socialSentiment) ? parsed.socialSentiment : null,
       confidence: typeof parsed.confidence === 'number' ? Math.min(1, Math.max(0, parsed.confidence)) : 0.7,
       summary: typeof parsed.summary === 'string' ? parsed.summary.slice(0, 500) : '',
+      newsSummary: typeof parsed.newsSummary === 'string' ? parsed.newsSummary.slice(0, 500) : null,
+      socialSummary: typeof parsed.socialSummary === 'string' ? parsed.socialSummary.slice(0, 500) : null,
       themes: Array.isArray(parsed.themes) ? parsed.themes.slice(0, 5).map(String) : [],
     };
   } catch {

@@ -3,7 +3,7 @@ import SEO from '@/components/SEO'
 import {
   Tag, Plus, X, Lock, Newspaper, Search, LogIn, Globe, CrosshairIcon,
   Bell, BellOff, Layers, FolderPlus,
-  Folder, FolderOpen, Trash2, Code2, BarChart2, Zap, TrendingUp, TrendingDown, Minus, RefreshCw, Sparkles
+  Folder, FolderOpen, Trash2, Code2, BarChart2, Zap, TrendingUp, TrendingDown, Minus, RefreshCw, Sparkles, MessageSquare
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,7 +22,7 @@ import api from '@/api'
 import { useUser } from '@clerk/clerk-react'
 import { Link } from 'react-router-dom'
 import { sanitizeKeyword, isValidKeyword } from '@/lib/sanitize'
-import type { Article, Keyword, KeywordTopic, KeywordAlertSetting, SearchAnalyticsEntry, GoogleTrendsData, KeywordSentimentData } from '@/types/article'
+import type { Article, Keyword, KeywordTopic, KeywordAlertSetting, GoogleTrendsData, KeywordSentimentData } from '@/types/article'
 import { ApiReadyContext } from '@/App'
 
 // ─── Region options ───────────────────────────────────────────────────────────
@@ -66,78 +66,6 @@ const load = <T,>(key: string, fallback: T): T => {
 }
 const save = (key: string, value: unknown) => {
   try { localStorage.setItem(key, JSON.stringify(value)) } catch { }
-}
-
-// ─── Analytics helpers ────────────────────────────────────────────────────────
-
-function groupByDay(entries: SearchAnalyticsEntry[]): { date: string; count: number }[] {
-  const map: Record<string, number> = {}
-  for (const e of entries) {
-    const day = e.created_at.slice(0, 10)
-    map[day] = (map[day] ?? 0) + 1
-  }
-  return Object.entries(map)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, count]) => ({ date, count }))
-}
-
-function expansionBreakdown(entries: SearchAnalyticsEntry[]): { source: string; count: number; pct: number }[] {
-  const map: Record<string, number> = {}
-  for (const e of entries) {
-    const s = e.expansion_source ?? 'unknown'
-    map[s] = (map[s] ?? 0) + 1
-  }
-  const total = entries.length || 1
-  return Object.entries(map)
-    .map(([source, count]) => ({ source, count, pct: Math.round((count / total) * 100) }))
-    .sort((a, b) => b.count - a.count)
-}
-
-const EXPANSION_LABELS: Record<string, { label: string; colour: string }> = {
-  static: { label: 'Static map', colour: 'bg-blue-500' },
-  llm: { label: 'AI-expanded', colour: 'bg-purple-500' },
-  boolean: { label: 'Boolean query', colour: 'bg-green-500' },
-  raw: { label: 'Raw keyword', colour: 'bg-amber-500' },
-  unknown: { label: 'Unknown', colour: 'bg-stone-400' },
-}
-
-function computeVelocity(entries: SearchAnalyticsEntry[], days: number): { direction: 'rising' | 'falling' | 'stable'; changePct: number } {
-  if (entries.length < 2) return { direction: 'stable', changePct: 0 }
-  const mid = new Date(Date.now() - (days / 2) * 86400000).toISOString()
-  const first = entries.filter(e => e.created_at < mid)
-  const second = entries.filter(e => e.created_at >= mid)
-  const avg = (arr: SearchAnalyticsEntry[]) =>
-    arr.reduce((s, e) => s + (e.result_count ?? 0), 0) / (arr.length || 1)
-  const avgFirst = avg(first)
-  const avgSecond = avg(second)
-  const changePct = avgFirst === 0 ? 0 : Math.round(((avgSecond - avgFirst) / avgFirst) * 100)
-  const direction = changePct > 5 ? 'rising' : changePct < -5 ? 'falling' : 'stable'
-  return { direction, changePct }
-}
-
-function aggregateSourcesAndGeo(entries: SearchAnalyticsEntry[]): {
-  sources: [string, number][]
-  countries: [string, number][]
-} {
-  const sources: Record<string, number> = {}
-  const countries: Record<string, number> = {}
-  for (const e of entries) {
-    if (e.top_sources) {
-      for (const [s, c] of Object.entries(e.top_sources)) sources[s] = (sources[s] ?? 0) + c
-    }
-    if (e.top_countries) {
-      for (const [c, n] of Object.entries(e.top_countries)) countries[c] = (countries[c] ?? 0) + n
-    }
-  }
-  const sort = (obj: Record<string, number>): [string, number][] =>
-    Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, 6)
-  return { sources: sort(sources), countries: sort(countries) }
-}
-
-function countryCodeToFlag(code: string): string {
-  const upper = code.toUpperCase()
-  if (upper.length !== 2) return '🌐'
-  return String.fromCodePoint(...[...upper].map(c => c.charCodeAt(0) + 0x1f1a5))
 }
 
 // (Per-keyword AlertModal removed — alerts are now feed-only)
@@ -332,15 +260,10 @@ export default function Keywords() {
   // ── Analytics tab ──
   const [activeView, setActiveView] = useState<'articles' | 'analytics'>('articles')
   const [analyticsDays, setAnalyticsDays] = useState<7 | 30 | 90>(30)
-  const [analyticsEntries, setAnalyticsEntries] = useState<SearchAnalyticsEntry[]>([])
-  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false)
   const [googleTrends, setGoogleTrends] = useState<GoogleTrendsData | null>(null)
   const [isLoadingTrends, setIsLoadingTrends] = useState(false)
   const [sentimentData, setSentimentData] = useState<KeywordSentimentData | null>(null)
   const [isLoadingSentiment, setIsLoadingSentiment] = useState(false)
-  const [compareKeywords, setCompareKeywords] = useState<string[]>([])
-  const [compareData, setCompareData] = useState<Record<string, { date: string; count: number }[]>>({})
-  const [isLoadingCompare, setIsLoadingCompare] = useState(false)
 
   const abortRef = useRef<AbortController | null>(null)
 
@@ -462,26 +385,9 @@ export default function Keywords() {
   // Reset to articles view and clear comparison state when selection changes
   useEffect(() => {
     setActiveView('articles')
-    setCompareKeywords([])
     setGoogleTrends(null)
     setSentimentData(null)
   }, [selection])
-
-  // Load analytics when the analytics tab is active
-  useEffect(() => {
-    if (activeView !== 'analytics' || !selection || !isSignedIn) return
-    const kwNames: string[] = selection.type === 'keyword'
-      ? [keywords.find(k => k.id === selection.id)?.keyword].filter(Boolean) as string[]
-      : (topics.find(t => t.id === selection.id)?.keyword_topic_members ?? [])
-        .map(m => keywords.find(k => k.id === m.keyword_id)?.keyword)
-        .filter(Boolean) as string[]
-    if (!kwNames.length) return
-    setIsLoadingAnalytics(true)
-    api.getSearchAnalytics(analyticsDays, kwNames.length === 1 ? kwNames[0] : kwNames)
-      .then(setAnalyticsEntries)
-      .catch(() => toast.error('Failed to load analytics'))
-      .finally(() => setIsLoadingAnalytics(false))
-  }, [activeView, analyticsDays, selection, isSignedIn, keywords, topics])
 
   // Load Google Trends for single-keyword selections
   useEffect(() => {
@@ -516,27 +422,6 @@ export default function Keywords() {
       .catch(() => setSentimentData(null)) // silently fail — optional feature
       .finally(() => setIsLoadingSentiment(false))
   }, [activeView, selection, analyticsDays, isSignedIn, keywords])
-
-  // Load comparison keyword analytics
-  useEffect(() => {
-    if (compareKeywords.length === 0 || activeView !== 'analytics') {
-      setCompareData({})
-      return
-    }
-    setIsLoadingCompare(true)
-    Promise.all(
-      compareKeywords.map(kw =>
-        api.getSearchAnalytics(analyticsDays, kw).then(entries => ({ kw, data: groupByDay(entries) }))
-      )
-    )
-      .then(results => {
-        const map: Record<string, { date: string; count: number }[]> = {}
-        for (const { kw, data } of results) map[kw] = data
-        setCompareData(map)
-      })
-      .catch(() => toast.error('Failed to load comparison data'))
-      .finally(() => setIsLoadingCompare(false))
-  }, [compareKeywords, analyticsDays, activeView])
 
   // ── CRUD ────────────────────────────────────────────────────────────────────
 
@@ -638,15 +523,6 @@ export default function Keywords() {
   const selectedKeyword = selection?.type === 'keyword' ? keywords.find(k => k.id === selection.id) : null
   const selectedTopic = selection?.type === 'topic' ? topics.find(t => t.id === selection.id) : null
   const selectionLabel = selectedKeyword?.keyword ?? selectedTopic?.name ?? null
-
-  const analyticsDaily = groupByDay(analyticsEntries)
-  const analyticsBreakdown = expansionBreakdown(analyticsEntries)
-  const analyticsMaxDay = Math.max(...analyticsDaily.map(d => d.count), 1)
-  const analyticsAvgResults = analyticsEntries.length
-    ? Math.round(analyticsEntries.reduce((s, e) => s + (e.result_count ?? 0), 0) / analyticsEntries.length)
-    : 0
-  const velocity = computeVelocity(analyticsEntries, analyticsDays)
-  const analyticsSourceData = aggregateSourcesAndGeo(analyticsEntries)
 
   return (
     <div className="h-full flex flex-col bg-stone-50 dark:bg-slate-900">
@@ -1092,361 +968,185 @@ export default function Keywords() {
                 {activeView === 'analytics' && (
                   <ScrollArea className="flex-1">
                     <div className="p-4 lg:p-6">
-                      {isLoadingAnalytics ? (
-                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                          {[...Array(3)].map((_, i) => <div key={i} className="h-24 rounded-xl skeleton-shimmer" />)}
-                        </div>
-                      ) : analyticsEntries.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
-                          <BarChart2 className="w-10 h-10 text-stone-300 dark:text-slate-600 mb-4" />
-                          <h3 className="text-lg font-semibold text-stone-700 dark:text-slate-300 mb-1">No search history yet</h3>
-                          <p className="text-stone-400 dark:text-slate-500 text-sm max-w-xs">
-                            Search history for "{selectionLabel}" will appear here after you view articles.
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-6 max-w-5xl">
+                      <div className="space-y-6 max-w-5xl">
 
-                          {/* ── Trend Overview ─────────────────────────────── */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {/* Google Search Trend */}
-                            <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
-                              <div className="flex items-center justify-between mb-3">
-                                <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm">Google Search Trend</h2>
-                                {isLoadingTrends && <span className="text-[10px] text-stone-400 animate-pulse">Loading…</span>}
-                                {!isLoadingTrends && googleTrends && (
-                                  <span className={`flex items-center gap-1 text-xs font-medium ${googleTrends.direction === 'rising' ? 'text-green-600' : googleTrends.direction === 'falling' ? 'text-red-500' : 'text-stone-500'}`}>
-                                    {googleTrends.direction === 'rising' ? <TrendingUp className="w-3.5 h-3.5" /> : googleTrends.direction === 'falling' ? <TrendingDown className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
-                                    {googleTrends.direction === 'stable' ? 'Stable' : `${googleTrends.direction === 'rising' ? '+' : ''}${googleTrends.changePct}%`}
-                                  </span>
-                                )}
-                              </div>
-                              {isLoadingTrends ? (
-                                <div className="h-16 skeleton-shimmer rounded" />
-                              ) : googleTrends && googleTrends.interest.length > 0 ? (
-                                <>
-                                  <div className="flex items-end gap-0.5 h-16">
-                                    {googleTrends.interest.map(({ date, value }) => (
-                                      <div
-                                        key={date}
-                                        className={`flex-1 rounded-t transition-opacity hover:opacity-100 opacity-80 ${googleTrends.direction === 'rising' ? 'bg-green-500' : googleTrends.direction === 'falling' ? 'bg-red-400' : 'bg-slate-400'}`}
-                                        style={{ height: `${Math.max(value, 2)}%`, minHeight: 2 }}
-                                        title={`${date}: ${value}/100`}
-                                      />
-                                    ))}
-                                  </div>
-                                  <p className="text-[10px] text-stone-400 dark:text-slate-500 mt-2">
-                                    Google search interest (0–100) · last {analyticsDays}d
-                                  </p>
-                                </>
-                              ) : (
-                                <p className="text-xs text-stone-400 dark:text-slate-500">
-                                  {selectedTopic
-                                    ? 'Google Trends available for individual keywords only.'
-                                    : 'No data — add a SERPAPI_KEY environment variable to enable.'}
-                                </p>
-                              )}
-                            </div>
-
-                            {/* News Coverage Velocity */}
-                            <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
-                              <div className="flex items-center justify-between mb-3">
-                                <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm">News Coverage Trend</h2>
-                                <span className={`flex items-center gap-1 text-xs font-medium ${velocity.direction === 'rising' ? 'text-green-600' : velocity.direction === 'falling' ? 'text-red-500' : 'text-stone-500'}`}>
-                                  {velocity.direction === 'rising' ? <TrendingUp className="w-3.5 h-3.5" /> : velocity.direction === 'falling' ? <TrendingDown className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
-                                  {velocity.direction === 'stable' ? 'Stable' : `${velocity.direction === 'rising' ? '+' : ''}${velocity.changePct}%`}
-                                </span>
-                              </div>
-                              <p className="text-xs text-stone-500 dark:text-slate-400">
-                                Article volume is{' '}
-                                <span className={`font-medium ${velocity.direction === 'rising' ? 'text-green-600' : velocity.direction === 'falling' ? 'text-red-500' : 'text-stone-700 dark:text-slate-300'}`}>
-                                  {velocity.direction === 'rising' ? 'increasing' : velocity.direction === 'falling' ? 'decreasing' : 'stable'}
-                                </span>{' '}
-                                compared to the first half of this period.
-                              </p>
-                              <p className="text-[10px] text-stone-400 dark:text-slate-500 mt-3">
-                                Based on avg articles per search · last {analyticsDays}d
-                              </p>
-                            </div>
+                        {/* ── Google Search Trend ─────────────────────────── */}
+                        <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
+                          <div className="flex items-center justify-between mb-3">
+                            <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm flex items-center gap-2">
+                              <TrendingUp className="w-4 h-4 text-blue-500" />
+                              Google Search Trend
+                            </h2>
+                            {isLoadingTrends && <span className="text-[10px] text-stone-400 animate-pulse">Loading…</span>}
+                            {!isLoadingTrends && googleTrends && (
+                              <span className={`flex items-center gap-1 text-xs font-medium ${googleTrends.direction === 'rising' ? 'text-green-600' : googleTrends.direction === 'falling' ? 'text-red-500' : 'text-stone-500'}`}>
+                                {googleTrends.direction === 'rising' ? <TrendingUp className="w-3.5 h-3.5" /> : googleTrends.direction === 'falling' ? <TrendingDown className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
+                                {googleTrends.direction === 'stable' ? 'Stable' : `${googleTrends.direction === 'rising' ? '+' : ''}${googleTrends.changePct}%`}
+                              </span>
+                            )}
                           </div>
-
-                          {/* ── Breakout Queries ───────────────────────────── */}
-                          {googleTrends && googleTrends.breakoutQueries.length > 0 && (
-                            <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
-                              <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-1 flex items-center gap-2">
-                                <Zap className="w-4 h-4 text-amber-500" />
-                                Breakout Searches
-                              </h2>
-                              <p className="text-[11px] text-stone-500 dark:text-slate-400 mb-3">
-                                Fast-rising Google searches related to "{selectionLabel}"
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                {googleTrends.breakoutQueries.map(q => (
-                                  <span key={q} className="px-3 py-1 text-xs rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                                    {q}
-                                  </span>
+                          {isLoadingTrends ? (
+                            <div className="h-16 skeleton-shimmer rounded" />
+                          ) : googleTrends && googleTrends.interest.length > 0 ? (
+                            <>
+                              <div className="flex items-end gap-0.5 h-16">
+                                {googleTrends.interest.map(({ date, value }) => (
+                                  <div
+                                    key={date}
+                                    className={`flex-1 rounded-t transition-opacity hover:opacity-100 opacity-80 ${googleTrends.direction === 'rising' ? 'bg-green-500' : googleTrends.direction === 'falling' ? 'bg-red-400' : 'bg-slate-400'}`}
+                                    style={{ height: `${Math.max(value, 2)}%`, minHeight: 2 }}
+                                    title={`${date}: ${value}/100`}
+                                  />
                                 ))}
                               </div>
-                            </div>
+                              <p className="text-[10px] text-stone-400 dark:text-slate-500 mt-2">
+                                Google search interest (0–100) · last {analyticsDays}d
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-xs text-stone-400 dark:text-slate-500">
+                              {selectedTopic
+                                ? 'Google Trends available for individual keywords only.'
+                                : 'No data — add a SERPAPI_KEY environment variable to enable.'}
+                            </p>
                           )}
+                        </div>
 
-                          {/* ── AI Sentiment Summary ───────────────────────── */}
-                          {(isLoadingSentiment || sentimentData) && (
-                            <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
-                              <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-3 flex items-center gap-2">
-                                <Sparkles className="w-4 h-4 text-purple-500" />
-                                AI Sentiment Summary
-                              </h2>
-                              {isLoadingSentiment ? (
-                                <div className="space-y-2">
-                                  <div className="h-4 w-24 skeleton-shimmer rounded" />
-                                  <div className="h-3 w-full skeleton-shimmer rounded" />
-                                  <div className="h-3 w-4/5 skeleton-shimmer rounded" />
-                                </div>
-                              ) : sentimentData && (
-                                <>
+                        {/* ── Breakout Searches ───────────────────────────── */}
+                        {googleTrends && googleTrends.breakoutQueries.length > 0 && (
+                          <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
+                            <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-1 flex items-center gap-2">
+                              <Zap className="w-4 h-4 text-amber-500" />
+                              Breakout Searches
+                            </h2>
+                            <p className="text-[11px] text-stone-500 dark:text-slate-400 mb-3">
+                              Fast-rising Google searches related to "{selectionLabel}"
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {googleTrends.breakoutQueries.map(q => (
+                                <span key={q} className="px-3 py-1 text-xs rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                  {q}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── Sentiment sections (single keyword only) ────── */}
+                        {selection?.type === 'keyword' && (
+                          <>
+                            {isLoadingSentiment ? (
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {[...Array(2)].map((_, i) => (
+                                  <div key={i} className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5 space-y-3">
+                                    <div className="h-4 w-32 skeleton-shimmer rounded" />
+                                    <div className="h-3 w-full skeleton-shimmer rounded" />
+                                    <div className="h-3 w-4/5 skeleton-shimmer rounded" />
+                                    <div className="h-3 w-3/5 skeleton-shimmer rounded" />
+                                  </div>
+                                ))}
+                              </div>
+                            ) : sentimentData ? (
+                              <>
+                                {/* News Reporting Sentiment */}
+                                <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
+                                  <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-3 flex items-center gap-2">
+                                    <Newspaper className="w-4 h-4 text-blue-500" />
+                                    News Reporting Sentiment
+                                  </h2>
                                   <div className="flex items-center gap-3 mb-3">
                                     <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                                      sentimentData.sentiment === 'positive' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
-                                      sentimentData.sentiment === 'negative' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
-                                      sentimentData.sentiment === 'mixed'    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
-                                                                               'bg-stone-100 text-stone-600 dark:bg-slate-700 dark:text-slate-300'
+                                      sentimentData.newsSentiment === 'positive' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                                      sentimentData.newsSentiment === 'negative' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                                      sentimentData.newsSentiment === 'mixed'    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
+                                                                                   'bg-stone-100 text-stone-600 dark:bg-slate-700 dark:text-slate-300'
                                     }`}>
-                                      {sentimentData.sentiment.charAt(0).toUpperCase() + sentimentData.sentiment.slice(1)}
+                                      {sentimentData.newsSentiment.charAt(0).toUpperCase() + sentimentData.newsSentiment.slice(1)}
                                     </span>
                                     <span className="text-[10px] text-stone-400 dark:text-slate-500">
-                                      News: <span className="font-medium">{sentimentData.newsSentiment}</span>
-                                      {sentimentData.socialSentiment && (
-                                        <> · Reddit: <span className="font-medium">{sentimentData.socialSentiment}</span></>
-                                      )}
+                                      {sentimentData.newsCount} article{sentimentData.newsCount !== 1 ? 's' : ''} analysed · last {analyticsDays}d
                                     </span>
                                   </div>
-                                  <p className="text-xs text-stone-600 dark:text-slate-300 leading-relaxed mb-3">
-                                    {sentimentData.summary}
+                                  <p className="text-xs text-stone-600 dark:text-slate-300 leading-relaxed">
+                                    {sentimentData.newsSummary ?? sentimentData.summary}
                                   </p>
-                                  {sentimentData.themes.length > 0 && (
-                                    <div className="flex flex-wrap gap-1.5 mb-3">
+                                </div>
+
+                                {/* Social Media Sentiment */}
+                                <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
+                                  <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-3 flex items-center gap-2">
+                                    <MessageSquare className="w-4 h-4 text-purple-500" />
+                                    Social Media Sentiment
+                                  </h2>
+                                  {sentimentData.socialSentiment ? (
+                                    <>
+                                      <div className="flex items-center gap-3 mb-3">
+                                        <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                                          sentimentData.socialSentiment === 'positive' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                                          sentimentData.socialSentiment === 'negative' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                                          sentimentData.socialSentiment === 'mixed'    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
+                                                                                         'bg-stone-100 text-stone-600 dark:bg-slate-700 dark:text-slate-300'
+                                        }`}>
+                                          {sentimentData.socialSentiment.charAt(0).toUpperCase() + sentimentData.socialSentiment.slice(1)}
+                                        </span>
+                                        <span className="text-[10px] text-stone-400 dark:text-slate-500">
+                                          {sentimentData.redditCount} Reddit post{sentimentData.redditCount !== 1 ? 's' : ''} analysed · last {analyticsDays}d
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-stone-600 dark:text-slate-300 leading-relaxed">
+                                        {sentimentData.socialSummary ?? sentimentData.summary}
+                                      </p>
+                                    </>
+                                  ) : (
+                                    <p className="text-xs text-stone-400 dark:text-slate-500">
+                                      No social media posts found for this keyword in the selected period.
+                                    </p>
+                                  )}
+                                </div>
+
+                                {/* Key Themes */}
+                                {sentimentData.themes.length > 0 && (
+                                  <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
+                                    <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-3 flex items-center gap-2">
+                                      <Sparkles className="w-4 h-4 text-purple-500" />
+                                      Key Themes
+                                    </h2>
+                                    <div className="flex flex-wrap gap-2">
                                       {sentimentData.themes.map(t => (
-                                        <span key={t} className="px-2.5 py-0.5 text-[11px] rounded-full bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                        <span key={t} className="px-3 py-1 text-xs rounded-full bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                                           {t}
                                         </span>
                                       ))}
                                     </div>
-                                  )}
-                                  <p className="text-[10px] text-stone-400 dark:text-slate-500">
-                                    Based on {sentimentData.newsCount} news article{sentimentData.newsCount !== 1 ? 's' : ''}
-                                    {sentimentData.redditCount > 0 && ` · ${sentimentData.redditCount} Reddit post${sentimentData.redditCount !== 1 ? 's' : ''}`}
-                                    {' '}· last {analyticsDays}d
-                                  </p>
-                                </>
-                              )}
-                            </div>
-                          )}
-
-                          {/* ── KPI row ────────────────────────────────────── */}
-                          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                            {[
-                              { label: 'Total searches', value: analyticsEntries.length, icon: Search, colour: 'text-blue-600' },
-                              { label: 'Avg results / search', value: analyticsAvgResults, icon: BarChart2, colour: 'text-purple-600' },
-                              { label: 'AI-expanded queries', value: analyticsBreakdown.find(b => b.source === 'llm')?.count ?? 0, icon: Zap, colour: 'text-amber-600' },
-                            ].map(({ label, value, icon: Icon, colour }) => (
-                              <div key={label} className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-4">
-                                <div className={`${colour} mb-2`}><Icon className="w-5 h-5" /></div>
-                                <div className="text-2xl font-bold text-stone-900 dark:text-stone-100">{value.toLocaleString()}</div>
-                                <div className="text-xs text-stone-500 dark:text-slate-400 mt-0.5">{label}</div>
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* ── Searches over time + expansion method ──────── */}
-                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
-                              <div className="flex items-center justify-between mb-4">
-                                <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm">Searches per day</h2>
-                                {velocity.direction !== 'stable' && (
-                                  <span className={`flex items-center gap-1 text-[11px] font-medium ${velocity.direction === 'rising' ? 'text-green-600' : 'text-red-500'}`}>
-                                    {velocity.direction === 'rising' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                                    {velocity.direction === 'rising' ? 'Trending up' : 'Trending down'}
-                                  </span>
+                                  </div>
                                 )}
-                              </div>
-                              {analyticsDaily.length === 0 ? (
-                                <p className="text-xs text-stone-400">No data</p>
-                              ) : (
-                                <div className="flex items-end gap-1 h-32">
-                                  {analyticsDaily.map(({ date, count }) => (
-                                    <div key={date} className="flex flex-col items-center flex-1 min-w-0 gap-1 group">
-                                      <div
-                                        className="w-full rounded-t bg-slate-800 dark:bg-slate-400 transition-all group-hover:bg-blue-600 dark:group-hover:bg-blue-400"
-                                        style={{ height: `${(count / analyticsMaxDay) * 100}%`, minHeight: 2 }}
-                                        title={`${date}: ${count} search${count !== 1 ? 'es' : ''}`}
-                                      />
-                                      <span className="text-[8px] text-stone-400 rotate-45 origin-left hidden lg:block truncate w-6">
-                                        {date.slice(5)}
-                                      </span>
-                                    </div>
-                                  ))}
+                              </>
+                            ) : (
+                              <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
+                                <div className="flex flex-col items-center justify-center py-8 text-center">
+                                  <BarChart2 className="w-8 h-8 text-stone-300 dark:text-slate-600 mb-3" />
+                                  <p className="text-sm text-stone-500 dark:text-slate-400">
+                                    Sentiment analysis unavailable for this keyword.
+                                  </p>
+                                  <p className="text-xs text-stone-400 dark:text-slate-500 mt-1">
+                                    No news articles or social posts were found in the selected period.
+                                  </p>
                                 </div>
-                              )}
-                            </div>
-
-                            <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
-                              <h2 className="font-semibold text-stone-900 dark:text-stone-100 mb-4 text-sm">Query expansion method</h2>
-                              <div className="space-y-2.5">
-                                {analyticsBreakdown.map(({ source, count, pct }) => {
-                                  const meta = EXPANSION_LABELS[source] ?? { label: source, colour: 'bg-stone-400' }
-                                  return (
-                                    <div key={source}>
-                                      <div className="flex justify-between text-xs mb-1">
-                                        <span className="text-stone-600 dark:text-slate-400">{meta.label}</span>
-                                        <span className="font-medium text-stone-800 dark:text-slate-300">{count} ({pct}%)</span>
-                                      </div>
-                                      <div className="h-1.5 bg-stone-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                                        <div className={`h-full rounded-full ${meta.colour}`} style={{ width: `${pct}%` }} />
-                                      </div>
-                                    </div>
-                                  )
-                                })}
                               </div>
-                            </div>
+                            )}
+                          </>
+                        )}
+
+                        {/* Topic: no sentiment note */}
+                        {selection?.type === 'topic' && !isLoadingTrends && (
+                          <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
+                            <p className="text-xs text-stone-400 dark:text-slate-500">
+                              Sentiment analysis is available for individual keywords. Select a keyword to see news and social sentiment.
+                            </p>
                           </div>
+                        )}
 
-                          {/* ── Source & Geographic Coverage ───────────────── */}
-                          {(analyticsSourceData.sources.length > 0 || analyticsSourceData.countries.length > 0) && (
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                              {analyticsSourceData.sources.length > 0 && (
-                                <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
-                                  <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-4 flex items-center gap-2">
-                                    <Newspaper className="w-4 h-4 text-stone-400" />
-                                    Top News Sources
-                                  </h2>
-                                  <div className="space-y-2.5">
-                                    {analyticsSourceData.sources.map(([name, count]) => {
-                                      const max = analyticsSourceData.sources[0]?.[1] ?? 1
-                                      return (
-                                        <div key={name}>
-                                          <div className="flex justify-between text-xs mb-1">
-                                            <span className="text-stone-700 dark:text-slate-300 truncate max-w-[65%]">{name}</span>
-                                            <span className="font-medium text-stone-500 dark:text-slate-400">{count}</span>
-                                          </div>
-                                          <div className="h-1.5 bg-stone-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                                            <div className="h-full rounded-full bg-blue-500" style={{ width: `${(count / max) * 100}%` }} />
-                                          </div>
-                                        </div>
-                                      )
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-                              {analyticsSourceData.countries.length > 0 && (
-                                <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
-                                  <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-4 flex items-center gap-2">
-                                    <Globe className="w-4 h-4 text-stone-400" />
-                                    Geographic Coverage
-                                  </h2>
-                                  <div className="space-y-2">
-                                    {analyticsSourceData.countries.map(([code, count]) => (
-                                      <div key={code} className="flex items-center justify-between text-xs">
-                                        <span className="flex items-center gap-2">
-                                          <span className="text-base leading-none">{countryCodeToFlag(code)}</span>
-                                          <span className="text-stone-700 dark:text-slate-300 uppercase">{code}</span>
-                                        </span>
-                                        <span className="font-medium text-stone-500 dark:text-slate-400">{count} article{count !== 1 ? 's' : ''}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* ── Keyword Comparison ─────────────────────────── */}
-                          {!selectedTopic && keywords.length > 1 && (
-                            <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
-                              <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-1">Keyword Comparison</h2>
-                              <p className="text-[11px] text-stone-500 dark:text-slate-400 mb-3">
-                                Select up to 2 other keywords to compare article volume.
-                              </p>
-                              <div className="flex flex-wrap gap-2 mb-4">
-                                {keywords
-                                  .filter(k => k.id !== selection?.id)
-                                  .map(k => {
-                                    const isSelected = compareKeywords.includes(k.keyword)
-                                    const disabled = !isSelected && compareKeywords.length >= 2
-                                    return (
-                                      <button
-                                        key={k.id}
-                                        disabled={disabled}
-                                        onClick={() => setCompareKeywords(prev =>
-                                          isSelected ? prev.filter(x => x !== k.keyword) : prev.length < 2 ? [...prev, k.keyword] : prev
-                                        )}
-                                        className={`px-3 py-1 text-xs rounded-full border font-medium transition-colors ${isSelected
-                                          ? 'bg-blue-600 text-white border-blue-600'
-                                          : disabled
-                                            ? 'bg-stone-50 dark:bg-slate-700 text-stone-300 dark:text-slate-600 border-stone-200 dark:border-slate-600 cursor-not-allowed'
-                                            : 'bg-stone-50 dark:bg-slate-700 text-stone-600 dark:text-slate-300 border-stone-200 dark:border-slate-600 hover:border-blue-400 hover:text-blue-600'
-                                          }`}
-                                      >
-                                        {k.keyword}
-                                      </button>
-                                    )
-                                  })}
-                              </div>
-                              {compareKeywords.length > 0 && (
-                                isLoadingCompare ? (
-                                  <div className="h-32 skeleton-shimmer rounded" />
-                                ) : (
-                                  <>
-                                    <div className="flex flex-wrap items-center gap-4 mb-3">
-                                      <div className="flex items-center gap-1.5 text-xs text-stone-600 dark:text-slate-400">
-                                        <div className="w-3 h-3 rounded-sm bg-blue-600" />
-                                        {selectionLabel}
-                                      </div>
-                                      {compareKeywords.map((kw, i) => (
-                                        <div key={kw} className="flex items-center gap-1.5 text-xs text-stone-600 dark:text-slate-400">
-                                          <div className={`w-3 h-3 rounded-sm ${i === 0 ? 'bg-green-500' : 'bg-orange-500'}`} />
-                                          {kw}
-                                        </div>
-                                      ))}
-                                    </div>
-                                    {(() => {
-                                      const allDates = Array.from(new Set([
-                                        ...analyticsDaily.map(d => d.date),
-                                        ...compareKeywords.flatMap(kw => (compareData[kw] ?? []).map(d => d.date)),
-                                      ])).sort()
-                                      const primaryMap = Object.fromEntries(analyticsDaily.map(d => [d.date, d.count]))
-                                      const compareMaps = compareKeywords.map(kw =>
-                                        Object.fromEntries((compareData[kw] ?? []).map(d => [d.date, d.count]))
-                                      )
-                                      const maxVal = Math.max(
-                                        ...allDates.map(d => Math.max(primaryMap[d] ?? 0, ...compareMaps.map(m => m[d] ?? 0))),
-                                        1
-                                      )
-                                      return (
-                                        <div className="flex items-end gap-1 h-32">
-                                          {allDates.map(date => (
-                                            <div key={date} className="flex items-end gap-0.5 flex-1 min-w-0">
-                                              {[primaryMap[date] ?? 0, ...compareMaps.map(m => m[date] ?? 0)].map((val, i) => (
-                                                <div
-                                                  key={i}
-                                                  className={`flex-1 rounded-t ${i === 0 ? 'bg-blue-600' : i === 1 ? 'bg-green-500' : 'bg-orange-500'}`}
-                                                  style={{ height: `${(val / maxVal) * 100}%`, minHeight: val > 0 ? 2 : 0 }}
-                                                  title={`${date} · ${i === 0 ? selectionLabel : compareKeywords[i - 1]}: ${val}`}
-                                                />
-                                              ))}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )
-                                    })()}
-                                  </>
-                                )
-                              )}
-                            </div>
-                          )}
-
-                        </div>
-                      )}
+                      </div>
                     </div>
                   </ScrollArea>
                 )}
