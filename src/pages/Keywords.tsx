@@ -1054,7 +1054,7 @@ export default function Keywords() {
                                     <Newspaper className="w-4 h-4 text-blue-500" />
                                     News Reporting Sentiment
                                   </h2>
-                                  <div className="flex items-center gap-3 mb-3">
+                                  <div className="flex items-center gap-3 mb-4">
                                     <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
                                       sentimentData.newsSentiment === 'positive' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
                                       sentimentData.newsSentiment === 'negative' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
@@ -1067,9 +1067,27 @@ export default function Keywords() {
                                       {sentimentData.newsCount} article{sentimentData.newsCount !== 1 ? 's' : ''} analysed · last {analyticsDays}d
                                     </span>
                                   </div>
-                                  <p className="text-xs text-stone-600 dark:text-slate-300 leading-relaxed">
-                                    {sentimentData.newsSummary ?? sentimentData.summary}
-                                  </p>
+                                  {Array.isArray(sentimentData.newsSummary) ? (
+                                    <ul className="space-y-2">
+                                      {sentimentData.newsSummary.map((item, i) => {
+                                        const [topic, ...rest] = item.split(/\s*[—–-]\s*/)
+                                        const detail = rest.join(' — ')
+                                        return (
+                                          <li key={i} className="flex gap-2 text-xs text-stone-600 dark:text-slate-300 leading-relaxed">
+                                            <span className="mt-0.5 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-blue-400 dark:bg-blue-500" />
+                                            <span>
+                                              <span className="font-medium text-stone-800 dark:text-slate-100">{topic.trim()}</span>
+                                              {detail && <span className="text-stone-500 dark:text-slate-400"> — {detail.trim()}</span>}
+                                            </span>
+                                          </li>
+                                        )
+                                      })}
+                                    </ul>
+                                  ) : (
+                                    <p className="text-xs text-stone-600 dark:text-slate-300 leading-relaxed">
+                                      {sentimentData.newsSummary ?? sentimentData.summary}
+                                    </p>
+                                  )}
                                 </div>
 
                                 {/* Social Media Sentiment */}
@@ -1080,7 +1098,7 @@ export default function Keywords() {
                                   </h2>
                                   {sentimentData.socialSentiment ? (
                                     <>
-                                      <div className="flex items-center gap-3 mb-3">
+                                      <div className="flex items-center gap-3 mb-4">
                                         <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
                                           sentimentData.socialSentiment === 'positive' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
                                           sentimentData.socialSentiment === 'negative' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
@@ -1093,9 +1111,27 @@ export default function Keywords() {
                                           {sentimentData.redditCount} Reddit post{sentimentData.redditCount !== 1 ? 's' : ''} analysed · last {analyticsDays}d
                                         </span>
                                       </div>
-                                      <p className="text-xs text-stone-600 dark:text-slate-300 leading-relaxed">
-                                        {sentimentData.socialSummary ?? sentimentData.summary}
-                                      </p>
+                                      {Array.isArray(sentimentData.socialSummary) ? (
+                                        <ul className="space-y-2">
+                                          {sentimentData.socialSummary.map((item, i) => {
+                                            const [topic, ...rest] = item.split(/\s*[—–-]\s*/)
+                                            const detail = rest.join(' — ')
+                                            return (
+                                              <li key={i} className="flex gap-2 text-xs text-stone-600 dark:text-slate-300 leading-relaxed">
+                                                <span className="mt-0.5 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-purple-400 dark:bg-purple-500" />
+                                                <span>
+                                                  <span className="font-medium text-stone-800 dark:text-slate-100">{topic.trim()}</span>
+                                                  {detail && <span className="text-stone-500 dark:text-slate-400"> — {detail.trim()}</span>}
+                                                </span>
+                                              </li>
+                                            )
+                                          })}
+                                        </ul>
+                                      ) : (
+                                        <p className="text-xs text-stone-600 dark:text-slate-300 leading-relaxed">
+                                          {sentimentData.socialSummary ?? sentimentData.summary}
+                                        </p>
+                                      )}
                                     </>
                                   ) : (
                                     <p className="text-xs text-stone-400 dark:text-slate-500">
