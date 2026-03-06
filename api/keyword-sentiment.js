@@ -42,9 +42,19 @@ Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
   "newsSentiment": "positive" or "negative" or "neutral" or "mixed",
   "socialSentiment": "positive" or "negative" or "neutral" or "mixed" or null,
   "confidence": <number between 0 and 1>,
-  "summary": "<2-3 sentences describing the overall combined coverage tone and public mood>",
-  "newsSummary": "<2-3 sentences summarising the tone and key narratives in the news reporting>",
-  "socialSummary": "<2-3 sentences summarising the public mood and key themes in social media commentary, or null if no social posts>",
+  "summary": "<1-2 sentences describing the overall combined coverage tone>",
+  "newsSummary": [
+    "<Article topic — key detail or development, e.g. 'Trump Iran sanctions — new restrictions target oil exports and banking'>",
+    "<Article topic — key detail>",
+    "<Article topic — key detail>",
+    "<Article topic — key detail>",
+    "<Article topic — key detail>"
+  ],
+  "socialSummary": [
+    "<Top social post topic — key sentiment or detail, e.g. 'Outrage over CCTV footage — users questioning official account'>",
+    "<Post topic — key detail>",
+    "<Post topic — key detail>"
+  ] or null,
   "themes": ["<theme1>", "<theme2>", "<theme3>"]
 }
 
@@ -52,8 +62,10 @@ Rules:
 - Use "mixed" when coverage contains significant positive and negative elements
 - Use "neutral" for purely factual, non-evaluative coverage
 - Set socialSentiment and socialSummary to null if no Reddit posts were provided
-- Keep themes concise (2-4 words each)
-- Each summary should be insightful and specific to its source type, not generic`;
+- newsSummary: list the top 3-5 distinct news stories, each as "<topic> — <key detail or latest development>"
+- socialSummary: list the top 3 social post themes, each as "<topic> — <public reaction or key detail>"
+- Keep each bullet concise (one line), specific, and informative — not generic
+- Keep themes concise (2-4 words each)`;
 }
 
 function parseSentimentJSON(text) {
@@ -70,8 +82,12 @@ function parseSentimentJSON(text) {
       socialSentiment: validSentiments.includes(parsed.socialSentiment) ? parsed.socialSentiment : null,
       confidence: typeof parsed.confidence === 'number' ? Math.min(1, Math.max(0, parsed.confidence)) : 0.7,
       summary: typeof parsed.summary === 'string' ? parsed.summary.slice(0, 500) : '',
-      newsSummary: typeof parsed.newsSummary === 'string' ? parsed.newsSummary.slice(0, 500) : null,
-      socialSummary: typeof parsed.socialSummary === 'string' ? parsed.socialSummary.slice(0, 500) : null,
+      newsSummary: Array.isArray(parsed.newsSummary)
+        ? parsed.newsSummary.slice(0, 5).map(s => String(s).slice(0, 200))
+        : typeof parsed.newsSummary === 'string' ? parsed.newsSummary.slice(0, 500) : null,
+      socialSummary: Array.isArray(parsed.socialSummary)
+        ? parsed.socialSummary.slice(0, 5).map(s => String(s).slice(0, 200))
+        : typeof parsed.socialSummary === 'string' ? parsed.socialSummary.slice(0, 500) : null,
       themes: Array.isArray(parsed.themes) ? parsed.themes.slice(0, 5).map(String) : [],
     };
   } catch {
@@ -88,7 +104,7 @@ async function sentimentWithGemini(prompt, key) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 600 }
+      generationConfig: { temperature: 0.2, maxOutputTokens: 900 }
     })
   });
   const data = await res.json();
@@ -107,7 +123,7 @@ async function sentimentWithCerebras(prompt, key) {
       model: 'llama-3.3-70b',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
-      max_tokens: 600
+      max_tokens: 900
     })
   });
   const data = await res.json();
@@ -124,7 +140,7 @@ async function sentimentWithGroq(prompt, key) {
       model: 'llama-3.1-8b-instant',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
-      max_tokens: 600
+      max_tokens: 900
     })
   });
   const data = await res.json();
@@ -143,7 +159,7 @@ async function sentimentWithMistral(prompt, key) {
       model: 'mistral-small-latest',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
-      max_tokens: 600
+      max_tokens: 900
     })
   });
   const data = await res.json();
@@ -160,7 +176,7 @@ async function sentimentWithSambaNova(prompt, key) {
       model: 'Meta-Llama-3.3-70B-Instruct',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
-      max_tokens: 600
+      max_tokens: 900
     })
   });
   const data = await res.json();
@@ -177,7 +193,7 @@ async function sentimentWithOpenRouter(prompt, key) {
       model: 'mistralai/mistral-7b-instruct:free',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
-      max_tokens: 600
+      max_tokens: 900
     })
   });
   const data = await res.json();
@@ -194,7 +210,7 @@ async function sentimentWithOpenAI(prompt, key) {
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
-      max_tokens: 600
+      max_tokens: 900
     })
   });
   const data = await res.json();
@@ -213,7 +229,7 @@ async function sentimentWithCohere(prompt, key) {
       model: 'command-r-08-2024',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
-      max_tokens: 600
+      max_tokens: 900
     })
   });
   const data = await res.json();
