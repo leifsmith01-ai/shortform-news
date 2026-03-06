@@ -80,6 +80,11 @@ export interface KeywordSentimentData {
   newsSummary: string[] | string | null
   socialSummary: string[] | string | null
   themes: string[]
+  narrativeFrames: string[]
+  keyEntities: { people: string[]; organisations: string[] }
+  headlineSplit: { positive: number; negative: number; neutral: number; mixed: number } | null
+  outletTiers: { tier: string; label: string; count: number; pct: number }[]
+  geographicSpread: { country: string; count: number }[]
   newsCount: number
   redditCount: number
   cached?: boolean

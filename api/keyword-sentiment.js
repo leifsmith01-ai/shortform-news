@@ -20,6 +20,51 @@ function fetchWithTimeout(url, options = {}) {
   return fetch(url, { ...options, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
 }
 
+// ── Outlet tier helpers ───────────────────────────────────────────────────────
+
+const PRESTIGE_SOURCES = [
+  'reuters', 'associated press', 'ap news', 'ap ', 'bbc', 'new york times', 'nyt',
+  'washington post', 'the economist', 'economist', 'financial times', 'ft.com', 'bloomberg',
+  'wall street journal', 'wsj', 'the guardian', 'guardian', 'le monde', 'der spiegel',
+];
+const NATIONAL_SOURCES = [
+  'cnn', 'npr', 'politico', 'axios', 'the atlantic', 'time', 'newsweek', 'usa today',
+  'abc news', 'nbc news', 'cbs news', 'fox news', 'sky news', 'telegraph', 'the telegraph',
+  'the independent', 'independent', 'the times', 'daily mail', 'mirror', 'sun ', 'afp',
+  'al jazeera', 'dw', 'france 24', 'south china morning post', 'straitstimes', 'theage',
+  'smh', 'sydney morning herald', 'the australian', 'globe and mail',
+];
+
+function classifyOutletTier(sourceName) {
+  if (!sourceName) return 'regional';
+  const s = sourceName.toLowerCase();
+  if (PRESTIGE_SOURCES.some(t => s.includes(t))) return 'prestige';
+  if (NATIONAL_SOURCES.some(t => s.includes(t))) return 'national';
+  return 'regional';
+}
+
+function computeOutletTiers(articles) {
+  const counts = { prestige: 0, national: 0, regional: 0 };
+  for (const a of articles) counts[classifyOutletTier(a.source)]++;
+  const total = articles.length || 1;
+  return [
+    { tier: 'prestige', label: 'Prestige / Wire', count: counts.prestige, pct: Math.round((counts.prestige / total) * 100) },
+    { tier: 'national', label: 'National / Broadcast', count: counts.national, pct: Math.round((counts.national / total) * 100) },
+    { tier: 'regional', label: 'Regional / Other', count: counts.regional, pct: Math.round((counts.regional / total) * 100) },
+  ].filter(t => t.count > 0);
+}
+
+function computeGeographicSpread(articles) {
+  const map = {};
+  for (const a of articles) {
+    if (a.country) map[a.country] = (map[a.country] ?? 0) + 1;
+  }
+  return Object.entries(map)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([country, count]) => ({ country, count }));
+}
+
 // ── LLM prompt ────────────────────────────────────────────────────────────────
 
 function buildSentimentPrompt(keyword, newsTitles, redditTitles) {
@@ -55,7 +100,18 @@ Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
     "<Post topic — key detail>",
     "<Post topic — key detail>"
   ] or null,
-  "themes": ["<theme1>", "<theme2>", "<theme3>"]
+  "themes": ["<theme1>", "<theme2>", "<theme3>"],
+  "narrativeFrames": ["<main narrative angle 1>", "<angle 2>", "<angle 3>"],
+  "keyEntities": {
+    "people": ["<full name>", "<full name>"],
+    "organisations": ["<org name>", "<org name>"]
+  },
+  "headlineSplit": {
+    "positive": <integer, % of headlines with positive tone>,
+    "negative": <integer, % of headlines with negative tone>,
+    "neutral": <integer, % of headlines with neutral/factual tone>,
+    "mixed": <integer, % of headlines with mixed tone>
+  }
 }
 
 Rules:
@@ -65,7 +121,10 @@ Rules:
 - newsSummary: list the top 3-5 distinct news stories, each as "<topic> — <key detail or latest development>"
 - socialSummary: list the top 3 social post themes, each as "<topic> — <public reaction or key detail>"
 - Keep each bullet concise (one line), specific, and informative — not generic
-- Keep themes concise (2-4 words each)`;
+- Keep themes concise (2-4 words each)
+- narrativeFrames: identify 2-4 distinct angles journalists are using to frame this story (e.g. "accountability", "economic impact", "public health risk", "political fallout")
+- keyEntities: the most mentioned people and organisations appearing alongside "${keyword}" — max 5 each, omit the keyword subject itself if it's obvious
+- headlineSplit: estimate the % breakdown of headline tones — must sum to 100`;
 }
 
 function parseSentimentJSON(text) {
@@ -89,6 +148,17 @@ function parseSentimentJSON(text) {
         ? parsed.socialSummary.slice(0, 5).map(s => String(s).slice(0, 200))
         : typeof parsed.socialSummary === 'string' ? parsed.socialSummary.slice(0, 500) : null,
       themes: Array.isArray(parsed.themes) ? parsed.themes.slice(0, 5).map(String) : [],
+      narrativeFrames: Array.isArray(parsed.narrativeFrames) ? parsed.narrativeFrames.slice(0, 4).map(String) : [],
+      keyEntities: {
+        people: Array.isArray(parsed.keyEntities?.people) ? parsed.keyEntities.people.slice(0, 5).map(String) : [],
+        organisations: Array.isArray(parsed.keyEntities?.organisations) ? parsed.keyEntities.organisations.slice(0, 5).map(String) : [],
+      },
+      headlineSplit: (parsed.headlineSplit && typeof parsed.headlineSplit === 'object') ? {
+        positive: Math.max(0, Math.round(Number(parsed.headlineSplit.positive) || 0)),
+        negative: Math.max(0, Math.round(Number(parsed.headlineSplit.negative) || 0)),
+        neutral:  Math.max(0, Math.round(Number(parsed.headlineSplit.neutral)  || 0)),
+        mixed:    Math.max(0, Math.round(Number(parsed.headlineSplit.mixed)    || 0)),
+      } : null,
     };
   } catch {
     return null;
@@ -104,7 +174,7 @@ async function sentimentWithGemini(prompt, key) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 900 }
+      generationConfig: { temperature: 0.2, maxOutputTokens: 1200 }
     })
   });
   const data = await res.json();
@@ -123,7 +193,7 @@ async function sentimentWithCerebras(prompt, key) {
       model: 'llama-3.3-70b',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
-      max_tokens: 900
+      max_tokens: 1200
     })
   });
   const data = await res.json();
@@ -140,7 +210,7 @@ async function sentimentWithGroq(prompt, key) {
       model: 'llama-3.1-8b-instant',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
-      max_tokens: 900
+      max_tokens: 1200
     })
   });
   const data = await res.json();
@@ -159,7 +229,7 @@ async function sentimentWithMistral(prompt, key) {
       model: 'mistral-small-latest',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
-      max_tokens: 900
+      max_tokens: 1200
     })
   });
   const data = await res.json();
@@ -176,7 +246,7 @@ async function sentimentWithSambaNova(prompt, key) {
       model: 'Meta-Llama-3.3-70B-Instruct',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
-      max_tokens: 900
+      max_tokens: 1200
     })
   });
   const data = await res.json();
@@ -193,7 +263,7 @@ async function sentimentWithOpenRouter(prompt, key) {
       model: 'mistralai/mistral-7b-instruct:free',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
-      max_tokens: 900
+      max_tokens: 1200
     })
   });
   const data = await res.json();
@@ -210,7 +280,7 @@ async function sentimentWithOpenAI(prompt, key) {
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
-      max_tokens: 900
+      max_tokens: 1200
     })
   });
   const data = await res.json();
@@ -229,7 +299,7 @@ async function sentimentWithCohere(prompt, key) {
       model: 'command-r-08-2024',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
-      max_tokens: 900
+      max_tokens: 1200
     })
   });
   const data = await res.json();
@@ -282,7 +352,7 @@ async function fetchNewsArticles(keyword, supabaseUrl, serviceKey) {
 
     // Step 2: fetch recent articles for those keyword_ids
     const artRes = await fetchWithTimeout(
-      `${supabaseUrl}/rest/v1/keyword_articles?keyword_id=in.(${ids})&select=title,description,source,published_at&order=published_at.desc&limit=30`,
+      `${supabaseUrl}/rest/v1/keyword_articles?keyword_id=in.(${ids})&select=title,description,source,published_at,country&order=published_at.desc&limit=50`,
       { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
     );
     if (!artRes.ok) return [];
@@ -385,6 +455,8 @@ export default async function handler(req, res) {
     ...result,
     newsCount: newsArticles.length,
     redditCount: redditPosts.length,
+    outletTiers: computeOutletTiers(newsArticles),
+    geographicSpread: computeGeographicSpread(newsArticles),
   };
 
   await setCache(cacheKey, payload, SENTIMENT_CACHE_TTL);

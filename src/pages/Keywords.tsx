@@ -3,7 +3,8 @@ import SEO from '@/components/SEO'
 import {
   Tag, Plus, X, Lock, Newspaper, Search, LogIn, Globe, CrosshairIcon,
   Bell, BellOff, Layers, FolderPlus,
-  Folder, FolderOpen, Trash2, Code2, BarChart2, Zap, TrendingUp, TrendingDown, Minus, RefreshCw, Sparkles, MessageSquare
+  Folder, FolderOpen, Trash2, Code2, BarChart2, Zap, TrendingUp, TrendingDown, Minus, RefreshCw, Sparkles, MessageSquare,
+  AlertTriangle, Users, Building2, LayoutGrid
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -66,6 +67,22 @@ const load = <T,>(key: string, fallback: T): T => {
 }
 const save = (key: string, value: unknown) => {
   try { localStorage.setItem(key, JSON.stringify(value)) } catch { }
+}
+
+function countryCodeToFlag(code: string): string {
+  const upper = code.toUpperCase()
+  if (upper.length !== 2) return '🌐'
+  return String.fromCodePoint(...[...upper].map(c => c.charCodeAt(0) + 0x1f1a5))
+}
+
+function normaliseSplit(split: { positive: number; negative: number; neutral: number; mixed: number }) {
+  const total = split.positive + split.negative + split.neutral + split.mixed || 1
+  return {
+    positive: Math.round((split.positive / total) * 100),
+    negative: Math.round((split.negative / total) * 100),
+    neutral:  Math.round((split.neutral  / total) * 100),
+    mixed:    Math.round((split.mixed    / total) * 100),
+  }
 }
 
 // (Per-keyword AlertModal removed — alerts are now feed-only)
@@ -1174,6 +1191,217 @@ export default function Keywords() {
                                   {t}
                                 </span>
                               ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── Headline Tone Split ─────────────────────────── */}
+                        {selection?.type === 'keyword' && (
+                          <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
+                            <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-4 flex items-center gap-2">
+                              <LayoutGrid className="w-4 h-4 text-blue-500" />
+                              Headline Tone Breakdown
+                            </h2>
+                            {isLoadingSentiment ? (
+                              <div className="h-8 skeleton-shimmer rounded" />
+                            ) : sentimentData?.headlineSplit ? (() => {
+                              const s = normaliseSplit(sentimentData.headlineSplit)
+                              const segments = [
+                                { key: 'positive', label: 'Positive', pct: s.positive, colour: 'bg-green-500' },
+                                { key: 'mixed',    label: 'Mixed',    pct: s.mixed,    colour: 'bg-amber-400' },
+                                { key: 'neutral',  label: 'Neutral',  pct: s.neutral,  colour: 'bg-slate-400' },
+                                { key: 'negative', label: 'Negative', pct: s.negative, colour: 'bg-red-500' },
+                              ].filter(seg => seg.pct > 0)
+                              return (
+                                <>
+                                  <div className="flex rounded-full overflow-hidden h-5 mb-3 gap-0.5">
+                                    {segments.map(seg => (
+                                      <div
+                                        key={seg.key}
+                                        className={`${seg.colour} transition-all`}
+                                        style={{ width: `${seg.pct}%` }}
+                                        title={`${seg.label}: ${seg.pct}%`}
+                                      />
+                                    ))}
+                                  </div>
+                                  <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                                    {segments.map(seg => (
+                                      <div key={seg.key} className="flex items-center gap-1.5 text-xs text-stone-600 dark:text-slate-400">
+                                        <span className={`w-2.5 h-2.5 rounded-sm ${seg.colour}`} />
+                                        {seg.label} <span className="font-semibold text-stone-800 dark:text-slate-200">{seg.pct}%</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </>
+                              )
+                            })() : (
+                              <p className="text-xs text-stone-400 dark:text-slate-500">No headline data available.</p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* ── Divergence warning ──────────────────────────── */}
+                        {selection?.type === 'keyword' && !isLoadingSentiment && sentimentData &&
+                          sentimentData.socialSentiment &&
+                          sentimentData.newsSentiment !== sentimentData.socialSentiment && (() => {
+                            const valence = { positive: 2, mixed: 1, neutral: 0, negative: -1 }
+                            const diff = Math.abs(
+                              (valence[sentimentData.newsSentiment] ?? 0) -
+                              (valence[sentimentData.socialSentiment] ?? 0)
+                            )
+                            if (diff < 2) return null
+                            return (
+                              <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 p-5 flex gap-3">
+                                <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                                <div>
+                                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-1">Sentiment Divergence</p>
+                                  <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+                                    News coverage is <span className="font-medium">{sentimentData.newsSentiment}</span> while public social sentiment is <span className="font-medium">{sentimentData.socialSentiment}</span>. This gap may indicate unmet public expectations, an emerging narrative shift, or a PR opportunity.
+                                  </p>
+                                </div>
+                              </div>
+                            )
+                          })()
+                        }
+
+                        {/* ── Narrative Frames + Key Entities ─────────────── */}
+                        {selection?.type === 'keyword' && (
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                            {/* Narrative Frames */}
+                            <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
+                              <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-3 flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-indigo-500" />
+                                Narrative Frames
+                              </h2>
+                              {isLoadingSentiment ? (
+                                <div className="space-y-2">
+                                  {[...Array(3)].map((_, i) => <div key={i} className="h-7 skeleton-shimmer rounded-full" />)}
+                                </div>
+                              ) : sentimentData?.narrativeFrames?.length ? (
+                                <>
+                                  <p className="text-[11px] text-stone-400 dark:text-slate-500 mb-3">How journalists are framing this story</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {sentimentData.narrativeFrames.map(f => (
+                                      <span key={f} className="px-3 py-1.5 text-xs rounded-full bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 font-medium">
+                                        {f}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </>
+                              ) : (
+                                <p className="text-xs text-stone-400 dark:text-slate-500">No narrative frame data available.</p>
+                              )}
+                            </div>
+
+                            {/* Key Entities */}
+                            <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
+                              <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-3 flex items-center gap-2">
+                                <Users className="w-4 h-4 text-teal-500" />
+                                Key Entities Mentioned
+                              </h2>
+                              {isLoadingSentiment ? (
+                                <div className="space-y-3">
+                                  <div className="h-3 w-16 skeleton-shimmer rounded" />
+                                  <div className="flex gap-2"><div className="h-7 w-20 skeleton-shimmer rounded-full" /><div className="h-7 w-24 skeleton-shimmer rounded-full" /></div>
+                                </div>
+                              ) : sentimentData?.keyEntities && (sentimentData.keyEntities.people.length > 0 || sentimentData.keyEntities.organisations.length > 0) ? (
+                                <div className="space-y-3">
+                                  {sentimentData.keyEntities.people.length > 0 && (
+                                    <div>
+                                      <p className="text-[10px] font-medium text-stone-400 dark:text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                                        <Users className="w-3 h-3" /> People
+                                      </p>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {sentimentData.keyEntities.people.map(p => (
+                                          <span key={p} className="px-2.5 py-1 text-xs rounded-full bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+                                            {p}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {sentimentData.keyEntities.organisations.length > 0 && (
+                                    <div>
+                                      <p className="text-[10px] font-medium text-stone-400 dark:text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                                        <Building2 className="w-3 h-3" /> Organisations
+                                      </p>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {sentimentData.keyEntities.organisations.map(o => (
+                                          <span key={o} className="px-2.5 py-1 text-xs rounded-full bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800">
+                                            {o}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-stone-400 dark:text-slate-500">No entity data available.</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── Outlet Tier Breakdown + Geographic Spread ────── */}
+                        {selection?.type === 'keyword' && (
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                            {/* Outlet Tier Breakdown */}
+                            <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
+                              <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-1 flex items-center gap-2">
+                                <Newspaper className="w-4 h-4 text-stone-400" />
+                                Outlet Tier Breakdown
+                              </h2>
+                              <p className="text-[11px] text-stone-400 dark:text-slate-500 mb-4">Share of coverage by publication tier</p>
+                              {isLoadingSentiment ? (
+                                <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="h-5 skeleton-shimmer rounded" />)}</div>
+                              ) : sentimentData?.outletTiers?.length ? (
+                                <div className="space-y-3">
+                                  {sentimentData.outletTiers.map(({ tier, label, count, pct }) => (
+                                    <div key={tier}>
+                                      <div className="flex justify-between text-xs mb-1">
+                                        <span className="text-stone-700 dark:text-slate-300 font-medium">{label}</span>
+                                        <span className="text-stone-400 dark:text-slate-500">{count} article{count !== 1 ? 's' : ''} · {pct}%</span>
+                                      </div>
+                                      <div className="h-2 bg-stone-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                        <div
+                                          className={`h-full rounded-full ${tier === 'prestige' ? 'bg-blue-600' : tier === 'national' ? 'bg-blue-400' : 'bg-blue-200 dark:bg-blue-800'}`}
+                                          style={{ width: `${pct}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-stone-400 dark:text-slate-500">No outlet data available.</p>
+                              )}
+                            </div>
+
+                            {/* Geographic Spread */}
+                            <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
+                              <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-1 flex items-center gap-2">
+                                <Globe className="w-4 h-4 text-stone-400" />
+                                Geographic Spread
+                              </h2>
+                              <p className="text-[11px] text-stone-400 dark:text-slate-500 mb-4">Countries where this story is being covered</p>
+                              {isLoadingSentiment ? (
+                                <div className="space-y-2">{[...Array(4)].map((_, i) => <div key={i} className="h-5 skeleton-shimmer rounded" />)}</div>
+                              ) : sentimentData?.geographicSpread?.length ? (
+                                <div className="space-y-2">
+                                  {sentimentData.geographicSpread.map(({ country, count }) => (
+                                    <div key={country} className="flex items-center justify-between text-xs">
+                                      <span className="flex items-center gap-2">
+                                        <span className="text-base leading-none">{countryCodeToFlag(country)}</span>
+                                        <span className="text-stone-700 dark:text-slate-300 uppercase font-medium">{country}</span>
+                                      </span>
+                                      <span className="text-stone-400 dark:text-slate-500">{count} article{count !== 1 ? 's' : ''}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-stone-400 dark:text-slate-500">No geographic data available.</p>
+                              )}
                             </div>
                           </div>
                         )}
