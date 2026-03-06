@@ -130,6 +130,7 @@ export default function Home() {
   // Stale-while-revalidate: keeps the last successful fetch visible while a new one runs.
   // Pre-populate to true if we already have cached articles so the loading skeleton is skipped.
   const [hasStaleData, setHasStaleData] = useState(() => hasFreshCache());
+  const [digest, setDigest] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [groupBy, setGroupBy] = useState(null);
@@ -165,6 +166,7 @@ export default function Home() {
 
     setLoading(true);
     setError(null);
+    setDigest(null);
 
     try {
       // For non-English-primary countries, the backend automatically includes
@@ -196,6 +198,7 @@ export default function Home() {
         });
         setArticles(merged);
         setHasStaleData(true);
+        setDigest(result.digest ?? null);
         setLowCoverage(result.lowCoverage || []);
         setLastUpdated(new Date());
 
@@ -444,7 +447,7 @@ export default function Home() {
                   </div>
                 )}
                 <TrendingSummary
-                  articles={articles}
+                  digest={digest}
                   dateRange={dateRange}
                   selectedCountries={selectedCountries}
                   selectedCategories={selectedCategories}
