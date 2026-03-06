@@ -1,6 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { TrendingUp, ChevronDown, ChevronUp } from 'lucide-react';
-import type { Article } from '@/types/article';
+import React from 'react';
+import { Sparkles } from 'lucide-react';
 
 const COUNTRY_NAMES: Record<string, string> = {
   us: 'United States', ca: 'Canada', mx: 'Mexico', cu: 'Cuba', jm: 'Jamaica',
@@ -37,129 +36,58 @@ const CATEGORY_NAMES: Record<string, string> = {
 };
 
 const DATE_RANGE_LABELS: Record<string, string> = {
-  '24h': 'the last 24 hours',
-  '3d': 'the last 3 days',
-  'week': 'the last week',
-  'month': 'the last month',
+  '24h': 'last 24 hours',
+  '3d': 'last 3 days',
+  'week': 'last week',
+  'month': 'last month',
 };
 
 interface TrendingSummaryProps {
-  articles: Article[];
+  digest: string | null | undefined;
   dateRange: string;
   selectedCountries: string[];
   selectedCategories: string[];
 }
 
 export default function TrendingSummary({
-  articles,
+  digest,
   dateRange,
   selectedCountries,
   selectedCategories,
 }: TrendingSummaryProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  if (!digest) return null;
 
-  const topArticles = useMemo(() => {
-    // Sort multi-source articles by coverage count descending
-    const multiSource = articles
-      .filter(a => a._coverage && a._coverage.count >= 2)
-      .sort((a, b) => (b._coverage!.count) - (a._coverage!.count));
-
-    if (multiSource.length === 0) return [];
-
-    // Take top 3; pad from the main list if needed (without duplicates)
-    const top = multiSource.slice(0, 3);
-    if (top.length < 3) {
-      const topUrls = new Set(top.map(a => a.url));
-      for (const a of articles) {
-        if (top.length >= 3) break;
-        if (!topUrls.has(a.url)) {
-          top.push(a);
-          topUrls.add(a.url);
-        }
-      }
-    }
-    return top;
-  }, [articles]);
-
-  const contextLabel = useMemo(() => {
-    const country = selectedCountries.length === 1
-      ? (COUNTRY_NAMES[selectedCountries[0]] ?? selectedCountries[0])
-      : selectedCountries.length > 1
-        ? 'multiple countries'
-        : '';
-    const category = selectedCategories.length === 1
-      ? (CATEGORY_NAMES[selectedCategories[0]] ?? selectedCategories[0])
-      : selectedCategories.length > 1
-        ? 'multiple categories'
-        : '';
-    if (country && category) return `${country} — ${category}`;
-    return country || category || 'your selected filters';
-  }, [selectedCountries, selectedCategories]);
-
+  const contextParts: string[] = [];
+  if (selectedCountries.length === 1 && selectedCountries[0] !== 'world') {
+    contextParts.push(COUNTRY_NAMES[selectedCountries[0]] ?? selectedCountries[0]);
+  } else if (selectedCountries.length > 1) {
+    contextParts.push('Multiple countries');
+  }
+  if (selectedCategories.length === 1) {
+    contextParts.push(CATEGORY_NAMES[selectedCategories[0]] ?? selectedCategories[0]);
+  } else if (selectedCategories.length > 1) {
+    contextParts.push('Multiple categories');
+  }
   const timeLabel = DATE_RANGE_LABELS[dateRange] ?? dateRange;
-
-  if (topArticles.length === 0) return null;
+  contextParts.push(timeLabel);
 
   return (
-    <div className="mb-6 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden">
-      {/* Header */}
-      <button
-        className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-stone-50 dark:hover:bg-slate-700/50 transition-colors"
-        onClick={() => setCollapsed(c => !c)}
-        aria-expanded={!collapsed}
-      >
-        <div className="flex items-center gap-2.5">
-          <TrendingUp className="w-4 h-4 text-slate-500 dark:text-slate-400 flex-shrink-0" />
-          <span className="text-sm font-semibold text-stone-800 dark:text-slate-200">
-            Top stories in {contextLabel} over {timeLabel}
-          </span>
-        </div>
-        {collapsed
-          ? <ChevronDown className="w-4 h-4 text-stone-400 dark:text-slate-500 flex-shrink-0" />
-          : <ChevronUp className="w-4 h-4 text-stone-400 dark:text-slate-500 flex-shrink-0" />
-        }
-      </button>
-
-      {/* Body */}
-      {!collapsed && (
-        <div className="divide-y divide-stone-100 dark:divide-slate-700">
-          {topArticles.map((article, i) => {
-            const bullets = article.summary_points?.slice(0, 2) ?? [];
-            const hasBullets = bullets.length > 0;
-            return (
-              <div key={article.url ?? i} className="px-5 py-4">
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <a
-                    href={article.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm font-semibold text-stone-900 dark:text-slate-100 hover:underline leading-snug"
-                  >
-                    {article.title}
-                  </a>
-                  {article._coverage && (
-                    <span className="flex-shrink-0 text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-stone-100 dark:bg-slate-700 rounded-full px-2 py-0.5 whitespace-nowrap">
-                      {article._coverage.count} sources
-                    </span>
-                  )}
-                </div>
-                {hasBullets ? (
-                  <ul className="space-y-1">
-                    {bullets.map((point, j) => (
-                      <li key={j} className="flex items-start gap-2 text-xs text-stone-600 dark:text-slate-400">
-                        <span className="mt-1 w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500 flex-shrink-0" />
-                        <span>{point.replace(/^[•\-–]\s*/, '')}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : article.description ? (
-                  <p className="text-xs text-stone-500 dark:text-slate-400 line-clamp-2">{article.description}</p>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      )}
+    <div className="mb-6 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-5 py-4">
+      <div className="flex items-center gap-2 mb-2.5">
+        <Sparkles className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 flex-shrink-0" />
+        <span className="text-xs font-semibold tracking-wide uppercase text-slate-400 dark:text-slate-500">
+          AI Briefing
+        </span>
+        {contextParts.length > 0 && (
+          <>
+            <span className="text-xs text-slate-300 dark:text-slate-600">·</span>
+            <span className="text-xs text-slate-400 dark:text-slate-500">
+              {contextParts.join(' · ')}
+            </span>
+          </>
+        )}
+      </div>
+      <p className="text-sm text-stone-700 dark:text-slate-300 leading-relaxed">{digest}</p>
     </div>
   );
 }
