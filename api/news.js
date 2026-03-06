@@ -3432,7 +3432,12 @@ const SUMMARY_CACHE_TTL_MS = 36 * 60 * 60 * 1000; // 36 hours
 
 // ── AI Digest — single paragraph overview of the current news mix ─────────
 const DIGEST_PROMPT = (headlines, context) =>
-  `You are a news editor writing a concise briefing. Given the top stories for ${context}, write 2-3 sentences capturing the major themes. Use present tense, third person. Be direct and factual. Do not start with "Here is", "This briefing", or similar filler.\n\nTop stories:\n${headlines}\n\nBriefing:`;
+  `You are a news editor. List the top stories for ${context}.\n` +
+  `For each story write exactly one bullet point: the story name, then " — ", then 2-3 key facts separated by semicolons.\n` +
+  `Only use facts from the provided articles. Use present tense. No intro sentence, no conclusion.\n\n` +
+  `Format:\n` +
+  `• Story name — key fact one; key fact two; key fact three\n\n` +
+  `Top articles:\n${headlines}`;
 
 const DIGEST_CACHE = new Map();
 const DIGEST_CACHE_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
@@ -3453,7 +3458,7 @@ async function generateDigest(prompt, llmKeys) {
       const res = await fetchWithTimeout(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3, maxOutputTokens: 200 } }),
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3, maxOutputTokens: 500 } }),
       });
       const data = await res.json();
       if (res.status === 429 || data.error?.code === 429 || data.error?.status === 'RESOURCE_EXHAUSTED') throw new QuotaExceededError('Gemini');
@@ -3466,7 +3471,7 @@ async function generateDigest(prompt, llmKeys) {
       const res = await fetchWithTimeout(url, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 200 }),
+        body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 500 }),
       });
       const data = await res.json();
       if (res.status === 429 || data.error?.code === 'rate_limit_exceeded') throw new QuotaExceededError(name);
@@ -3477,7 +3482,7 @@ async function generateDigest(prompt, llmKeys) {
       const res = await fetchWithTimeout('https://api.cohere.com/v2/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${llmKeys.cohere}` },
-        body: JSON.stringify({ model: 'command-r-08-2024', messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 200 }),
+        body: JSON.stringify({ model: 'command-r-08-2024', messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 500 }),
       });
       const data = await res.json();
       if (res.status === 429) throw new QuotaExceededError('Cohere');

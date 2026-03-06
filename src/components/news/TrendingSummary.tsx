@@ -71,6 +71,21 @@ export default function TrendingSummary({
   const timeLabel = DATE_RANGE_LABELS[dateRange] ?? dateRange;
   contextParts.push(timeLabel);
 
+  // Parse bullet lines: lines starting with • or - or *
+  const bulletLines = digest
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => /^[•\-\*]/.test(l))
+    .map(l => {
+      const text = l.replace(/^[•\-\*]\s*/, '');
+      const sep = text.indexOf(' — ') !== -1 ? ' — ' : ' - ';
+      const idx = text.indexOf(sep);
+      if (idx === -1) return { title: text, facts: '' };
+      return { title: text.slice(0, idx), facts: text.slice(idx + sep.length) };
+    });
+
+  const hasBullets = bulletLines.length > 0;
+
   return (
     <div className="mb-6 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-5 py-4">
       <div className="flex items-center gap-2 mb-2.5">
@@ -87,7 +102,21 @@ export default function TrendingSummary({
           </>
         )}
       </div>
-      <p className="text-sm text-stone-700 dark:text-slate-300 leading-relaxed">{digest}</p>
+      {hasBullets ? (
+        <ul className="space-y-1.5">
+          {bulletLines.map((b, i) => (
+            <li key={i} className="text-sm text-stone-700 dark:text-slate-300 leading-relaxed flex gap-2">
+              <span className="mt-0.5 text-slate-400 dark:text-slate-500 flex-shrink-0">•</span>
+              <span>
+                <strong className="font-semibold text-stone-800 dark:text-slate-200">{b.title}</strong>
+                {b.facts && <> — {b.facts}</>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-stone-700 dark:text-slate-300 leading-relaxed">{digest}</p>
+      )}
     </div>
   );
 }
