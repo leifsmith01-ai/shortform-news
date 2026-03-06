@@ -1034,26 +1034,23 @@ export default function Keywords() {
 
                         {/* ── Sentiment sections (single keyword only) ────── */}
                         {selection?.type === 'keyword' && (
-                          <>
-                            {isLoadingSentiment ? (
-                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {[...Array(2)].map((_, i) => (
-                                  <div key={i} className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5 space-y-3">
-                                    <div className="h-4 w-32 skeleton-shimmer rounded" />
-                                    <div className="h-3 w-full skeleton-shimmer rounded" />
-                                    <div className="h-3 w-4/5 skeleton-shimmer rounded" />
-                                    <div className="h-3 w-3/5 skeleton-shimmer rounded" />
-                                  </div>
-                                ))}
-                              </div>
-                            ) : sentimentData ? (
-                              <>
-                                {/* News Reporting Sentiment */}
-                                <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
-                                  <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-3 flex items-center gap-2">
-                                    <Newspaper className="w-4 h-4 text-blue-500" />
-                                    News Reporting Sentiment
-                                  </h2>
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                            {/* News Reporting Sentiment */}
+                            <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5 flex flex-col">
+                              <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-3 flex items-center gap-2">
+                                <Newspaper className="w-4 h-4 text-blue-500" />
+                                News Reporting Sentiment
+                              </h2>
+                              {isLoadingSentiment ? (
+                                <div className="space-y-3 flex-1">
+                                  <div className="h-6 w-24 skeleton-shimmer rounded-full" />
+                                  <div className="h-3 w-full skeleton-shimmer rounded" />
+                                  <div className="h-3 w-4/5 skeleton-shimmer rounded" />
+                                  <div className="h-3 w-3/5 skeleton-shimmer rounded" />
+                                </div>
+                              ) : sentimentData && sentimentData.newsCount > 0 ? (
+                                <>
                                   <div className="flex items-center gap-3 mb-4">
                                     <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
                                       sentimentData.newsSentiment === 'positive' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
@@ -1064,17 +1061,17 @@ export default function Keywords() {
                                       {sentimentData.newsSentiment.charAt(0).toUpperCase() + sentimentData.newsSentiment.slice(1)}
                                     </span>
                                     <span className="text-[10px] text-stone-400 dark:text-slate-500">
-                                      {sentimentData.newsCount} article{sentimentData.newsCount !== 1 ? 's' : ''} analysed · last {analyticsDays}d
+                                      {sentimentData.newsCount} article{sentimentData.newsCount !== 1 ? 's' : ''} · last {analyticsDays}d
                                     </span>
                                   </div>
                                   {Array.isArray(sentimentData.newsSummary) ? (
-                                    <ul className="space-y-2">
+                                    <ul className="space-y-2.5">
                                       {sentimentData.newsSummary.map((item, i) => {
                                         const [topic, ...rest] = item.split(/\s*[—–-]\s*/)
                                         const detail = rest.join(' — ')
                                         return (
-                                          <li key={i} className="flex gap-2 text-xs text-stone-600 dark:text-slate-300 leading-relaxed">
-                                            <span className="mt-0.5 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-blue-400 dark:bg-blue-500" />
+                                          <li key={i} className="flex gap-2.5 text-xs text-stone-600 dark:text-slate-300 leading-relaxed">
+                                            <span className="mt-1.5 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-blue-400 dark:bg-blue-500" />
                                             <span>
                                               <span className="font-medium text-stone-800 dark:text-slate-100">{topic.trim()}</span>
                                               {detail && <span className="text-stone-500 dark:text-slate-400"> — {detail.trim()}</span>}
@@ -1088,89 +1085,97 @@ export default function Keywords() {
                                       {sentimentData.newsSummary ?? sentimentData.summary}
                                     </p>
                                   )}
+                                </>
+                              ) : (
+                                <div className="flex-1 flex flex-col items-center justify-center py-6 text-center">
+                                  <Newspaper className="w-7 h-7 text-stone-200 dark:text-slate-600 mb-2" />
+                                  <p className="text-xs font-medium text-stone-500 dark:text-slate-400">No news articles found</p>
+                                  <p className="text-[11px] text-stone-400 dark:text-slate-500 mt-1 max-w-[200px]">
+                                    No tracked articles for this keyword in the last {analyticsDays} days.
+                                  </p>
                                 </div>
+                              )}
+                            </div>
 
-                                {/* Social Media Sentiment */}
-                                <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
-                                  <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-3 flex items-center gap-2">
-                                    <MessageSquare className="w-4 h-4 text-purple-500" />
-                                    Social Media Sentiment
-                                  </h2>
-                                  {sentimentData.socialSentiment ? (
-                                    <>
-                                      <div className="flex items-center gap-3 mb-4">
-                                        <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                                          sentimentData.socialSentiment === 'positive' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
-                                          sentimentData.socialSentiment === 'negative' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
-                                          sentimentData.socialSentiment === 'mixed'    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
-                                                                                         'bg-stone-100 text-stone-600 dark:bg-slate-700 dark:text-slate-300'
-                                        }`}>
-                                          {sentimentData.socialSentiment.charAt(0).toUpperCase() + sentimentData.socialSentiment.slice(1)}
-                                        </span>
-                                        <span className="text-[10px] text-stone-400 dark:text-slate-500">
-                                          {sentimentData.redditCount} Reddit post{sentimentData.redditCount !== 1 ? 's' : ''} analysed · last {analyticsDays}d
-                                        </span>
-                                      </div>
-                                      {Array.isArray(sentimentData.socialSummary) ? (
-                                        <ul className="space-y-2">
-                                          {sentimentData.socialSummary.map((item, i) => {
-                                            const [topic, ...rest] = item.split(/\s*[—–-]\s*/)
-                                            const detail = rest.join(' — ')
-                                            return (
-                                              <li key={i} className="flex gap-2 text-xs text-stone-600 dark:text-slate-300 leading-relaxed">
-                                                <span className="mt-0.5 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-purple-400 dark:bg-purple-500" />
-                                                <span>
-                                                  <span className="font-medium text-stone-800 dark:text-slate-100">{topic.trim()}</span>
-                                                  {detail && <span className="text-stone-500 dark:text-slate-400"> — {detail.trim()}</span>}
-                                                </span>
-                                              </li>
-                                            )
-                                          })}
-                                        </ul>
-                                      ) : (
-                                        <p className="text-xs text-stone-600 dark:text-slate-300 leading-relaxed">
-                                          {sentimentData.socialSummary ?? sentimentData.summary}
-                                        </p>
-                                      )}
-                                    </>
+                            {/* Social Media Sentiment */}
+                            <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5 flex flex-col">
+                              <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-3 flex items-center gap-2">
+                                <MessageSquare className="w-4 h-4 text-purple-500" />
+                                Social Media Sentiment
+                              </h2>
+                              {isLoadingSentiment ? (
+                                <div className="space-y-3 flex-1">
+                                  <div className="h-6 w-24 skeleton-shimmer rounded-full" />
+                                  <div className="h-3 w-full skeleton-shimmer rounded" />
+                                  <div className="h-3 w-4/5 skeleton-shimmer rounded" />
+                                  <div className="h-3 w-3/5 skeleton-shimmer rounded" />
+                                </div>
+                              ) : sentimentData && sentimentData.socialSentiment ? (
+                                <>
+                                  <div className="flex items-center gap-3 mb-4">
+                                    <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                                      sentimentData.socialSentiment === 'positive' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                                      sentimentData.socialSentiment === 'negative' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                                      sentimentData.socialSentiment === 'mixed'    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
+                                                                                     'bg-stone-100 text-stone-600 dark:bg-slate-700 dark:text-slate-300'
+                                    }`}>
+                                      {sentimentData.socialSentiment.charAt(0).toUpperCase() + sentimentData.socialSentiment.slice(1)}
+                                    </span>
+                                    <span className="text-[10px] text-stone-400 dark:text-slate-500">
+                                      {sentimentData.redditCount} Reddit post{sentimentData.redditCount !== 1 ? 's' : ''} · last {analyticsDays}d
+                                    </span>
+                                  </div>
+                                  {Array.isArray(sentimentData.socialSummary) ? (
+                                    <ul className="space-y-2.5">
+                                      {sentimentData.socialSummary.map((item, i) => {
+                                        const [topic, ...rest] = item.split(/\s*[—–-]\s*/)
+                                        const detail = rest.join(' — ')
+                                        return (
+                                          <li key={i} className="flex gap-2.5 text-xs text-stone-600 dark:text-slate-300 leading-relaxed">
+                                            <span className="mt-1.5 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-purple-400 dark:bg-purple-500" />
+                                            <span>
+                                              <span className="font-medium text-stone-800 dark:text-slate-100">{topic.trim()}</span>
+                                              {detail && <span className="text-stone-500 dark:text-slate-400"> — {detail.trim()}</span>}
+                                            </span>
+                                          </li>
+                                        )
+                                      })}
+                                    </ul>
                                   ) : (
-                                    <p className="text-xs text-stone-400 dark:text-slate-500">
-                                      No social media posts found for this keyword in the selected period.
+                                    <p className="text-xs text-stone-600 dark:text-slate-300 leading-relaxed">
+                                      {sentimentData.socialSummary ?? sentimentData.summary}
                                     </p>
                                   )}
+                                </>
+                              ) : (
+                                <div className="flex-1 flex flex-col items-center justify-center py-6 text-center">
+                                  <MessageSquare className="w-7 h-7 text-stone-200 dark:text-slate-600 mb-2" />
+                                  <p className="text-xs font-medium text-stone-500 dark:text-slate-400">No social posts found</p>
+                                  <p className="text-[11px] text-stone-400 dark:text-slate-500 mt-1 max-w-[200px]">
+                                    No Reddit activity found for this keyword in the last {analyticsDays} days.
+                                  </p>
                                 </div>
+                              )}
+                            </div>
 
-                                {/* Key Themes */}
-                                {sentimentData.themes.length > 0 && (
-                                  <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
-                                    <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-3 flex items-center gap-2">
-                                      <Sparkles className="w-4 h-4 text-purple-500" />
-                                      Key Themes
-                                    </h2>
-                                    <div className="flex flex-wrap gap-2">
-                                      {sentimentData.themes.map(t => (
-                                        <span key={t} className="px-3 py-1 text-xs rounded-full bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                                          {t}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </>
-                            ) : (
-                              <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
-                                <div className="flex flex-col items-center justify-center py-8 text-center">
-                                  <BarChart2 className="w-8 h-8 text-stone-300 dark:text-slate-600 mb-3" />
-                                  <p className="text-sm text-stone-500 dark:text-slate-400">
-                                    Sentiment analysis unavailable for this keyword.
-                                  </p>
-                                  <p className="text-xs text-stone-400 dark:text-slate-500 mt-1">
-                                    No news articles or social posts were found in the selected period.
-                                  </p>
-                                </div>
-                              </div>
-                            )}
-                          </>
+                          </div>
+                        )}
+
+                        {/* Key Themes (single keyword only, when data exists) */}
+                        {selection?.type === 'keyword' && !isLoadingSentiment && sentimentData && sentimentData.themes.length > 0 && (
+                          <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
+                            <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-3 flex items-center gap-2">
+                              <Sparkles className="w-4 h-4 text-purple-500" />
+                              Key Themes
+                            </h2>
+                            <div className="flex flex-wrap gap-2">
+                              {sentimentData.themes.map(t => (
+                                <span key={t} className="px-3 py-1 text-xs rounded-full bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
                         )}
 
                         {/* Topic: no sentiment note */}
