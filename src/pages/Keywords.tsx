@@ -801,7 +801,7 @@ export default function Keywords() {
                       </Link>
                     </div>
                   ) : isLoadingKeywords ? (
-                    <div className="flex flex-nowrap lg:flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {[...Array(5)].map((_, i) => <div key={i} className="h-8 w-20 rounded-full skeleton-shimmer flex-shrink-0" />)}
                     </div>
                   ) : (
@@ -812,7 +812,7 @@ export default function Keywords() {
                           <p className="text-[10px] font-semibold text-stone-400 dark:text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1">
                             <Layers className="w-3 h-3" /> Feeds
                           </p>
-                          <div className="flex flex-nowrap lg:flex-wrap gap-2 overflow-x-auto lg:overflow-visible pb-1">
+                          <div className="flex flex-wrap gap-2 pb-1">
                             {topics.map(topic => {
                               const isSelected = selection?.type === 'topic' && selection.id === topic.id
                               const memberCount = topic.keyword_topic_members?.length ?? 0
@@ -860,7 +860,7 @@ export default function Keywords() {
                             <p className="text-xs text-stone-300 dark:text-slate-600 mt-1 hidden lg:block">Add one above to create your first feed.</p>
                           </div>
                         ) : (
-                          <div className="flex flex-nowrap lg:flex-wrap gap-2 overflow-x-auto lg:overflow-x-visible pb-1 lg:pb-0">
+                          <div className="flex flex-wrap gap-2 pb-1 lg:pb-0">
                             {keywords.map(kw => {
                               const isSelected = selection?.type === 'keyword' && selection.id === kw.id
                               const count = articleCounts[kw.id]

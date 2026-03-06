@@ -372,7 +372,7 @@ export default function Home() {
               </div>
 
               {(selectedCountries.length > 1 || selectedCategories.length > 1) && articles.length > 0 && (
-                <div className="hidden lg:flex flex-col items-end gap-1">
+                <div className="flex flex-col items-end gap-1">
                   <span className="text-[10px] text-stone-400 uppercase tracking-wider hidden sm:block">Group by</span>
                   <ToggleGroup type="single" value={groupBy || 'none'} onValueChange={setGroupBy}>
                     <ToggleGroupItem value="none" aria-label="Flat list — all articles in one stream" title="Flat list — all articles in one stream" className="text-xs">

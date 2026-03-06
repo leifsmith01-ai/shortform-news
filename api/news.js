@@ -19,7 +19,7 @@ import { getCache, setCache } from './lib/redisCache.js';
 // Maximum number of articles to generate AI summaries for per request.
 // Raising this improves coverage but uses more LLM API quota.
 // Override via MAX_SUMMARY_ARTICLES env var (e.g. set to 5 to reduce costs).
-const MAX_SUMMARY_ARTICLES = parseInt(process.env.MAX_SUMMARY_ARTICLES || '20', 10);
+const MAX_SUMMARY_ARTICLES = parseInt(process.env.MAX_SUMMARY_ARTICLES || '30', 10);
 
 // API request timeout (ms) — prevents a single slow API from blocking the whole response
 const API_TIMEOUT_MS = 8000;
