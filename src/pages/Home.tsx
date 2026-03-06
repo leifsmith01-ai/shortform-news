@@ -12,6 +12,7 @@ import NewsCard from '@/components/news/NewsCard';
 import LoadingCard from '@/components/news/LoadingCard';
 import EmptyState from '@/components/news/EmptyState';
 import GroupedArticles from '@/components/news/GroupedArticles';
+import TrendingSummary from '@/components/news/TrendingSummary';
 import LowCoverageTile from '@/components/news/LowCoverageTile';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import AdUnit from '@/components/AdUnit';
@@ -442,6 +443,12 @@ export default function Home() {
                     <span>Refreshing…</span>
                   </div>
                 )}
+                <TrendingSummary
+                  articles={articles}
+                  dateRange={dateRange}
+                  selectedCountries={selectedCountries}
+                  selectedCategories={selectedCategories}
+                />
                 {groupBy && groupBy !== 'none' ? (
                   <GroupedArticles
                     articles={articles}
