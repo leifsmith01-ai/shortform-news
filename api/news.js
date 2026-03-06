@@ -4081,12 +4081,13 @@ export default async function handler(req, res) {
         const searchResults = await Promise.all(searchPromises);
         results = searchResults.flat();
 
-        // ── Semantic Search Fallback (if lexical search failed) ─────────────
-        // If we found very few articles for an ad-hoc search, we try falling
-        // back to our entire keyword_articles vector store to find related 
-        // articles that might not share the exact words (e.g. "orbital mechanics" -> "SpaceX")
-        if (results.length < 5 && LLM_KEYS.gemini && SUPABASE_URL && SUPABASE_KEY) {
-          console.log(`  [Semantic] Lexical returned only ${results.length}. Trying vector search for: "${keyword}"`);
+        // ── Semantic Search (keyword mode: always; regular search: fallback) ──
+        // In keyword monitoring mode, always augment lexical results with vector
+        // search so semantically-related articles are included even if they don't
+        // share the exact search terms (e.g. "tariffs" → articles about "trade war").
+        // For regular ad-hoc searches, only run this when lexical returned too few results.
+        if ((isKeywordMode || results.length < 5) && LLM_KEYS.gemini && SUPABASE_URL && SUPABASE_KEY) {
+          console.log(`  [Semantic] ${isKeywordMode ? 'Keyword mode' : `Lexical returned only ${results.length}`}. Running vector search for: "${keyword}"`);
           try {
             const { createClient } = await import('@supabase/supabase-js');
             const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
