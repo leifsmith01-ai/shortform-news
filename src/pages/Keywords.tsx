@@ -3,7 +3,7 @@ import SEO from '@/components/SEO'
 import {
   Tag, Plus, X, Lock, Newspaper, Search, LogIn, Globe, CrosshairIcon,
   Bell, BellOff, Layers, FolderPlus,
-  Folder, FolderOpen, Trash2, Code2, BarChart2, Zap, TrendingUp, TrendingDown, Minus, RefreshCw
+  Folder, FolderOpen, Trash2, Code2, BarChart2, Zap, TrendingUp, TrendingDown, Minus, RefreshCw, Sparkles
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,7 +22,7 @@ import api from '@/api'
 import { useUser } from '@clerk/clerk-react'
 import { Link } from 'react-router-dom'
 import { sanitizeKeyword, isValidKeyword } from '@/lib/sanitize'
-import type { Article, Keyword, KeywordTopic, KeywordAlertSetting, SearchAnalyticsEntry, GoogleTrendsData } from '@/types/article'
+import type { Article, Keyword, KeywordTopic, KeywordAlertSetting, SearchAnalyticsEntry, GoogleTrendsData, KeywordSentimentData } from '@/types/article'
 import { ApiReadyContext } from '@/App'
 
 // ─── Region options ───────────────────────────────────────────────────────────
@@ -336,6 +336,8 @@ export default function Keywords() {
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false)
   const [googleTrends, setGoogleTrends] = useState<GoogleTrendsData | null>(null)
   const [isLoadingTrends, setIsLoadingTrends] = useState(false)
+  const [sentimentData, setSentimentData] = useState<KeywordSentimentData | null>(null)
+  const [isLoadingSentiment, setIsLoadingSentiment] = useState(false)
   const [compareKeywords, setCompareKeywords] = useState<string[]>([])
   const [compareData, setCompareData] = useState<Record<string, { date: string; count: number }[]>>({})
   const [isLoadingCompare, setIsLoadingCompare] = useState(false)
@@ -462,6 +464,7 @@ export default function Keywords() {
     setActiveView('articles')
     setCompareKeywords([])
     setGoogleTrends(null)
+    setSentimentData(null)
   }, [selection])
 
   // Load analytics when the analytics tab is active
@@ -495,6 +498,23 @@ export default function Keywords() {
       .then(setGoogleTrends)
       .catch(() => setGoogleTrends(null)) // silently fail — optional feature
       .finally(() => setIsLoadingTrends(false))
+  }, [activeView, selection, analyticsDays, isSignedIn, keywords])
+
+  // Load AI sentiment summary for single-keyword selections
+  useEffect(() => {
+    if (activeView !== 'analytics' || !selection || selection.type !== 'keyword' || !isSignedIn) {
+      setSentimentData(null)
+      setIsLoadingSentiment(false)
+      return
+    }
+    const kwName = keywords.find(k => k.id === selection.id)?.keyword
+    if (!kwName) return
+    setIsLoadingSentiment(true)
+    setSentimentData(null)
+    api.getKeywordSentiment(kwName, analyticsDays as 7 | 30 | 90)
+      .then(setSentimentData)
+      .catch(() => setSentimentData(null)) // silently fail — optional feature
+      .finally(() => setIsLoadingSentiment(false))
   }, [activeView, selection, analyticsDays, isSignedIn, keywords])
 
   // Load comparison keyword analytics
@@ -1167,6 +1187,59 @@ export default function Keywords() {
                                   </span>
                                 ))}
                               </div>
+                            </div>
+                          )}
+
+                          {/* ── AI Sentiment Summary ───────────────────────── */}
+                          {(isLoadingSentiment || sentimentData) && (
+                            <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 p-5">
+                              <h2 className="font-semibold text-stone-900 dark:text-stone-100 text-sm mb-3 flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-purple-500" />
+                                AI Sentiment Summary
+                              </h2>
+                              {isLoadingSentiment ? (
+                                <div className="space-y-2">
+                                  <div className="h-4 w-24 skeleton-shimmer rounded" />
+                                  <div className="h-3 w-full skeleton-shimmer rounded" />
+                                  <div className="h-3 w-4/5 skeleton-shimmer rounded" />
+                                </div>
+                              ) : sentimentData && (
+                                <>
+                                  <div className="flex items-center gap-3 mb-3">
+                                    <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                                      sentimentData.sentiment === 'positive' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                                      sentimentData.sentiment === 'negative' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                                      sentimentData.sentiment === 'mixed'    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
+                                                                               'bg-stone-100 text-stone-600 dark:bg-slate-700 dark:text-slate-300'
+                                    }`}>
+                                      {sentimentData.sentiment.charAt(0).toUpperCase() + sentimentData.sentiment.slice(1)}
+                                    </span>
+                                    <span className="text-[10px] text-stone-400 dark:text-slate-500">
+                                      News: <span className="font-medium">{sentimentData.newsSentiment}</span>
+                                      {sentimentData.socialSentiment && (
+                                        <> · Reddit: <span className="font-medium">{sentimentData.socialSentiment}</span></>
+                                      )}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-stone-600 dark:text-slate-300 leading-relaxed mb-3">
+                                    {sentimentData.summary}
+                                  </p>
+                                  {sentimentData.themes.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5 mb-3">
+                                      {sentimentData.themes.map(t => (
+                                        <span key={t} className="px-2.5 py-0.5 text-[11px] rounded-full bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                          {t}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <p className="text-[10px] text-stone-400 dark:text-slate-500">
+                                    Based on {sentimentData.newsCount} news article{sentimentData.newsCount !== 1 ? 's' : ''}
+                                    {sentimentData.redditCount > 0 && ` · ${sentimentData.redditCount} Reddit post${sentimentData.redditCount !== 1 ? 's' : ''}`}
+                                    {' '}· last {analyticsDays}d
+                                  </p>
+                                </>
+                              )}
                             </div>
                           )}
 

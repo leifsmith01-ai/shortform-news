@@ -71,6 +71,18 @@ export interface GoogleTrendsData {
   cached?: boolean
 }
 
+export interface KeywordSentimentData {
+  sentiment: 'positive' | 'negative' | 'neutral' | 'mixed'
+  newsSentiment: 'positive' | 'negative' | 'neutral' | 'mixed'
+  socialSentiment: 'positive' | 'negative' | 'neutral' | 'mixed' | null
+  confidence: number
+  summary: string
+  themes: string[]
+  newsCount: number
+  redditCount: number
+  cached?: boolean
+}
+
 export interface FetchNewsParams {
   countries: string[]
   categories: string[]
