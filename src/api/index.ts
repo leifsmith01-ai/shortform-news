@@ -5,7 +5,7 @@
 import { mockApiService } from './mockApiService'
 import { newsApiClient } from './newsApiClient'
 import SupabaseApiService from './supabaseApiService'
-import type { ApiClient, Article, FetchNewsParams, KeywordTopic, KeywordAlertSetting, SearchAnalyticsEntry, GoogleTrendsData } from '@/types/article'
+import type { ApiClient, Article, FetchNewsParams, KeywordTopic, KeywordAlertSetting, SearchAnalyticsEntry, GoogleTrendsData, KeywordSentimentData } from '@/types/article'
 
 // Use mock API ONLY if explicitly set to 'true', otherwise always use real API
 const USE_MOCK_API = String(import.meta.env.VITE_USE_MOCK_API).toLowerCase() === 'true'
@@ -214,6 +214,17 @@ class ApiService {
       throw new Error(body.error || `Google Trends request failed (${res.status})`)
     }
     return res.json() as Promise<GoogleTrendsData>
+  }
+
+  // ─── Keyword Sentiment ────────────────────────────────────────────────────
+
+  async getKeywordSentiment(keyword: string, days: 7 | 30 | 90 = 7): Promise<KeywordSentimentData> {
+    const res = await fetch(`/api/keyword-sentiment?keyword=${encodeURIComponent(keyword)}&days=${days}`)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.error || `Sentiment request failed (${res.status})`)
+    }
+    return res.json() as Promise<KeywordSentimentData>
   }
 
   // ─── Article Reactions — requires sign-in ────────────────────────────────
