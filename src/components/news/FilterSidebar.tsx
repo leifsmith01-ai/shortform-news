@@ -1,27 +1,16 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Globe, Newspaper, ChevronDown, Search, Flame, TrendingUp, Tag, Sparkles, Bookmark, Clock, Building2, Settings } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Globe, Newspaper, ChevronDown, Search, Building2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { TRUSTED_SOURCES, SOURCE_GROUPS, ALL_SOURCE_DOMAINS } from '@/lib/sources';
-
-const NAV_LINKS = [
-  { name: 'Trending', icon: Flame, page: '/trending' },
-  { name: 'Finance', icon: TrendingUp, page: '/finance' },
-  { name: 'Keywords', icon: Tag, page: '/keywords' },
-  { name: 'For You', icon: Sparkles, page: '/personalized' },
-  { name: 'Saved', icon: Bookmark, page: '/saved' },
-  { name: 'History', icon: Clock, page: '/history' },
-  { name: 'Settings', icon: Settings, page: '/settings' },
-];
 
 const COUNTRIES_BY_CONTINENT = {
   'North America': [
@@ -142,10 +131,10 @@ const COUNTRIES_BY_CONTINENT = {
 
 const CATEGORIES = [
   { id: 'all', name: 'All', icon: '📰' },
-  { id: 'health-tech-science', name: 'Health, Tech and Science', icon: '🧬' },
+  { id: 'health-tech-science', name: 'Health, Tech & Science', icon: '🧬' },
   { id: 'business', name: 'Business', icon: '📈' },
   { id: 'sports', name: 'Sports', icon: '⚽' },
-  { id: 'entertainment', name: 'Entertainment (Music, film, tv and gaming)', icon: '🎬' },
+  { id: 'entertainment', name: 'Entertainment', icon: '🎬' },
   { id: 'politics', name: 'Politics', icon: '🏛️' },
 ];
 
@@ -302,29 +291,6 @@ export default function FilterSidebar({
         </div>
       </div>
 
-      {/* Quick navigation — visible on mobile where bottom nav can be hard to reach */}
-      <div className="px-4 py-3 border-b border-slate-800 lg:hidden">
-        <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">Go to</p>
-        <div className="grid grid-cols-3 gap-1.5">
-          {NAV_LINKS.map(({ name, icon: Icon, page }) => {
-            const active = location.pathname === page;
-            return (
-              <Link
-                key={page}
-                to={page}
-                className={`flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-center transition-colors ${active
-                  ? 'bg-white text-slate-900'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
-                  }`}
-              >
-                <Icon className="w-4 h-4 flex-shrink-0" />
-                <span className="text-[10px] font-medium leading-tight">{name}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-
       <ScrollArea className="flex-1 px-4 py-6 overflow-y-auto">
         {/* Search Section */}
         <div className="mb-6">
@@ -372,7 +338,7 @@ export default function FilterSidebar({
               </div>
             )}
           </div>
-          <p className="mt-1.5 text-[11px] text-slate-600">
+          <p className="mt-1.5 text-xs text-slate-600">
             Use <span className="font-mono text-slate-500">AND</span> / <span className="font-mono text-slate-500">NOT</span> for precise searches
           </p>
         </div>

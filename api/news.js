@@ -3430,6 +3430,79 @@ async function summarizeWithOpenRouter(content, key) {
 const SUMMARY_CACHE = new Map();
 const SUMMARY_CACHE_TTL_MS = 36 * 60 * 60 * 1000; // 36 hours
 
+// ── AI Digest — single paragraph overview of the current news mix ─────────
+const DIGEST_PROMPT = (headlines, context) =>
+  `You are a news editor. List the top stories for ${context}.\n` +
+  `For each story write exactly one bullet point: the story name, then " — ", then 2-3 key facts separated by semicolons.\n` +
+  `Only use facts from the provided articles. Use present tense. No intro sentence, no conclusion.\n\n` +
+  `Format:\n` +
+  `• Story name — key fact one; key fact two; key fact three\n\n` +
+  `Top articles:\n${headlines}`;
+
+const DIGEST_CACHE = new Map();
+const DIGEST_CACHE_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+async function generateDigest(prompt, llmKeys) {
+  const oaiProviders = [
+    llmKeys.cerebras && ['Cerebras', 'https://api.cerebras.ai/v1/chat/completions', 'llama-3.3-70b', llmKeys.cerebras, null],
+    llmKeys.groq && ['Groq', 'https://api.groq.com/openai/v1/chat/completions', 'llama-3.1-8b-instant', llmKeys.groq, null],
+    llmKeys.mistral && ['Mistral', 'https://api.mistral.ai/v1/chat/completions', 'mistral-small-latest', llmKeys.mistral, null],
+    llmKeys.sambanova && ['SambaNova', 'https://api.sambanova.ai/v1/chat/completions', 'Meta-Llama-3.3-70B-Instruct', llmKeys.sambanova, null],
+    llmKeys.openrouter && ['OpenRouter', 'https://openrouter.ai/api/v1/chat/completions', 'meta-llama/llama-4-scout:free', llmKeys.openrouter, 'shortform-news'],
+    llmKeys.openai && ['OpenAI', 'https://api.openai.com/v1/chat/completions', 'gpt-4o-mini', llmKeys.openai, null],
+  ].filter(Boolean);
+
+  const providers = [
+    llmKeys.gemini && (async () => {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${llmKeys.gemini}`;
+      const res = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3, maxOutputTokens: 500 } }),
+      });
+      const data = await res.json();
+      if (res.status === 429 || data.error?.code === 429 || data.error?.status === 'RESOURCE_EXHAUSTED') throw new QuotaExceededError('Gemini');
+      if (!res.ok) { console.error(`Gemini digest error: ${data.error?.message?.slice(0, 80)}`); return null; }
+      return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
+    }),
+    ...oaiProviders.map(([name, url, model, key, referer]) => async () => {
+      const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` };
+      if (referer) headers['HTTP-Referer'] = referer;
+      const res = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 500 }),
+      });
+      const data = await res.json();
+      if (res.status === 429 || data.error?.code === 'rate_limit_exceeded') throw new QuotaExceededError(name);
+      if (!res.ok) { console.error(`${name} digest error: ${data.error?.message?.slice(0, 80)}`); return null; }
+      return data.choices?.[0]?.message?.content?.trim() || null;
+    }),
+    llmKeys.cohere && (async () => {
+      const res = await fetchWithTimeout('https://api.cohere.com/v2/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${llmKeys.cohere}` },
+        body: JSON.stringify({ model: 'command-r-08-2024', messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 500 }),
+      });
+      const data = await res.json();
+      if (res.status === 429) throw new QuotaExceededError('Cohere');
+      if (!res.ok) { console.error(`Cohere digest error: ${JSON.stringify(data).slice(0, 80)}`); return null; }
+      return data.message?.content?.[0]?.text?.trim() || null;
+    }),
+  ].filter(Boolean);
+
+  for (const attempt of providers) {
+    try {
+      const result = await attempt();
+      if (result) return result;
+    } catch (err) {
+      if (err.name === 'QuotaExceededError') { console.warn(`[digest] ${err.message} — trying next`); continue; }
+      console.error('[digest] unexpected error:', err.message);
+    }
+  }
+  return null;
+}
+
 // Main: try each configured provider in order; skip to next on quota exhaustion
 async function generateSummary(article, llmKeys) {
   const content = prepareArticleContent(article);
@@ -4499,6 +4572,36 @@ export default async function handler(req, res) {
       }));
     }
 
+    // AI Digest — one paragraph overview of the current news mix, cached per filter combo
+    let digestText = null;
+    if (HAS_LLM && finalArticles.length > 0) {
+      const digestKey = countryList.slice().sort().join(',') + '|' + categoryList.slice().sort().join(',') + '|' + (dateRange || 'all');
+      const cachedDigest = DIGEST_CACHE.get(digestKey);
+      if (cachedDigest && (Date.now() - cachedDigest.timestamp) < DIGEST_CACHE_TTL_MS) {
+        digestText = cachedDigest.text;
+      } else {
+        try {
+          const DATE_LABELS = { '24h': 'last 24 hours', '3d': 'last 3 days', 'week': 'last week', 'month': 'last month' };
+          const ctxParts = [];
+          if (countryList.length === 1 && countryList[0] !== 'world') ctxParts.push(`country: ${countryList[0].toUpperCase()}`);
+          else if (countryList.length > 1) ctxParts.push(`countries: ${countryList.join(', ')}`);
+          if (categoryList.length === 1 && categoryList[0] !== 'all') ctxParts.push(`category: ${categoryList[0]}`);
+          ctxParts.push(DATE_LABELS[dateRange] || 'recent period');
+          const contextLabel = ctxParts.join(' · ');
+
+          const headlines = finalArticles.slice(0, 5).map((a, i) => {
+            const desc = (a.description || '').replace(/\s*\[\+\d+ chars\].*$/s, '').trim().slice(0, 120);
+            return `${i + 1}. ${a.title}${desc ? ': ' + desc : ''}`;
+          }).join('\n');
+
+          digestText = await generateDigest(DIGEST_PROMPT(headlines, contextLabel), LLM_KEYS);
+          if (digestText) DIGEST_CACHE.set(digestKey, { text: digestText, timestamp: Date.now() });
+        } catch (err) {
+          console.error('[digest] failed:', err.message);
+        }
+      }
+    }
+
     evictCacheIfNeeded();
 
     return res.status(200).json({
@@ -4506,6 +4609,7 @@ export default async function handler(req, res) {
       articles: finalArticles,
       totalResults: finalArticles.length,
       cached: false,
+      digest: digestText || undefined,
       lowCoverage: lowCoverage.length > 0 ? lowCoverage : undefined,
     });
 

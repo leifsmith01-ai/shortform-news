@@ -264,7 +264,7 @@ export default function Keywords() {
 
   // ── Input / filters ──
   const [inputValue, setInputValue] = useState('')
-  const [dateRange, setDateRange] = useState<'24h' | '3d' | 'week' | 'month'>('24h')
+  const [timeframe, setTimeframe] = useState<'24h' | '3d' | 'week' | 'month' | '3months'>('week')
   const [region, setRegion] = useState<string>(() => load(LS.REGION, 'world'))
   const [strictMode, setStrictMode] = useState<boolean>(() => load(LS.STRICT, false))
   const [showBoolBuilder, setShowBoolBuilder] = useState<boolean>(() => load(LS.BOOL_MODE, false))
@@ -276,13 +276,24 @@ export default function Keywords() {
 
   // ── Analytics tab ──
   const [activeView, setActiveView] = useState<'articles' | 'analytics'>('articles')
-  const [analyticsDays, setAnalyticsDays] = useState<7 | 30 | 90>(30)
+  const [sentimentError, setSentimentError] = useState<string | null>(null)
   const [googleTrends, setGoogleTrends] = useState<GoogleTrendsData | null>(null)
   const [isLoadingTrends, setIsLoadingTrends] = useState(false)
   const [sentimentData, setSentimentData] = useState<KeywordSentimentData | null>(null)
   const [isLoadingSentiment, setIsLoadingSentiment] = useState(false)
 
   const abortRef = useRef<AbortController | null>(null)
+
+  // Convert unified timeframe to number of days for API calls
+  const timeframeToDays = (tf: typeof timeframe): number => {
+    switch (tf) {
+      case '24h':     return 1
+      case '3d':      return 3
+      case 'week':    return 7
+      case 'month':   return 30
+      case '3months': return 90
+    }
+  }
 
   // Persist preferences
   useEffect(() => { save(LS.REGION, region) }, [region])
@@ -329,7 +340,7 @@ export default function Keywords() {
         countries: region === 'world' ? ['world'] : [region],
         categories: ['world'],
         searchQuery: query,
-        dateRange,
+        dateRange: timeframe,
         mode: 'keyword',
         strictMode,
         threshold: kw.threshold ?? DEFAULT_THRESHOLD,
@@ -348,7 +359,7 @@ export default function Keywords() {
     } finally {
       if (!ctrl.signal.aborted) setIsLoadingArticles(false)
     }
-  }, [dateRange, region, strictMode, showBoolBuilder, boolQuery])
+  }, [timeframe, region, strictMode, showBoolBuilder, boolQuery])
 
   const fetchArticlesForTopic = useCallback(async (topic: KeywordTopic, forceRefresh: boolean = false) => {
     if (abortRef.current) abortRef.current.abort()
@@ -370,7 +381,7 @@ export default function Keywords() {
         countries: region === 'world' ? ['world'] : [region],
         categories: ['world'],
         searchQuery: combinedQuery,
-        dateRange,
+        dateRange: timeframe,
         mode: 'keyword',
         strictMode,
         threshold: DEFAULT_THRESHOLD,
@@ -385,7 +396,7 @@ export default function Keywords() {
     } finally {
       if (!ctrl.signal.aborted) setIsLoadingArticles(false)
     }
-  }, [keywords, dateRange, region, strictMode])
+  }, [keywords, timeframe, region, strictMode])
 
   // Trigger fetch whenever selection or filters change
   useEffect(() => {
@@ -417,16 +428,17 @@ export default function Keywords() {
     if (!kwName) return
     setIsLoadingTrends(true)
     setGoogleTrends(null)
-    api.getGoogleTrends(kwName, analyticsDays)
+    api.getGoogleTrends(kwName, timeframeToDays(timeframe))
       .then(setGoogleTrends)
       .catch(() => setGoogleTrends(null)) // silently fail — optional feature
       .finally(() => setIsLoadingTrends(false))
-  }, [activeView, selection, analyticsDays, isSignedIn, keywords])
+  }, [activeView, selection, timeframe, isSignedIn, keywords])
 
   // Load AI sentiment summary for single-keyword selections
   useEffect(() => {
     if (activeView !== 'analytics' || !selection || selection.type !== 'keyword' || !isSignedIn) {
       setSentimentData(null)
+      setSentimentError(null)
       setIsLoadingSentiment(false)
       return
     }
@@ -434,11 +446,12 @@ export default function Keywords() {
     if (!kwName) return
     setIsLoadingSentiment(true)
     setSentimentData(null)
-    api.getKeywordSentiment(kwName, analyticsDays as 7 | 30 | 90)
-      .then(setSentimentData)
-      .catch(() => setSentimentData(null)) // silently fail — optional feature
+    setSentimentError(null)
+    api.getKeywordSentiment(kwName, timeframeToDays(timeframe))
+      .then(data => { setSentimentData(data); setSentimentError(null) })
+      .catch((err: Error) => { setSentimentData(null); setSentimentError(err?.message ?? 'Sentiment analysis unavailable') })
       .finally(() => setIsLoadingSentiment(false))
-  }, [activeView, selection, analyticsDays, isSignedIn, keywords])
+  }, [activeView, selection, timeframe, isSignedIn, keywords])
 
   // ── CRUD ────────────────────────────────────────────────────────────────────
 
@@ -731,7 +744,7 @@ export default function Keywords() {
                               const memberCount = topic.keyword_topic_members?.length ?? 0
                               const hasTopicAlert = alertSettings.some(s => s.topic_id === topic.id && s.enabled)
                               return (
-                                <div key={topic.id} className="relative group/topic flex-shrink-0 lg:flex-shrink">
+                                <div key={topic.id} className="relative group/topic">
                                   <button
                                     onClick={() => setSelection({ type: 'topic', id: topic.id })}
                                     className={`inline-flex items-center gap-1.5 pl-2.5 pr-7 py-1.5 rounded-full text-sm font-medium transition-colors ${isSelected
@@ -778,7 +791,7 @@ export default function Keywords() {
                               const isSelected = selection?.type === 'keyword' && selection.id === kw.id
                               const count = articleCounts[kw.id]
                               return (
-                                <div key={kw.id} className="relative group/kw flex-shrink-0 lg:flex-shrink">
+                                <div key={kw.id} className="relative group/kw">
                                   <span
                                     onClick={() => setSelection({ type: 'keyword', id: kw.id })}
                                     className={`inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-full text-sm font-medium cursor-pointer select-none transition-colors ${isSelected
@@ -863,7 +876,7 @@ export default function Keywords() {
                     )}
                   </div>
 
-                  <div className="ml-auto flex items-center gap-3">
+                  <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
                     {/* Manual Refresh Button */}
                     <button
                       onClick={() => {
@@ -911,40 +924,21 @@ export default function Keywords() {
                         </button>
                       ))}
                     </div>
-                    {/* Timeframe (articles view only) */}
-                    {activeView === 'articles' && (
-                      <div className="flex items-center gap-1">
-                        {(['24h', '3d', 'week', 'month'] as const).map(range => (
-                          <button
-                            key={range}
-                            onClick={() => setDateRange(range)}
-                            className={`px-2.5 py-1 text-xs rounded-full font-medium transition-colors ${dateRange === range
-                              ? 'bg-slate-900 text-white'
-                              : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-600'
-                              }`}
-                          >
-                            {range === '24h' ? '24h' : range === '3d' ? '3 days' : range === 'week' ? '1 week' : '1 month'}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {/* Analytics days selector (analytics view only) */}
-                    {activeView === 'analytics' && (
-                      <div className="flex items-center gap-1">
-                        {([7, 30, 90] as const).map(d => (
-                          <button
-                            key={d}
-                            onClick={() => setAnalyticsDays(d)}
-                            className={`px-2.5 py-1 text-xs rounded-full font-medium transition-colors ${analyticsDays === d
-                              ? 'bg-slate-900 text-white'
-                              : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-600'
-                              }`}
-                          >
-                            {d}d
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    {/* Unified timeframe selector — same for Articles and Analytics */}
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {(['24h', '3d', 'week', 'month', '3months'] as const).map(tf => (
+                        <button
+                          key={tf}
+                          onClick={() => setTimeframe(tf)}
+                          className={`px-2.5 py-1 text-xs rounded-full font-medium transition-colors ${timeframe === tf
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-600'
+                            }`}
+                        >
+                          {tf === '24h' ? '24h' : tf === '3d' ? '3 days' : tf === 'week' ? '1 week' : tf === 'month' ? '1 month' : '3 months'}
+                        </button>
+                      ))}
+                    </div>
                     {activeView === 'articles' && !isLoadingArticles && (
                       <span className="text-xs text-stone-400 dark:text-slate-500">
                         {articles.length} article{articles.length !== 1 ? 's' : ''}
@@ -1017,7 +1011,7 @@ export default function Keywords() {
                                 ))}
                               </div>
                               <p className="text-[10px] text-stone-400 dark:text-slate-500 mt-2">
-                                Google search interest (0–100) · last {analyticsDays}d
+                                Google search interest (0–100) · last {timeframeToDays(timeframe)}d
                               </p>
                             </>
                           ) : (
@@ -1078,7 +1072,7 @@ export default function Keywords() {
                                       {sentimentData.newsSentiment.charAt(0).toUpperCase() + sentimentData.newsSentiment.slice(1)}
                                     </span>
                                     <span className="text-[10px] text-stone-400 dark:text-slate-500">
-                                      {sentimentData.newsCount} article{sentimentData.newsCount !== 1 ? 's' : ''} · last {analyticsDays}d
+                                      {sentimentData.newsCount} article{sentimentData.newsCount !== 1 ? 's' : ''} · last {timeframeToDays(timeframe)}d
                                     </span>
                                   </div>
                                   {Array.isArray(sentimentData.newsSummary) ? (
@@ -1106,9 +1100,11 @@ export default function Keywords() {
                               ) : (
                                 <div className="flex-1 flex flex-col items-center justify-center py-6 text-center">
                                   <Newspaper className="w-7 h-7 text-stone-200 dark:text-slate-600 mb-2" />
-                                  <p className="text-xs font-medium text-stone-500 dark:text-slate-400">No news articles found</p>
+                                  <p className="text-xs font-medium text-stone-500 dark:text-slate-400">
+                                    {sentimentError ? 'Analysis unavailable' : 'No news articles found'}
+                                  </p>
                                   <p className="text-[11px] text-stone-400 dark:text-slate-500 mt-1 max-w-[200px]">
-                                    No tracked articles for this keyword in the last {analyticsDays} days.
+                                    {sentimentError ?? `No tracked articles for this keyword in the last ${timeframeToDays(timeframe)} days.`}
                                   </p>
                                 </div>
                               )}
@@ -1127,21 +1123,32 @@ export default function Keywords() {
                                   <div className="h-3 w-4/5 skeleton-shimmer rounded" />
                                   <div className="h-3 w-3/5 skeleton-shimmer rounded" />
                                 </div>
-                              ) : sentimentData && sentimentData.socialSentiment ? (
+                              ) : sentimentData && (sentimentData.socialCount > 0 || sentimentData.redditCount > 0) ? (
                                 <>
-                                  <div className="flex items-center gap-3 mb-4">
+                                  <div className="flex items-center gap-3 mb-3 flex-wrap">
                                     <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
                                       sentimentData.socialSentiment === 'positive' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
                                       sentimentData.socialSentiment === 'negative' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
                                       sentimentData.socialSentiment === 'mixed'    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
                                                                                      'bg-stone-100 text-stone-600 dark:bg-slate-700 dark:text-slate-300'
                                     }`}>
-                                      {sentimentData.socialSentiment.charAt(0).toUpperCase() + sentimentData.socialSentiment.slice(1)}
+                                      {sentimentData.socialSentiment
+                                        ? sentimentData.socialSentiment.charAt(0).toUpperCase() + sentimentData.socialSentiment.slice(1)
+                                        : 'Mixed'}
                                     </span>
                                     <span className="text-[10px] text-stone-400 dark:text-slate-500">
-                                      {sentimentData.redditCount} Reddit post{sentimentData.redditCount !== 1 ? 's' : ''} · last {analyticsDays}d
+                                      {(sentimentData.socialCount ?? sentimentData.redditCount)} post{(sentimentData.socialCount ?? sentimentData.redditCount) !== 1 ? 's' : ''} · last {timeframeToDays(timeframe)}d
                                     </span>
                                   </div>
+                                  {sentimentData.socialSources && Object.keys(sentimentData.socialSources).length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mb-3">
+                                      {Object.entries(sentimentData.socialSources).map(([platform, count]) => (
+                                        <span key={platform} className="text-[10px] px-1.5 py-0.5 rounded bg-stone-100 dark:bg-slate-700 text-stone-500 dark:text-slate-400">
+                                          {platform.charAt(0).toUpperCase() + platform.slice(1)} {count}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
                                   {Array.isArray(sentimentData.socialSummary) ? (
                                     <ul className="space-y-2.5">
                                       {sentimentData.socialSummary.map((item, i) => {
@@ -1201,9 +1208,11 @@ export default function Keywords() {
                               ) : (
                                 <div className="flex-1 flex flex-col items-center justify-center py-6 text-center">
                                   <MessageSquare className="w-7 h-7 text-stone-200 dark:text-slate-600 mb-2" />
-                                  <p className="text-xs font-medium text-stone-500 dark:text-slate-400">No social posts found</p>
+                                  <p className="text-xs font-medium text-stone-500 dark:text-slate-400">
+                                    {sentimentError ? 'Analysis unavailable' : 'No social posts found'}
+                                  </p>
                                   <p className="text-[11px] text-stone-400 dark:text-slate-500 mt-1 max-w-[200px]">
-                                    No Reddit activity found for this keyword in the last {analyticsDays} days.
+                                    {sentimentError ?? `No social activity found for this keyword in the last ${timeframeToDays(timeframe)} days.`}
                                   </p>
                                 </div>
                               )}

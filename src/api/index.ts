@@ -207,7 +207,7 @@ class ApiService {
 
   // ─── Google Trends ────────────────────────────────────────────────────────
 
-  async getGoogleTrends(keyword: string, days: 7 | 30 | 90): Promise<GoogleTrendsData> {
+  async getGoogleTrends(keyword: string, days: number): Promise<GoogleTrendsData> {
     const res = await fetch(`/api/google-trends?keyword=${encodeURIComponent(keyword)}&period=${days}`)
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
@@ -218,7 +218,7 @@ class ApiService {
 
   // ─── Keyword Sentiment ────────────────────────────────────────────────────
 
-  async getKeywordSentiment(keyword: string, days: 7 | 30 | 90 = 7): Promise<KeywordSentimentData> {
+  async getKeywordSentiment(keyword: string, days: number = 7): Promise<KeywordSentimentData> {
     const res = await fetch(`/api/keyword-sentiment?keyword=${encodeURIComponent(keyword)}&days=${days}`)
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
