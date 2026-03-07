@@ -496,7 +496,7 @@ async function fetchRedditComments(posts) {
         .filter(c => c?.body && c.body !== '[deleted]' && c.body !== '[removed]' && c.body.length < 500)
         .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
         .slice(0, 3)
-        .map(c => ({ body: c.body.slice(0, 200), score: c.score ?? 0 }));
+        .map(c => ({ body: c.body.slice(0, 200), score: c.score ?? 0, author: c.author ?? 'unknown' }));
       return { post, comments };
     } catch {
       return { post, comments: [] };
@@ -709,6 +709,20 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: 'No content found for this keyword' });
   }
 
+  // Build top posts with already-fetched comments for display in the UI
+  const topPosts = redditPosts.slice(0, 3).map(p => {
+    const commentData = redditComments.find(rc => rc.post?.id === p.id);
+    const topComment = commentData?.comments?.[0] ?? null;
+    return {
+      title: p.title ?? '',
+      subreddit: `r/${p.subreddit ?? ''}`,
+      score: p.score ?? 0,
+      numComments: p.num_comments ?? 0,
+      url: `https://www.reddit.com/r/${p.subreddit}/comments/${p.id}/`,
+      topComment: topComment ? { body: topComment.body, score: topComment.score, author: topComment.author } : null,
+    };
+  });
+
   // ── Build prompt and run LLM ────────────────────────────────────────────
   const newsTitles = newsArticles.map(a => a.title).filter(Boolean);
   const socialData  = { redditPosts, redditComments, blueskyPosts, mastodonPosts, youtubeComments, xPosts };
@@ -735,6 +749,7 @@ export default async function handler(req, res) {
     redditCount: redditPosts.length, // kept for backwards compatibility
     socialCount,
     socialSources,
+    topPosts,
     outletTiers: computeOutletTiers(newsArticles),
     geographicSpread: computeGeographicSpread(newsArticles),
   };

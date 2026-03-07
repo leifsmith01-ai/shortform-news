@@ -71,6 +71,19 @@ export interface GoogleTrendsData {
   cached?: boolean
 }
 
+export interface RedditPost {
+  title: string
+  subreddit: string
+  score: number
+  numComments: number
+  url: string
+  topComment: {
+    body: string
+    score: number
+    author: string
+  } | null
+}
+
 export interface KeywordSentimentData {
   sentiment: 'positive' | 'negative' | 'neutral' | 'mixed'
   newsSentiment: 'positive' | 'negative' | 'neutral' | 'mixed'
@@ -83,6 +96,7 @@ export interface KeywordSentimentData {
   narrativeFrames: string[]
   keyEntities: { people: string[]; organisations: string[] }
   headlineSplit: { positive: number; negative: number; neutral: number; mixed: number } | null
+  topPosts?: RedditPost[]
   outletTiers: { tier: string; label: string; count: number; pct: number }[]
   geographicSpread: { country: string; count: number }[]
   newsCount: number
