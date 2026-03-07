@@ -446,74 +446,47 @@ async function fetchNewsArticlesLive(keyword, appOrigin, days) {
   }
 }
 
-// ── Reddit (OAuth + comments) ─────────────────────────────────────────────────
+// ── Reddit (RSS — no API credentials required) ────────────────────────────────
 
-// In-memory token cache (survives for the duration of the serverless instance)
-let _redditToken = null; // { value, expiresAt }
-
-async function getRedditToken() {
-  const clientId     = process.env.REDDIT_CLIENT_ID;
-  const clientSecret = process.env.REDDIT_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return null;
-
-  if (_redditToken && _redditToken.expiresAt > Date.now() + 60_000) {
-    return _redditToken.value;
-  }
-
-  try {
-    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-    const res = await fetchWithTimeout('https://www.reddit.com/api/v1/access_token', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${credentials}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'shortform-news/1.0 (by /u/shortformnews)',
-      },
-      body: 'grant_type=client_credentials',
-    });
-    if (!res.ok) { console.warn('[sentiment] Reddit OAuth failed:', res.status); return null; }
-    const data = await res.json();
-    if (!data.access_token) return null;
-    _redditToken = { value: data.access_token, expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000 };
-    return _redditToken.value;
-  } catch (err) {
-    console.warn('[sentiment] Reddit OAuth error:', err.message);
-    return null;
-  }
+function parseRedditRSS(xml) {
+  const entries = [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].map(m => m[1]);
+  return entries.map(entry => {
+    const rawTitle = (entry.match(/<title[^>]*>([\s\S]*?)<\/title>/) || [])[1] ?? '';
+    const title = rawTitle
+      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/, '$1')
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+      .trim();
+    const link = (entry.match(/<link[^>]*href="([^"]+)"/) || entry.match(/<link[^>]*>([\s\S]*?)<\/link>/) || [])[1]?.trim();
+    // Extract subreddit + post ID from URL: /r/<sub>/comments/<id>/
+    const m = link?.match(/\/r\/([^/]+)\/comments\/([^/]+)/);
+    if (!title || !m) return null;
+    return { title, subreddit: m[1], id: m[2], score: 0, num_comments: 0 };
+  }).filter(Boolean);
 }
 
-async function fetchRedditPosts(keyword, days = 7, token = null) {
+async function fetchRedditPosts(keyword, days = 7) {
   try {
     const t = days <= 1 ? 'day' : days <= 7 ? 'week' : days <= 30 ? 'month' : 'year';
-    const baseUrl = token ? 'https://oauth.reddit.com' : 'https://www.reddit.com';
-    const url = `${baseUrl}/search.json?q=${encodeURIComponent(keyword)}&sort=hot&t=${t}&limit=25`;
-    const headers = token
-      ? { 'Authorization': `Bearer ${token}`, 'User-Agent': 'shortform-news/1.0 (by /u/shortformnews)' }
-      : { 'User-Agent': 'Mozilla/5.0 (compatible; shortform-news/1.0; +https://shortformnews.com)', 'Accept': 'application/json', 'Accept-Language': 'en-US,en;q=0.9' };
-    const res = await fetchWithTimeout(url, { headers });
-    if (!res.ok) { console.warn(`[sentiment] Reddit returned ${res.status} for "${keyword}"`); return []; }
-    const data = await res.json();
-    return (data?.data?.children ?? [])
-      .map(p => p.data)
-      .filter(p => p?.title)
-      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-      .slice(0, 15);
+    const url = `https://www.reddit.com/search.rss?q=${encodeURIComponent(keyword)}&sort=hot&t=${t}&limit=25`;
+    const res = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': 'shortform-news/1.0 (RSS reader; +https://shortform.news)' },
+    });
+    if (!res.ok) { console.warn(`[sentiment] Reddit RSS returned ${res.status} for "${keyword}"`); return []; }
+    const xml = await res.text();
+    return parseRedditRSS(xml).slice(0, 15);
   } catch (err) {
-    console.warn('[sentiment] Failed to fetch Reddit posts:', err.message);
+    console.warn('[sentiment] Failed to fetch Reddit RSS:', err.message);
     return [];
   }
 }
 
-async function fetchRedditComments(posts, token = null) {
+async function fetchRedditComments(posts) {
   const top3 = posts.slice(0, 3);
-  const headers = token
-    ? { 'Authorization': `Bearer ${token}`, 'User-Agent': 'shortform-news/1.0 (by /u/shortformnews)' }
-    : { 'User-Agent': 'Mozilla/5.0 (compatible; shortform-news/1.0)', 'Accept': 'application/json' };
+  const headers = { 'User-Agent': 'shortform-news/1.0 (RSS reader; +https://shortform.news)', 'Accept': 'application/json' };
 
   const results = await Promise.allSettled(top3.map(async post => {
     try {
-      const baseUrl = token ? 'https://oauth.reddit.com' : 'https://www.reddit.com';
-      const url = `${baseUrl}/r/${post.subreddit}/comments/${post.id}.json?limit=5&sort=top&depth=1`;
+      const url = `https://www.reddit.com/r/${post.subreddit}/comments/${post.id}.json?limit=5&sort=top&depth=1`;
       const res = await fetchWithTimeout(url, { headers }, 5000);
       if (!res.ok) return { post, comments: [] };
       const data = await res.json();
@@ -717,19 +690,17 @@ export default async function handler(req, res) {
   }
 
   // ── Fetch all social sources in parallel ────────────────────────────────
-  const redditToken = await getRedditToken();
-
   const [redditPosts, blueskyPosts, mastodonPosts, youtubeComments, xPosts] = await Promise.all([
-    fetchRedditPosts(kw, Number(days), redditToken),
+    fetchRedditPosts(kw, Number(days)),
     fetchBlueskyPosts(kw, Number(days)),
     fetchMastodonPosts(kw, Number(days)),
     fetchYouTubeComments(kw, Number(days)),
     fetchXPosts(kw, Number(days)),
   ]);
 
-  // Fetch top comments for the 3 highest-scoring Reddit posts
+  // Fetch top comments for the highest-upvoted Reddit posts
   const redditComments = redditPosts.length > 0
-    ? await fetchRedditComments(redditPosts, redditToken)
+    ? await fetchRedditComments(redditPosts)
     : [];
 
   const socialCount = redditPosts.length + blueskyPosts.length + mastodonPosts.length + youtubeComments.length + xPosts.length;
