@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Bookmark, Clock, Sparkles, Tag, Bell, TrendingUp, LogIn, Flame, Settings, Info, Shield } from 'lucide-react';
+import {
+  Home, Bookmark, Clock, Sparkles, Tag, TrendingUp,
+  LogIn, Flame, Settings, Info, Shield, MoreHorizontal, X,
+} from 'lucide-react';
 import { UserButton, SignedIn, SignedOut } from '@clerk/clerk-react';
 
 const organizationSchema = {
@@ -28,24 +31,36 @@ const websiteSchema = {
   },
 };
 
+// Primary tabs shown directly in the bottom nav bar (max 4 + "More")
+const primaryNavItems = [
+  { name: 'Home', icon: Home, page: '/' },
+  { name: 'Trending', icon: Flame, page: '/trending' },
+  { name: 'For You', icon: Sparkles, page: '/personalized' },
+  { name: 'Keywords', icon: Tag, page: '/keywords' },
+];
+
+// Secondary items accessible via the "More" bottom sheet
+const secondaryNavItems = [
+  { name: 'Finance', icon: TrendingUp, page: '/finance' },
+  { name: 'Saved', icon: Bookmark, page: '/saved' },
+  { name: 'History', icon: Clock, page: '/history' },
+  { name: 'Settings', icon: Settings, page: '/settings' },
+  { name: 'About', icon: Info, page: '/about' },
+  { name: 'Privacy', icon: Shield, page: '/privacy-policy' },
+];
+
+// All items combined for the desktop sidebar
+const allNavItems = [...primaryNavItems, ...secondaryNavItems];
+
 export default function Layout({ children, currentPageName }: { children: React.ReactNode; currentPageName: string }) {
   const location = useLocation();
-
-  const navItems = [
-    { name: 'Home', icon: Home, page: '/' },
-    { name: 'Trending', icon: Flame, page: '/trending' },
-    { name: 'Finance', icon: TrendingUp, page: '/finance' },
-    { name: 'For You', icon: Sparkles, page: '/personalized' },
-    { name: 'Keywords', icon: Tag, page: '/keywords' },
-    { name: 'Saved', icon: Bookmark, page: '/saved' },
-    { name: 'History', icon: Clock, page: '/history' },
-    { name: 'Settings', icon: Settings, page: '/settings' },
-    { name: 'About', icon: Info, page: '/about', showOnMobile: false },
-    { name: 'Privacy', icon: Shield, page: '/privacy-policy', showOnMobile: false },
-  ];
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const isActive = (page: string) =>
     location.pathname === page || currentPageName === page;
+
+  // Highlight "More" when the current page is a secondary nav item
+  const isMoreActive = secondaryNavItems.some(item => isActive(item.page));
 
   return (
     <div className="app-container flex flex-col md:flex-row">
@@ -91,7 +106,7 @@ export default function Layout({ children, currentPageName }: { children: React.
 
           {/* Navigation */}
           <nav className="flex flex-col gap-2 flex-1">
-            {navItems.map((item) => {
+            {allNavItems.map((item) => {
               const Icon = item.icon;
               return (
                 <div key={item.page} className="relative group/navitem">
@@ -111,9 +126,6 @@ export default function Layout({ children, currentPageName }: { children: React.
                   <span className="pointer-events-none absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1 text-xs font-medium text-white bg-slate-700 rounded-lg opacity-0 group-hover/navitem:opacity-100 transition-opacity duration-150 whitespace-nowrap z-50 shadow-lg">
                     {item.name}
                   </span>
-                  {item.isPremium && (
-                    <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-amber-400 border-2 border-slate-900 pointer-events-none" />
-                  )}
                 </div>
               );
             })}
@@ -130,47 +142,123 @@ export default function Layout({ children, currentPageName }: { children: React.
               title="Sign In"
             >
               <LogIn className="w-5 h-5" />
-              <span className="text-[10px] font-semibold uppercase tracking-wide">Sign In</span>
+              <span className="text-xs font-semibold uppercase tracking-wide">Sign In</span>
             </Link>
           </SignedOut>
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 min-h-0 h-full pt-[60px] md:pt-0 pb-16 md:pb-0">
+        <main className="flex-1 min-h-0 h-full pt-[60px] md:pt-0 pb-[calc(56px+max(8px,env(safe-area-inset-bottom)))] md:pb-0">
           {children}
         </main>
       </div>
 
-      {/* ── Mobile bottom navigation (hidden on md+) ──────────────────── */}
-      <nav className="md:hidden flex-shrink-0 bg-slate-900 border-t border-slate-800 px-1 pt-2 pb-[max(8px,env(safe-area-inset-bottom))] fixed bottom-0 inset-x-0 z-50">
-        <div className="flex justify-around items-center overflow-x-auto scrollbar-none gap-0.5">
-          {navItems.filter(item => item.showOnMobile !== false).map((item) => {
+      {/* ── Mobile bottom navigation — 5 tabs (hidden on md+) ─────────── */}
+      <nav
+        className="md:hidden flex-shrink-0 bg-slate-900 border-t border-slate-800 fixed bottom-0 inset-x-0 z-50"
+        style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom))' }}
+      >
+        <div className="flex items-stretch">
+          {primaryNavItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.page);
             return (
               <Link
                 key={item.page}
                 to={item.page}
-                className={`relative flex flex-col items-center gap-1 min-w-[52px] px-1.5 py-2 rounded-xl transition-colors ${active
-                  ? 'text-white'
-                  : 'text-slate-500 hover:text-slate-300 active:bg-white/10'
-                  }`}
+                className={`relative flex flex-col items-center justify-center gap-1 flex-1 min-h-[56px] px-1 pt-2 pb-1 transition-colors ${
+                  active ? 'text-white' : 'text-slate-500 active:bg-white/10'
+                }`}
               >
+                {/* Top accent line for active tab */}
                 {active && (
-                  <span className="absolute inset-0 bg-white/15 rounded-xl" />
+                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-white rounded-full" />
+                )}
+                {/* Background highlight for active tab */}
+                {active && (
+                  <span className="absolute inset-x-1 inset-y-0 bg-white/20 rounded-xl" />
                 )}
                 <Icon className={`w-5 h-5 flex-shrink-0 relative z-10 ${active ? 'text-white' : ''}`} />
-                <span className={`text-[10px] font-medium leading-tight text-center relative z-10 ${active ? 'text-white' : 'text-slate-500'}`}>
+                <span className={`text-xs font-medium leading-tight text-center relative z-10 ${active ? 'text-white' : 'text-slate-500'}`}>
                   {item.name}
                 </span>
-                {item.isPremium && (
-                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
-                )}
               </Link>
             );
           })}
+
+          {/* More button */}
+          <button
+            onClick={() => setMoreOpen(true)}
+            className={`relative flex flex-col items-center justify-center gap-1 flex-1 min-h-[56px] px-1 pt-2 pb-1 transition-colors ${
+              isMoreActive ? 'text-white' : 'text-slate-500 active:bg-white/10'
+            }`}
+          >
+            {isMoreActive && (
+              <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-white rounded-full" />
+            )}
+            {isMoreActive && (
+              <span className="absolute inset-x-1 inset-y-0 bg-white/20 rounded-xl" />
+            )}
+            <MoreHorizontal className={`w-5 h-5 relative z-10 ${isMoreActive ? 'text-white' : ''}`} />
+            <span className={`text-xs font-medium leading-tight text-center relative z-10 ${isMoreActive ? 'text-white' : 'text-slate-500'}`}>
+              More
+            </span>
+          </button>
         </div>
       </nav>
+
+      {/* ── More menu bottom sheet ─────────────────────────────────────── */}
+      {moreOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm"
+          onClick={() => setMoreOpen(false)}
+        >
+          <div
+            className="absolute bottom-0 inset-x-0 bg-slate-900 rounded-t-3xl border-t border-slate-800"
+            style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Drag handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-slate-700" />
+            </div>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3">
+              <span className="text-base font-semibold text-white">More</span>
+              <button
+                onClick={() => setMoreOpen(false)}
+                className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-white active:bg-white/10 transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Secondary nav grid */}
+            <div className="px-4 pb-2 grid grid-cols-3 gap-3">
+              {secondaryNavItems.map(({ name, icon: Icon, page }) => {
+                const active = isActive(page);
+                return (
+                  <Link
+                    key={page}
+                    to={page}
+                    onClick={() => setMoreOpen(false)}
+                    className={`flex flex-col items-center gap-2 py-4 px-2 rounded-2xl transition-colors ${
+                      active
+                        ? 'bg-white text-slate-900'
+                        : 'bg-slate-800 text-slate-300 active:bg-slate-700'
+                    }`}
+                  >
+                    <Icon className="w-6 h-6" />
+                    <span className="text-xs font-medium text-center">{name}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

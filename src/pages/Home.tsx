@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import SEO from '@/components/SEO';
-import { RefreshCw, Menu, Sparkles, AlertCircle } from 'lucide-react';
+import { RefreshCw, Menu, Sparkles, AlertCircle, X } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -19,6 +19,7 @@ import AdUnit from '@/components/AdUnit';
 import api from '@/api';
 import { sanitizeSearchQuery } from '@/lib/sanitize';
 import { mergeAndRank, getCachedArticles, hasFreshCache } from '@/lib/articleCache';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 const COUNTRY_NAMES: Record<string, string> = {
   // North America
@@ -53,11 +54,49 @@ const COUNTRY_NAMES: Record<string, string> = {
   world: 'World',
 };
 
+const COUNTRY_FLAGS: Record<string, string> = {
+  us: '🇺🇸', ca: '🇨🇦', mx: '🇲🇽', cu: '🇨🇺', jm: '🇯🇲',
+  cr: '🇨🇷', pa: '🇵🇦', do: '🇩🇴', gt: '🇬🇹', hn: '🇭🇳',
+  br: '🇧🇷', ar: '🇦🇷', cl: '🇨🇱', co: '🇨🇴', pe: '🇵🇪',
+  ve: '🇻🇪', ec: '🇪🇨', uy: '🇺🇾', py: '🇵🇾', bo: '🇧🇴',
+  gb: '🇬🇧', de: '🇩🇪', fr: '🇫🇷', it: '🇮🇹', es: '🇪🇸',
+  nl: '🇳🇱', se: '🇸🇪', no: '🇳🇴', pl: '🇵🇱', ch: '🇨🇭',
+  be: '🇧🇪', at: '🇦🇹', ie: '🇮🇪', pt: '🇵🇹', dk: '🇩🇰',
+  fi: '🇫🇮', gr: '🇬🇷', cz: '🇨🇿', ro: '🇷🇴', hu: '🇭🇺',
+  ua: '🇺🇦', rs: '🇷🇸', hr: '🇭🇷', bg: '🇧🇬', sk: '🇸🇰',
+  lt: '🇱🇹', lv: '🇱🇻', ee: '🇪🇪', is: '🇮🇸', lu: '🇱🇺',
+  cn: '🇨🇳', jp: '🇯🇵', in: '🇮🇳', kr: '🇰🇷', sg: '🇸🇬',
+  hk: '🇭🇰', tw: '🇹🇼', id: '🇮🇩', th: '🇹🇭', my: '🇲🇾',
+  ph: '🇵🇭', vn: '🇻🇳', pk: '🇵🇰', bd: '🇧🇩', lk: '🇱🇰',
+  mm: '🇲🇲', kh: '🇰🇭', np: '🇳🇵',
+  il: '🇮🇱', ae: '🇦🇪', sa: '🇸🇦', tr: '🇹🇷', qa: '🇶🇦',
+  kw: '🇰🇼', bh: '🇧🇭', om: '🇴🇲', jo: '🇯🇴', lb: '🇱🇧',
+  iq: '🇮🇶', ir: '🇮🇷',
+  za: '🇿🇦', ng: '🇳🇬', eg: '🇪🇬', ke: '🇰🇪', ma: '🇲🇦',
+  gh: '🇬🇭', et: '🇪🇹', tz: '🇹🇿', ug: '🇺🇬', sn: '🇸🇳',
+  ci: '🇨🇮', cm: '🇨🇲', dz: '🇩🇿', tn: '🇹🇳', rw: '🇷🇼',
+  au: '🇦🇺', nz: '🇳🇿', fj: '🇫🇯', pg: '🇵🇬', world: '🌍',
+};
+
+// Short display names for filter chips (avoid long strings on small screens)
+const SHORT_CATEGORY_NAMES: Record<string, string> = {
+  all: 'All',
+  'health-tech-science': 'Health & Tech',
+  business: 'Business',
+  sports: 'Sports',
+  entertainment: 'Entertainment',
+  politics: 'Politics',
+  world: 'World',
+};
+
 const CATEGORY_NAMES = {
   all: 'All',
-  'health-tech-science': 'Health, Tech and Science', business: 'Business',
-  sports: 'Sports', entertainment: 'Entertainment (Music, film, tv and gaming)',
-  politics: 'Politics', world: 'World'
+  'health-tech-science': 'Health, Tech and Science',
+  business: 'Business',
+  sports: 'Sports',
+  entertainment: 'Entertainment',
+  politics: 'Politics',
+  world: 'World',
 };
 
 // Migrate old subcategories to the new combined categories
@@ -77,7 +116,6 @@ function getStoredList(key: string, fallback: string[]): string[] {
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Apply migrations (e.g. entertainment → gaming, film, tv)
         if (key === 'selectedCategories') {
           const migrated = parsed.flatMap(v => CATEGORY_MIGRATIONS[v] ?? [v]);
           return [...new Set(migrated)];
@@ -92,9 +130,8 @@ function getStoredList(key: string, fallback: string[]): string[] {
 export default function Home() {
   const { isSignedIn } = useUser();
   const [savedKeywords, setSavedKeywords] = useState<string[]>([]);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Fetch saved keywords for autocomplete suggestions in the search box.
-  // This is non-critical — failure is silently ignored.
   useEffect(() => {
     if (!isSignedIn) { setSavedKeywords([]); return; }
     api.getKeywords()
@@ -114,9 +151,6 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState('24h');
   const [articles, setArticles] = useState(() => {
-    // Synchronously hydrate from localStorage cache on first render.
-    // This eliminates the skeleton flash for returning visitors — the first
-    // React paint already has real article data visible.
     if (!hasFreshCache()) return [];
     return getCachedArticles({
       countries: getStoredList('selectedCountries', ['us']),
@@ -127,15 +161,12 @@ export default function Home() {
   const [lowCoverage, setLowCoverage] = useState<{ country: string; category: string; count: number }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  // Stale-while-revalidate: keeps the last successful fetch visible while a new one runs.
-  // Pre-populate to true if we already have cached articles so the loading skeleton is skipped.
   const [hasStaleData, setHasStaleData] = useState(() => hasFreshCache());
   const [digest, setDigest] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [groupBy, setGroupBy] = useState(null);
 
-  // Persist filter selections across refreshes
   useEffect(() => {
     localStorage.setItem('selectedCountries', JSON.stringify(selectedCountries));
   }, [selectedCountries]);
@@ -148,7 +179,6 @@ export default function Home() {
     localStorage.setItem('selectedSources', JSON.stringify(selectedSources));
   }, [selectedSources]);
 
-  // Ref for aborting in-flight requests when filters change
   const abortControllerRef = React.useRef<AbortController | null>(null);
 
   const fetchNews = useCallback(async () => {
@@ -157,7 +187,6 @@ export default function Home() {
       return;
     }
 
-    // Cancel any in-flight request before starting a new one
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -169,9 +198,6 @@ export default function Home() {
     setDigest(null);
 
     try {
-      // For non-English-primary countries, the backend automatically includes
-      // native-language articles alongside English coverage. We signal 'all'
-      // whenever at least one selected country is not English-primary.
       const ENGLISH_PRIMARY = new Set(['us', 'gb', 'au', 'ca', 'nz', 'ie']);
       const language = selectedCountries.every(c => ENGLISH_PRIMARY.has(c)) ? 'en' : 'all';
 
@@ -184,12 +210,10 @@ export default function Home() {
         language,
       });
 
-      // If this request was aborted while in flight, discard the result
       if (controller.signal.aborted) return;
 
       if (result?.articles) {
         const fetchedArticles = result.articles;
-        // Merge fresh articles into cache and get ranked results
         const merged = mergeAndRank(fetchedArticles, {
           countries: selectedCountries,
           categories: selectedCategories,
@@ -202,7 +226,6 @@ export default function Home() {
         setLowCoverage(result.lowCoverage || []);
         setLastUpdated(new Date());
 
-        // Auto-detect grouping (reads groupBy via closure but doesn't depend on it)
         const shouldGroup = selectedCountries.length > 1 || selectedCategories.length > 1;
         setGroupBy(prev => {
           if (shouldGroup && !prev) {
@@ -232,7 +255,6 @@ export default function Home() {
         throw new Error('No articles returned from API');
       }
     } catch (error) {
-      // Don't show errors for intentionally aborted requests
       if (error?.name === 'AbortError' || controller.signal.aborted) return;
       console.error('Failed to fetch news:', error);
       setError({
@@ -241,9 +263,7 @@ export default function Home() {
         retry: true
       });
       toast.error('Unable to fetch news. Please try again.');
-      // Keep stale articles visible — don't wipe the screen on a failed refresh
     } finally {
-      // Only clear loading if this is still the active request
       if (!controller.signal.aborted) {
         setLoading(false);
       }
@@ -258,13 +278,16 @@ export default function Home() {
     return () => clearTimeout(timeoutId);
   }, [fetchNews]);
 
+  // Pull-to-refresh — attached to the scroll container wrapper
+  const { isPulling, pullProgress } = usePullToRefresh(fetchNews, scrollContainerRef);
+
   const hasFilters = selectedCountries.length > 0 && selectedCategories.length > 0;
 
   const dateRangeLabel = useMemo(() => ({
     '24h': 'Last 24 Hours',
     '3d': 'Last 3 Days',
     'week': 'This Week',
-    'month': 'This Month'
+    'month': 'This Month',
   }[dateRange]), [dateRange]);
 
   const itemListSchema = useMemo(() => ({
@@ -291,7 +314,8 @@ export default function Home() {
           <script type="application/ld+json">{JSON.stringify(itemListSchema)}</script>
         </Helmet>
       )}
-      {/* Desktop Sidebar */}
+
+      {/* Desktop Filter Sidebar */}
       <aside className="hidden lg:block w-72 flex-shrink-0 border-r border-stone-200 dark:border-slate-700">
         <FilterSidebar
           selectedCountries={selectedCountries}
@@ -308,14 +332,15 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="flex-1 min-h-0 flex flex-col">
-        {/* Header */}
+
+        {/* ── Page Header ──────────────────────────────────────────────── */}
         <header className="bg-white dark:bg-slate-800 border-b border-stone-200 dark:border-slate-700 px-4 lg:px-8 py-4 flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {/* Mobile Menu */}
+          <div className="flex items-center justify-between gap-3">
+            {/* Left: mobile filter drawer trigger + page title */}
+            <div className="flex items-center gap-3 min-w-0">
               <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="lg:hidden">
+                  <Button variant="ghost" size="icon" className="lg:hidden flex-shrink-0">
                     <Menu className="w-5 h-5" />
                   </Button>
                 </SheetTrigger>
@@ -334,12 +359,12 @@ export default function Home() {
                 </SheetContent>
               </Sheet>
 
-              <div>
-                <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-slate-900 dark:text-slate-200" />
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2 truncate">
+                  <Sparkles className="w-5 h-5 text-slate-900 dark:text-slate-200 flex-shrink-0" />
                   {dateRangeLabel}
                 </h1>
-                <p className="text-sm text-stone-500 dark:text-slate-400 hidden sm:block">
+                <p className="text-xs text-stone-500 dark:text-slate-400 hidden sm:block mt-0.5">
                   {hasFilters
                     ? `${articles.length} articles${searchQuery ? ` matching "${searchQuery}"` : ''}`
                     : 'Select filters to view news'
@@ -348,49 +373,41 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            {/* Right: desktop date range pills + group by + refresh */}
+            <div className="flex items-center gap-2 flex-shrink-0">
               {lastUpdated && (
-                <span className="text-xs text-stone-400 dark:text-slate-500 hidden sm:inline">
+                <span className="text-xs text-stone-400 dark:text-slate-500 hidden md:inline">
                   Updated {lastUpdated.toLocaleTimeString()}
                 </span>
               )}
 
-              {/* Time period pills — matching Keywords page style */}
-              <div className="flex items-center gap-1">
+              {/* Date range — desktop only in the header row */}
+              <div className="hidden lg:flex items-center gap-1">
                 {(['24h', '3d', 'week', 'month'] as const).map(range => (
                   <button
                     key={range}
                     onClick={() => setDateRange(range)}
-                    className={`px-2.5 py-1 text-xs rounded-full font-medium transition-colors ${dateRange === range
+                    className={`px-2.5 py-1.5 text-xs rounded-full font-medium transition-colors ${dateRange === range
                       ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900'
                       : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400 hover:bg-stone-200 dark:hover:bg-slate-600'
-                    }`}
+                      }`}
                   >
-                    {range === '24h' ? '24h'
-                      : range === '3d' ? <><span className="sm:hidden">3d</span><span className="hidden sm:inline">3 days</span></>
-                      : range === 'week' ? <><span className="sm:hidden">1w</span><span className="hidden sm:inline">1 week</span></>
-                      : <><span className="sm:hidden">1m</span><span className="hidden sm:inline">1 month</span></>
-                    }
+                    {range === '24h' ? '24h' : range === '3d' ? '3 days' : range === 'week' ? '1 week' : '1 month'}
                   </button>
                 ))}
               </div>
 
+              {/* Group by — desktop only */}
               {(selectedCountries.length > 1 || selectedCategories.length > 1) && articles.length > 0 && (
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-[10px] text-stone-400 uppercase tracking-wider hidden sm:block">Group by</span>
+                <div className="hidden lg:flex flex-col items-end gap-1">
+                  <span className="text-xs text-stone-400 uppercase tracking-wider">Group by</span>
                   <ToggleGroup type="single" value={groupBy || 'none'} onValueChange={setGroupBy}>
-                    <ToggleGroupItem value="none" aria-label="Flat list — all articles in one stream" title="Flat list — all articles in one stream" className="text-xs">
-                      Flat list
-                    </ToggleGroupItem>
+                    <ToggleGroupItem value="none" className="text-xs">Flat</ToggleGroupItem>
                     {selectedCountries.length > 1 && (
-                      <ToggleGroupItem value="country" aria-label="Group articles by country" title="Group articles by country" className="text-xs">
-                        Country
-                      </ToggleGroupItem>
+                      <ToggleGroupItem value="country" className="text-xs">Country</ToggleGroupItem>
                     )}
                     {selectedCategories.length > 1 && (
-                      <ToggleGroupItem value="category" aria-label="Group articles by category" title="Group articles by category" className="text-xs">
-                        Category
-                      </ToggleGroupItem>
+                      <ToggleGroupItem value="category" className="text-xs">Category</ToggleGroupItem>
                     )}
                   </ToggleGroup>
                 </div>
@@ -410,9 +427,67 @@ export default function Home() {
           </div>
         </header>
 
-        {/* Error Display */}
+        {/* ── Mobile sub-bar: date range + group by (lg: hidden) ─────── */}
+        <div className="lg:hidden bg-white dark:bg-slate-800 border-b border-stone-100 dark:border-slate-700/60 px-4 py-2 flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1.5 flex-1">
+            {(['24h', '3d', 'week', 'month'] as const).map(range => (
+              <button
+                key={range}
+                onClick={() => setDateRange(range)}
+                className={`flex-1 py-1.5 text-xs rounded-full font-medium transition-colors text-center ${dateRange === range
+                  ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900'
+                  : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-400'
+                  }`}
+              >
+                {range === '24h' ? '24h' : range === '3d' ? '3d' : range === 'week' ? '1w' : '1m'}
+              </button>
+            ))}
+          </div>
+
+          {/* Mobile group by */}
+          {(selectedCountries.length > 1 || selectedCategories.length > 1) && articles.length > 0 && (
+            <ToggleGroup type="single" value={groupBy || 'none'} onValueChange={setGroupBy} className="ml-2">
+              <ToggleGroupItem value="none" aria-label="Flat list" title="Flat list" className="text-xs px-2">Flat</ToggleGroupItem>
+              {selectedCountries.length > 1 && (
+                <ToggleGroupItem value="country" aria-label="Group by country" title="Group by country" className="text-xs px-2">Country</ToggleGroupItem>
+              )}
+              {selectedCategories.length > 1 && (
+                <ToggleGroupItem value="category" aria-label="Group by category" title="Group by category" className="text-xs px-2">Category</ToggleGroupItem>
+              )}
+            </ToggleGroup>
+          )}
+        </div>
+
+        {/* ── Mobile filter chips (active filters as removable pills) ── */}
+        {(selectedCountries.length > 0 || selectedCategories.length > 0) && (
+          <div className="lg:hidden flex items-center gap-2 px-4 py-2 bg-stone-50 dark:bg-slate-900 border-b border-stone-100 dark:border-slate-700/60 overflow-x-auto scrollbar-none flex-shrink-0">
+            {selectedCountries.map(code => (
+              <button
+                key={code}
+                onClick={() => setSelectedCountries(prev => prev.filter(c => c !== code))}
+                className="flex-shrink-0 flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-full bg-slate-900 dark:bg-slate-700 text-white text-xs font-medium"
+              >
+                <span>{COUNTRY_FLAGS[code] || '🌍'}</span>
+                <span className="max-w-[80px] truncate">{code.toUpperCase()}</span>
+                <X className="w-3 h-3 opacity-60 ml-0.5" />
+              </button>
+            ))}
+            {selectedCategories.filter(c => c !== 'all').map(cat => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategories(prev => prev.filter(c => c !== cat))}
+                className="flex-shrink-0 flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-stone-200 dark:bg-slate-700 text-stone-700 dark:text-slate-300 text-xs font-medium"
+              >
+                <span className="max-w-[90px] truncate">{SHORT_CATEGORY_NAMES[cat] || cat}</span>
+                <X className="w-3 h-3 opacity-60 ml-0.5" />
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ── Error banner ─────────────────────────────────────────────── */}
         {error && (
-          <div className="bg-red-50 border-b border-red-200 px-4 lg:px-8 py-3">
+          <div className="bg-red-50 border-b border-red-200 px-4 lg:px-8 py-3 flex-shrink-0">
             <div className="flex items-center gap-3">
               <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
               <div className="flex-1">
@@ -428,65 +503,81 @@ export default function Home() {
           </div>
         )}
 
-        {/* Content Area */}
-        <ScrollArea className="flex-1">
-          <div className="p-4 lg:p-8">
-            {loading && !hasStaleData ? (
-              // First-ever load — no previous data to show, render skeletons
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <LoadingCard key={i} index={i} />
-                ))}
-              </div>
-            ) : articles.length > 0 ? (
-              <div>
-                {loading && (
-                  <div className="flex items-center gap-2 text-xs text-stone-400 dark:text-slate-500 mb-4">
-                    <RefreshCw className="w-3 h-3 animate-spin" />
-                    <span>Refreshing…</span>
-                  </div>
-                )}
-                <TrendingSummary
-                  digest={digest}
-                  dateRange={dateRange}
-                  selectedCountries={selectedCountries}
-                  selectedCategories={selectedCategories}
+        {/* ── Scroll container with pull-to-refresh ────────────────────── */}
+        <div ref={scrollContainerRef} className="flex-1 min-h-0 relative">
+          {/* Pull-to-refresh indicator */}
+          {isPulling && (
+            <div
+              className="absolute top-0 inset-x-0 flex items-center justify-center z-10 pointer-events-none"
+              style={{ height: `${48 * pullProgress}px`, overflow: 'hidden' }}
+            >
+              <div className="flex items-center gap-2 text-xs text-stone-500 dark:text-slate-400">
+                <RefreshCw
+                  className="w-4 h-4 transition-transform"
+                  style={{ transform: `rotate(${pullProgress * 360}deg)` }}
                 />
-                {groupBy && groupBy !== 'none' ? (
-                  <GroupedArticles
-                    articles={articles}
-                    groupBy={groupBy}
-                    selectedKeys={groupBy === 'country' ? selectedCountries : selectedCategories}
-                  />
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {articles.map((article, index) => (
-                      <React.Fragment key={index}>
-                        <NewsCard article={article} index={index} rank={index + 1} isPriority={index < 3} />
-                        {/* Ad after every 6th article */}
-                        {(index + 1) % 6 === 0 && (
-                          <div className="col-span-full">
-                            <AdUnit
-                              slot="2844757664"
-                              format="horizontal"
-                              className="rounded-xl overflow-hidden bg-stone-100 dark:bg-slate-800 min-h-[90px]"
-                            />
-                          </div>
-                        )}
-                      </React.Fragment>
-                    ))}
-                    {/* Low coverage notification — shown after articles */}
-                    {lowCoverage.length > 0 && (
-                      <LowCoverageTile items={lowCoverage} index={articles.length} />
-                    )}
-                  </div>
-                )}
+                <span>{pullProgress >= 1 ? 'Release to refresh' : 'Pull to refresh'}</span>
               </div>
-            ) : (
-              <EmptyState hasFilters={hasFilters} />
-            )}
-          </div>
-        </ScrollArea>
+            </div>
+          )}
+
+          <ScrollArea className="h-full">
+            <div className="p-4 lg:p-8">
+              {loading && !hasStaleData ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {[...Array(6)].map((_, i) => (
+                    <LoadingCard key={i} index={i} />
+                  ))}
+                </div>
+              ) : articles.length > 0 ? (
+                <div>
+                  {loading && (
+                    <div className="flex items-center gap-2 text-xs text-stone-400 dark:text-slate-500 mb-4">
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      <span>Refreshing…</span>
+                    </div>
+                  )}
+                  <TrendingSummary
+                    digest={digest}
+                    dateRange={dateRange}
+                    selectedCountries={selectedCountries}
+                    selectedCategories={selectedCategories}
+                  />
+                  {groupBy && groupBy !== 'none' ? (
+                    <GroupedArticles
+                      articles={articles}
+                      groupBy={groupBy}
+                      selectedKeys={groupBy === 'country' ? selectedCountries : selectedCategories}
+                    />
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                      {articles.map((article, index) => (
+                        <React.Fragment key={index}>
+                          <NewsCard article={article} index={index} rank={index + 1} isPriority={index < 3} />
+                          {(index + 1) % 6 === 0 && (
+                            <div className="col-span-full">
+                              <AdUnit
+                                slot="2844757664"
+                                format="horizontal"
+                                className="rounded-xl overflow-hidden bg-stone-100 dark:bg-slate-800 min-h-[90px]"
+                              />
+                            </div>
+                          )}
+                        </React.Fragment>
+                      ))}
+                      {lowCoverage.length > 0 && (
+                        <LowCoverageTile items={lowCoverage} index={articles.length} />
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <EmptyState hasFilters={hasFilters} />
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+
       </main>
     </div>
   );

@@ -61,6 +61,9 @@ const CATEGORY_COLORS = {
   world: 'bg-cyan-500/10 text-cyan-600 border-cyan-200 dark:text-cyan-400 dark:border-cyan-700',
 };
 
+// True when the browser/webview supports the Web Share API (always true in native wrappers)
+const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+
 export default function NewsCard({ article, index, rank, isPriority = false }) {
   const [isSaved, setIsSaved] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -108,9 +111,6 @@ export default function NewsCard({ article, index, rank, isPriority = false }) {
   };
 
   const handleArticleClick = async () => {
-    // Only record when the Supabase connection is ready — if we're still
-    // initialising, api.addToHistory() would silently fall back to localStorage
-    // and the data would never appear on the Supabase-backed History page.
     if (!isSignedIn || !apiReady) return;
     try {
       await api.addToHistory({
@@ -137,7 +137,6 @@ export default function NewsCard({ article, index, rank, isPriority = false }) {
     setIsReacting(true);
     try {
       if (reaction === r) {
-        // Clicking the active reaction removes it
         await api.removeReaction(article.url);
         setReaction(null);
       } else {
@@ -162,17 +161,33 @@ export default function NewsCard({ article, index, rank, isPriority = false }) {
     }
   };
 
-  const handleShare = (platform) => {
+  // Uses the OS native share sheet when available (mobile browsers & native app wrappers),
+  // falls back to individual platform options on desktop web.
+  const handleShare = async (platform?: string) => {
     const safeUrl = getSafeArticleUrl();
     if (!safeUrl) {
       toast.error('Cannot share: invalid article URL');
       return;
     }
 
+    if (!platform && canNativeShare) {
+      try {
+        await navigator.share({
+          title: article.title,
+          text: article.summary_points?.[0] ?? article.title,
+          url: safeUrl,
+        });
+        return;
+      } catch (err) {
+        // User dismissed the share sheet — treat as a no-op
+        if ((err as Error).name === 'AbortError') return;
+        // For any other error, fall through to copy-link fallback
+      }
+    }
+
     const url = encodeURIComponent(safeUrl);
     const text = encodeURIComponent(article.title);
-
-    const shareUrls = {
+    const shareUrls: Record<string, string> = {
       twitter: `https://twitter.com/intent/tweet?text=${text}&url=${url}`,
       facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}`,
       linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${url}`,
@@ -181,7 +196,7 @@ export default function NewsCard({ article, index, rank, isPriority = false }) {
     if (platform === 'copy') {
       navigator.clipboard.writeText(safeUrl);
       toast.success('Link copied to clipboard!');
-    } else if (platform in shareUrls) {
+    } else if (platform && platform in shareUrls) {
       window.open(shareUrls[platform], '_blank', 'width=600,height=400,noopener,noreferrer');
     }
   };
@@ -203,59 +218,13 @@ export default function NewsCard({ article, index, rank, isPriority = false }) {
   return (
     <article
       style={{ animationDelay: `${Math.min(index, 5) * 50}ms` }}
-      className="news-card-enter group bg-white dark:bg-slate-800 rounded-2xl border border-stone-200 dark:border-slate-700 overflow-hidden hover:shadow-xl hover:shadow-stone-200/50 dark:hover:shadow-slate-900/50 transition-[box-shadow,transform] duration-500 hover:-translate-y-1 relative"
+      className="news-card-enter group bg-white dark:bg-slate-800 rounded-2xl border border-stone-200 dark:border-slate-700 overflow-hidden transition-[box-shadow] duration-300 hover:shadow-xl hover:shadow-stone-200/50 dark:hover:shadow-slate-900/50 active:scale-[0.98] active:shadow-md relative"
     >
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(newsArticleSchema) }} />
+
       {/* Ranking Badge */}
       <div className="absolute top-4 left-4 z-10 w-10 h-10 bg-slate-900 text-white rounded-full flex items-center justify-center font-bold text-lg shadow-lg">
         {rank}
-      </div>
-      
-      {/* Action Buttons */}
-      <div className="absolute top-4 right-4 z-10 flex gap-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              size="icon"
-              variant="secondary"
-              className="bg-white hover:bg-slate-50 rounded-full shadow-lg"
-            >
-              <Share2 className="w-4 h-4 text-slate-900" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => handleShare('twitter')}>
-              <Twitter className="w-4 h-4 mr-2" />
-              Share on Twitter
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleShare('facebook')}>
-              <Facebook className="w-4 h-4 mr-2" />
-              Share on Facebook
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleShare('linkedin')}>
-              <Linkedin className="w-4 h-4 mr-2" />
-              Share on LinkedIn
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleShare('copy')}>
-              <Link2 className="w-4 h-4 mr-2" />
-              Copy Link
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        
-        <Button
-          size="icon"
-          variant="secondary"
-          className="bg-white hover:bg-slate-50 rounded-full shadow-lg"
-          onClick={handleSave}
-          disabled={isSaving}
-        >
-          {isSaved ? (
-            <BookmarkCheck className="w-5 h-5 text-slate-900" />
-          ) : (
-            <Bookmark className="w-5 h-5 text-slate-900" />
-          )}
-        </Button>
       </div>
 
       {/* Image */}
@@ -266,8 +235,8 @@ export default function NewsCard({ article, index, rank, isPriority = false }) {
             alt={article.title}
             loading={isPriority ? 'eager' : 'lazy'}
             fetchPriority={isPriority ? 'high' : 'auto'}
-            className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-700 ${
-              imageLoaded || isPriority ? '' : 'blur-sm scale-105'
+            className={`w-full h-full object-cover transition-opacity duration-700 ${
+              imageLoaded || isPriority ? 'opacity-100' : 'opacity-0'
             }`}
             onLoad={() => setImageLoaded(true)}
             onError={() => setImageError(true)}
@@ -284,7 +253,7 @@ export default function NewsCard({ article, index, rank, isPriority = false }) {
           </Badge>
           {article.language && article.language !== 'en' && (
             <span
-              className="text-[10px] font-semibold px-1.5 py-0.5 rounded border bg-amber-50 border-amber-200 text-amber-700 uppercase tracking-wide"
+              className="text-xs font-semibold px-1.5 py-0.5 rounded border bg-amber-50 border-amber-200 text-amber-700 uppercase tracking-wide"
               title={`Article in ${article.language.toUpperCase()}`}
             >
               {article.language.toUpperCase()}
@@ -309,7 +278,7 @@ export default function NewsCard({ article, index, rank, isPriority = false }) {
         </h3>
 
         {/* Source */}
-        <p className="text-xs text-stone-400 dark:text-slate-500 mb-4 uppercase tracking-wide">
+        <p className="text-xs text-stone-400 dark:text-slate-500 mb-4 font-medium uppercase tracking-wide">
           {article.source}
         </p>
 
@@ -337,46 +306,102 @@ export default function NewsCard({ article, index, rank, isPriority = false }) {
           </div>
         )}
 
-        {/* Read More */}
-        <a
-          href={getSafeArticleUrl() ?? '#'}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={handleArticleClick}
-          className="inline-flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-200 hover:text-slate-700 dark:hover:text-slate-400 transition-colors group/link"
-        >
-          Read full article
-          <ExternalLink className="w-3.5 h-3.5 group-hover/link:translate-x-0.5 transition-transform" />
-        </a>
+        {/* Card footer — Read More + actions row */}
+        <div className="flex items-center gap-2 pt-3 border-t border-stone-100 dark:border-slate-700">
+          {/* Read full article link */}
+          <a
+            href={getSafeArticleUrl() ?? '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={handleArticleClick}
+            className="flex-1 inline-flex items-center gap-1.5 text-sm font-medium text-slate-900 dark:text-slate-200 hover:text-slate-700 dark:hover:text-slate-400 transition-colors group/link"
+          >
+            Read full article
+            <ExternalLink className="w-3.5 h-3.5 group-hover/link:translate-x-0.5 transition-transform" />
+          </a>
 
-        {/* Reaction row — influences the For You feed */}
-        <div className="flex items-center gap-2 mt-4 pt-3 border-t border-stone-100 dark:border-slate-700">
-          <span className="text-xs text-stone-400 dark:text-slate-500 flex-1">Relevant to you?</span>
+          {/* Reaction buttons — min 44px touch target */}
           <button
             onClick={(e) => handleReaction(e, 'up')}
             disabled={isReacting}
             title="Relevant — show me more like this"
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            className={`flex items-center justify-center min-w-[44px] min-h-[44px] px-3 rounded-xl text-sm font-medium transition-all ${
               reaction === 'up'
                 ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
-                : 'text-stone-400 dark:text-slate-500 hover:bg-stone-100 dark:hover:bg-slate-700 hover:text-stone-700 dark:hover:text-slate-300 border border-transparent'
+                : 'text-stone-400 dark:text-slate-500 hover:bg-stone-100 dark:hover:bg-slate-700 hover:text-stone-700 dark:hover:text-slate-300 border border-transparent active:bg-stone-200 dark:active:bg-slate-600'
             }`}
           >
-            <ThumbsUp className="w-3.5 h-3.5" />
-            {reaction === 'up' && <span>Yes</span>}
+            <ThumbsUp className="w-4 h-4" />
           </button>
           <button
             onClick={(e) => handleReaction(e, 'down')}
             disabled={isReacting}
             title="Not relevant — show me less like this"
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            className={`flex items-center justify-center min-w-[44px] min-h-[44px] px-3 rounded-xl text-sm font-medium transition-all ${
               reaction === 'down'
                 ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800'
-                : 'text-stone-400 dark:text-slate-500 hover:bg-stone-100 dark:hover:bg-slate-700 hover:text-stone-700 dark:hover:text-slate-300 border border-transparent'
+                : 'text-stone-400 dark:text-slate-500 hover:bg-stone-100 dark:hover:bg-slate-700 hover:text-stone-700 dark:hover:text-slate-300 border border-transparent active:bg-stone-200 dark:active:bg-slate-600'
             }`}
           >
-            <ThumbsDown className="w-3.5 h-3.5" />
-            {reaction === 'down' && <span>No</span>}
+            <ThumbsDown className="w-4 h-4" />
+          </button>
+
+          {/* Share — native share sheet on mobile, dropdown on desktop */}
+          {canNativeShare ? (
+            <button
+              onClick={() => handleShare()}
+              className="flex items-center justify-center min-w-[44px] min-h-[44px] px-3 rounded-xl text-stone-400 dark:text-slate-500 hover:bg-stone-100 dark:hover:bg-slate-700 hover:text-stone-700 dark:hover:text-slate-300 border border-transparent active:bg-stone-200 dark:active:bg-slate-600 transition-all"
+              title="Share"
+            >
+              <Share2 className="w-4 h-4" />
+            </button>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="flex items-center justify-center min-w-[44px] min-h-[44px] px-3 rounded-xl text-stone-400 dark:text-slate-500 hover:bg-stone-100 dark:hover:bg-slate-700 hover:text-stone-700 dark:hover:text-slate-300 border border-transparent active:bg-stone-200 dark:active:bg-slate-600 transition-all"
+                  title="Share"
+                >
+                  <Share2 className="w-4 h-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleShare('twitter')}>
+                  <Twitter className="w-4 h-4 mr-2" />
+                  Share on Twitter
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleShare('facebook')}>
+                  <Facebook className="w-4 h-4 mr-2" />
+                  Share on Facebook
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleShare('linkedin')}>
+                  <Linkedin className="w-4 h-4 mr-2" />
+                  Share on LinkedIn
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleShare('copy')}>
+                  <Link2 className="w-4 h-4 mr-2" />
+                  Copy Link
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          {/* Save */}
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            title={isSaved ? 'Unsave article' : 'Save article'}
+            className={`flex items-center justify-center min-w-[44px] min-h-[44px] px-3 rounded-xl transition-all border ${
+              isSaved
+                ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white border-slate-300 dark:border-slate-600'
+                : 'text-stone-400 dark:text-slate-500 border-transparent hover:bg-stone-100 dark:hover:bg-slate-700 hover:text-stone-700 dark:hover:text-slate-300 active:bg-stone-200 dark:active:bg-slate-600'
+            }`}
+          >
+            {isSaved ? (
+              <BookmarkCheck className="w-4 h-4" />
+            ) : (
+              <Bookmark className="w-4 h-4" />
+            )}
           </button>
         </div>
       </div>
