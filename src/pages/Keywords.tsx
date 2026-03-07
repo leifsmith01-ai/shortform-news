@@ -1123,9 +1123,9 @@ export default function Keywords() {
                                   <div className="h-3 w-4/5 skeleton-shimmer rounded" />
                                   <div className="h-3 w-3/5 skeleton-shimmer rounded" />
                                 </div>
-                              ) : sentimentData && sentimentData.redditCount > 0 ? (
+                              ) : sentimentData && (sentimentData.socialCount > 0 || sentimentData.redditCount > 0) ? (
                                 <>
-                                  <div className="flex items-center gap-3 mb-4">
+                                  <div className="flex items-center gap-3 mb-3 flex-wrap">
                                     <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
                                       sentimentData.socialSentiment === 'positive' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
                                       sentimentData.socialSentiment === 'negative' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
@@ -1137,9 +1137,18 @@ export default function Keywords() {
                                         : 'Mixed'}
                                     </span>
                                     <span className="text-[10px] text-stone-400 dark:text-slate-500">
-                                      {sentimentData.redditCount} Reddit post{sentimentData.redditCount !== 1 ? 's' : ''} · last {timeframeToDays(timeframe)}d
+                                      {(sentimentData.socialCount ?? sentimentData.redditCount)} post{(sentimentData.socialCount ?? sentimentData.redditCount) !== 1 ? 's' : ''} · last {timeframeToDays(timeframe)}d
                                     </span>
                                   </div>
+                                  {sentimentData.socialSources && Object.keys(sentimentData.socialSources).length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mb-3">
+                                      {Object.entries(sentimentData.socialSources).map(([platform, count]) => (
+                                        <span key={platform} className="text-[10px] px-1.5 py-0.5 rounded bg-stone-100 dark:bg-slate-700 text-stone-500 dark:text-slate-400">
+                                          {platform.charAt(0).toUpperCase() + platform.slice(1)} {count}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
                                   {Array.isArray(sentimentData.socialSummary) ? (
                                     <ul className="space-y-2.5">
                                       {sentimentData.socialSummary.map((item, i) => {
@@ -1169,7 +1178,7 @@ export default function Keywords() {
                                     {sentimentError ? 'Analysis unavailable' : 'No social posts found'}
                                   </p>
                                   <p className="text-[11px] text-stone-400 dark:text-slate-500 mt-1 max-w-[200px]">
-                                    {sentimentError ?? `No Reddit activity found for this keyword in the last ${timeframeToDays(timeframe)} days.`}
+                                    {sentimentError ?? `No social activity found for this keyword in the last ${timeframeToDays(timeframe)} days.`}
                                   </p>
                                 </div>
                               )}

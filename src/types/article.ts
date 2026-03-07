@@ -87,6 +87,8 @@ export interface KeywordSentimentData {
   geographicSpread: { country: string; count: number }[]
   newsCount: number
   redditCount: number
+  socialCount: number
+  socialSources: { reddit?: number; bluesky?: number; mastodon?: number; youtube?: number; twitter?: number }
   cached?: boolean
 }
 
