@@ -1163,6 +1163,40 @@ export default function Keywords() {
                                       {sentimentData.socialSummary ?? sentimentData.summary}
                                     </p>
                                   )}
+
+                                  {/* Top Reddit discussions */}
+                                  {Array.isArray(sentimentData.topPosts) && sentimentData.topPosts.length > 0 && (
+                                    <div className="mt-4 space-y-3">
+                                      <p className="text-[10px] font-medium uppercase tracking-wide text-stone-400 dark:text-slate-500">
+                                        Top Discussions
+                                      </p>
+                                      {sentimentData.topPosts.map((post, i) => (
+                                        <div key={i} className="rounded-lg bg-stone-50 dark:bg-slate-700/50 border border-stone-100 dark:border-slate-600 p-3">
+                                          <a
+                                            href={post.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs font-medium text-stone-800 dark:text-slate-100 hover:text-purple-600 dark:hover:text-purple-400 leading-snug line-clamp-2"
+                                          >
+                                            {post.title}
+                                          </a>
+                                          <p className="mt-1 text-[10px] text-stone-400 dark:text-slate-500">
+                                            {post.subreddit} · ↑{post.score.toLocaleString()} · {post.numComments} comments
+                                          </p>
+                                          {post.topComment && (
+                                            <blockquote className="mt-2 pl-2.5 border-l-2 border-purple-300 dark:border-purple-600">
+                                              <p className="text-[11px] text-stone-600 dark:text-slate-300 leading-relaxed line-clamp-3 italic">
+                                                "{post.topComment.body}"
+                                              </p>
+                                              <p className="mt-0.5 text-[10px] text-stone-400 dark:text-slate-500">
+                                                u/{post.topComment.author} · ↑{post.topComment.score}
+                                              </p>
+                                            </blockquote>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
                                 </>
                               ) : (
                                 <div className="flex-1 flex flex-col items-center justify-center py-6 text-center">

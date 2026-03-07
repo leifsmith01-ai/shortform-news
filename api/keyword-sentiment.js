@@ -384,6 +384,31 @@ async function fetchRedditPosts(keyword) {
   }
 }
 
+async function fetchTopCommentForPost(permalink) {
+  try {
+    const url = `https://www.reddit.com${permalink}.json?limit=5&sort=top`;
+    const res = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': 'shortform-news/1.0 (sentiment analysis)' }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    // data[0] = post listing, data[1] = comments listing
+    const comments = data?.[1]?.data?.children ?? [];
+    const top = comments
+      .map(c => c.data)
+      .filter(c => c?.body && c.body !== '[deleted]' && c.body !== '[removed]')
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
+    if (!top) return null;
+    return {
+      body: top.body.slice(0, 300),
+      score: top.score ?? 0,
+      author: top.author ?? 'unknown',
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
@@ -441,6 +466,22 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: 'No content found for this keyword' });
   }
 
+  // Build top posts with their most upvoted comment for display in the UI
+  const topPostSources = [...redditPosts]
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+    .slice(0, 3);
+  const topComments = await Promise.all(
+    topPostSources.map(p => p.permalink ? fetchTopCommentForPost(p.permalink) : Promise.resolve(null))
+  );
+  const topPosts = topPostSources.map((p, i) => ({
+    title: p.title ?? '',
+    subreddit: p.subreddit_name_prefixed ?? `r/${p.subreddit ?? ''}`,
+    score: p.score ?? 0,
+    numComments: p.num_comments ?? 0,
+    url: `https://www.reddit.com${p.permalink}`,
+    topComment: topComments[i],
+  }));
+
   const newsTitles = newsArticles.map(a => a.title).filter(Boolean);
   const redditTitles = redditPosts.map(p => p.title).filter(Boolean);
 
@@ -455,6 +496,7 @@ export default async function handler(req, res) {
     ...result,
     newsCount: newsArticles.length,
     redditCount: redditPosts.length,
+    topPosts,
     outletTiers: computeOutletTiers(newsArticles),
     geographicSpread: computeGeographicSpread(newsArticles),
   };
